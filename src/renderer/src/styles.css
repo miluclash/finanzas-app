@@ -1,0 +1,163 @@
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens: papel frío + tinta azul de cheque. Los importes son los protagonistas. */
+:root {
+  color-scheme: light;
+  --paper: #f3f5f4;
+  --surface: #ffffff;
+  --surface-2: #f8f9f8;
+  --ink: #1a2027;
+  --ink-2: #4a535e;
+  --muted: #6b7581;
+  --line: #dde2e3;
+  --line-strong: #c4cbcf;
+  --accent: #1c5cab;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6eef8;
+  --pos: #1b7340;
+  --neg: #b23a31;
+  --warn: #8a5a00;
+  --warn-soft: #fdf3dc;
+  --neg-soft: #fbe9e7;
+  --pos-soft: #e5f4ea;
+  --focus: #2a78d6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --grid: #e6eaeb;
+}
+
+.dark {
+  color-scheme: dark;
+  --paper: #11151a;
+  --surface: #171c22;
+  --surface-2: #1c222a;
+  --ink: #e6e9ec;
+  --ink-2: #b9c1ca;
+  --muted: #8f99a4;
+  --line: #29313a;
+  --line-strong: #3a444f;
+  --accent: #6da7ec;
+  --accent-ink: #0b1a2c;
+  --accent-soft: #1b2a3b;
+  --pos: #6cc18e;
+  --neg: #ec8a80;
+  --warn: #e3b25a;
+  --warn-soft: #2e2615;
+  --neg-soft: #33201e;
+  --pos-soft: #17291f;
+  --focus: #6da7ec;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --grid: #252c34;
+}
+
+@theme inline {
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-neg-soft: var(--neg-soft);
+  --color-pos-soft: var(--pos-soft);
+}
+
+@layer base {
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cifras alineadas en columnas */
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+  cursor: pointer;
+}
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 8px;
+  border: 2px solid var(--paper);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+dialog::backdrop {
+  background: rgb(10 14 20 / 0.45);
+}
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.recharts-cartesian-axis-tick text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+.recharts-cartesian-grid line {
+  stroke: var(--grid);
+}
+.recharts-tooltip-cursor {
+  fill: var(--surface-2);
+}

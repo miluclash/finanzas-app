@@ -23,6 +23,7 @@ const pctFormatter = new Intl.NumberFormat('es-ES', {
 /** 12345 -> "123,45 €" */
 export function formatEur(cents: number | null | undefined, opts: { sign?: boolean } = {}): string {
   if (cents === null || cents === undefined || Number.isNaN(cents)) return '—'
+  if (Object.is(cents, -0)) cents = 0
   const s = eurFormatter.format(cents / 100)
   if (opts.sign && cents > 0) return '+' + s
   return s
@@ -30,7 +31,7 @@ export function formatEur(cents: number | null | undefined, opts: { sign?: boole
 
 /** 12345 -> "123,45" (sin símbolo) */
 export function formatNumber(cents: number): string {
-  return numFormatter.format(cents / 100)
+  return numFormatter.format((cents || 0) / 100)
 }
 
 /** 0.1234 -> "12,3 %" */
