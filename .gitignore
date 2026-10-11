@@ -13,3 +13,4 @@ private/
 FINANCIAL_MASTER*.xlsx
 backups/
 test-output/
+*.tsbuildinfo
