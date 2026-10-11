@@ -46,6 +46,11 @@ type Tab = 'resumen' | 'ops' | 'precios' | 'activos'
 
 const nf = (v: string | null, max = 6) =>
   v === null ? '—' : new Intl.NumberFormat('es-ES', { maximumFractionDigits: max, useGrouping: 'always' } as Intl.NumberFormatOptions).format(Number(v))
+/** Precio por unidad: mínimo 2 decimales, máximo 4. */
+const pf = (v: string | null) =>
+  v === null
+    ? '—'
+    : `${new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4, useGrouping: 'always' } as Intl.NumberFormatOptions).format(Number(v))} €`
 
 export function InvestmentsPage() {
   const [tab, setTab] = useState<Tab>('resumen')
@@ -125,7 +130,7 @@ function Overview({ onNewOp }: { onNewOp: (d: Partial<InvestmentOp>) => void }) 
       )
     },
     { key: 'units', header: 'Unidades', align: 'right', sort: (h) => Number(h.units), cell: (h) => <span className="num">{nf(h.units)}</span> },
-    { key: 'avg', header: 'Precio medio', align: 'right', cell: (h) => <span className="num">{h.avgCost ? `${nf(h.avgCost, 4)} €` : '—'}</span> },
+    { key: 'avg', header: 'Precio medio', align: 'right', cell: (h) => <span className="num">{pf(h.avgCost)}</span> },
     { key: 'cost', header: 'Coste', align: 'right', sort: (h) => h.costBasisCents, cell: (h) => <span className="num">{formatEur(h.costBasisCents)}</span> },
     {
       key: 'price',
@@ -133,7 +138,7 @@ function Overview({ onNewOp }: { onNewOp: (d: Partial<InvestmentOp>) => void }) 
       align: 'right',
       cell: (h) => (
         <div>
-          <span className="num">{h.lastPrice ? `${nf(h.lastPrice, 4)} €` : '—'}</span>
+          <span className="num">{pf(h.lastPrice)}</span>
           <div className="text-[12px] text-muted">
             {h.priceSource === 'MANUAL' ? formatDate(h.lastPriceDate) : h.priceSource === 'OPERATION' ? `de operación ${formatDate(h.lastPriceDate)}` : 'sin precio'}
           </div>
@@ -312,7 +317,7 @@ function OpsView({ onEdit }: { onEdit: (op: InvestmentOp) => void }) {
     { key: 'type', header: 'Tipo', sort: (o) => o.type, cell: (o) => <Badge tone={o.type === 'SELL' ? 'warn' : o.type === 'BUY' ? 'accent' : 'neutral'}>{OP_TYPE_LABEL[o.type]}</Badge> },
     { key: 'inst', header: 'Activo', sort: (o) => maps.instrument.get(o.instrumentId ?? '')?.name ?? '', cell: (o) => (o.instrumentId ? maps.instrument.get(o.instrumentId)?.name : <span className="text-muted">Cuenta</span>) },
     { key: 'qty', header: 'Unidades', align: 'right', cell: (o) => <span className="num">{o.type === 'SPLIT' ? `× ${nf(o.splitRatio)}` : nf(o.quantity)}</span> },
-    { key: 'price', header: 'Precio', align: 'right', cell: (o) => <span className="num">{o.price ? `${nf(o.price, 4)} €` : '—'}</span> },
+    { key: 'price', header: 'Precio', align: 'right', cell: (o) => <span className="num">{pf(o.price)}</span> },
     {
       key: 'amount',
       header: 'Importe',
@@ -531,7 +536,7 @@ function PricesView() {
         columns={[
           { key: 'date', header: 'Fecha', cell: (p) => <span className="num">{formatDate(p.date)}</span> },
           { key: 'inst', header: 'Activo', cell: (p) => maps.instrument.get(p.instrumentId)?.name ?? p.instrumentId },
-          { key: 'price', header: 'Precio', align: 'right', cell: (p) => <span className="num">{nf(p.price, 6)} €</span> },
+          { key: 'price', header: 'Precio', align: 'right', cell: (p) => <span className="num">{pf(p.price)}</span> },
           { key: 'notes', header: 'Nota', cell: (p) => <span className="text-muted">{p.notes}</span> },
           {
             key: 'del',

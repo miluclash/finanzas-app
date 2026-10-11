@@ -48,7 +48,7 @@ export function computeAlerts(ctx: Ctx): Alert[] {
   const pending = ctx.transactions.filter((t) => t.status === 'PENDING_REVIEW').length
   if (pending) alerts.push({ level: 'warn', text: `${pending} movimiento(s) pendientes de revisar.`, link: '/movimientos?vista=revision' })
   let withErrors = 0
-  for (const t of ctx.transactions) if (transactionIssues(ctx, t).errors.length) withErrors++
+  for (const t of ctx.transactions) if (!t.investmentOpId && transactionIssues(ctx, t).errors.length) withErrors++
   if (withErrors) alerts.push({ level: 'error', text: `${withErrors} movimiento(s) con datos incorrectos.`, link: '/movimientos?vista=revision' })
   const dups = allDuplicatePairs(ctx).length
   if (dups) alerts.push({ level: 'warn', text: `${dups} posible(s) duplicado(s) por revisar.`, link: '/movimientos?vista=revision' })

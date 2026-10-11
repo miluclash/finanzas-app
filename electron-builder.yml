@@ -1,0 +1,31 @@
+appId: com.miluclash.finanzas
+productName: Finanzas
+copyright: Uso personal
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  artifactName: Finanzas-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Finanzas
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+linux:
+  target: [dir]
+  icon: resources/icon.png

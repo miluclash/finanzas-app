@@ -108,7 +108,7 @@ export function findDuplicates(ctx: Ctx, d: TxDraft): DuplicateMatch[] {
     if (t.accountId !== d.accountId || t.amountCents !== d.amountCents) continue
     if (Math.abs(diffDays(t.date, d.date)) > w) continue
     if (d.transferId && t.transferId === d.transferId) continue
-    if (d.linkedTxId === t.id || t.linkedTxId === d.id) continue
+    if ((d.linkedTxId && d.linkedTxId === t.id) || (d.id && t.linkedTxId === d.id)) continue
     if (d.id && (dismissed.has(`${d.id}|${t.id}`) || dismissed.has(`${t.id}|${d.id}`))) continue
     if (!looksDuplicate(d, t)) continue
     if (d.type === 'TRANSFER' && d.id) {

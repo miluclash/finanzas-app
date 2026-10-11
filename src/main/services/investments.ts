@@ -2,7 +2,7 @@
 import { cashEffects, computeHoldings, investmentSeries, portfolioSummary } from '@shared/domain/investments'
 import { addMonthsToMonth, monthOf } from '@shared/dates'
 import { BlockInput, InstrumentInput, OpInput, PriceInput } from '@shared/schemas'
-import type { AllocationBlock, Instrument, InvestmentOp, Price, Transaction } from '@shared/types'
+import type { Account, AllocationBlock, Instrument, InvestmentOp, Price, Transaction } from '@shared/types'
 import { audit } from '../db/store'
 import { entityToRow, insertRow, nextId, rowToEntity, selectById, updateRow } from '../db/tables'
 import { deleteEntity, friendlySqlError, parseInput, saveEntity } from './crud'
@@ -75,6 +75,9 @@ export function deleteInstrument(s: AppState, id: string): void {
 function syncCashTransactions(s: AppState, op: InvestmentOp): void {
   s.db.run('DELETE FROM transactions WHERE investment_op_id = ?', [op.id])
   if (!op.affectsCash) return
+  // Antes de la apertura de la cuenta el efectivo ya está dentro del saldo inicial: no se generan apuntes
+  const acc = selectById<Account>(s.db, 'accounts', op.accountId)
+  if (acc && op.date < acc.openingDate) return
   const settings = s.snap().settings
   const inst = op.instrumentId ? selectById<Instrument>(s.db, 'instruments', op.instrumentId) : null
   const now = s.now()

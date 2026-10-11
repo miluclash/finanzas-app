@@ -31,7 +31,7 @@ function createWindow(): void {
     title: 'Finanzas',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1115' : '#f6f7f9',
     autoHideMenuBar: true,
-    icon: path.join(__dirname, '../../resources/icon.png'),
+    icon: app.isPackaged ? path.join(process.resourcesPath, 'icon.png') : path.join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

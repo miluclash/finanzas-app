@@ -349,7 +349,7 @@ export function reviewQueue(s: AppState) {
   }
   const pending = ctx.transactions.filter((t) => t.status === 'PENDING_REVIEW').map(toRow)
   const issues = ctx.transactions
-    .filter((t) => t.status !== 'CANCELLED' && t.status !== 'PENDING_REVIEW')
+    .filter((t) => t.status !== 'CANCELLED' && t.status !== 'PENDING_REVIEW' && !t.investmentOpId)
     .map(toRow)
     .filter((r) => r.errors.length || r.warnings.some((w) => !w.startsWith('Posible duplicado')))
   const duplicates = allDuplicatePairs(ctx).map(([a, b]) => [toRow(ctx.txById.get(a)!), toRow(ctx.txById.get(b)!)] as [TxRow, TxRow])

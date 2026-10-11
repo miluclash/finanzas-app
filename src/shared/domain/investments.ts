@@ -377,9 +377,10 @@ function pctNum(v: string | null | undefined): number | null {
 /** Aportado de tu bolsillo a las cuentas de inversión: aportaciones previas + transferencias netas. */
 export function contributedTo(ctx: Ctx, accountIds: Set<string>, asOf: ISODate): number {
   let total = 0
+  // Lo aportado antes de empezar a registrar la cuenta se considera hecho desde el principio
   for (const id of accountIds) {
     const a = ctx.accountById.get(id)
-    if (a && a.openingDate <= asOf) total += a.initialContributionsCents
+    if (a) total += a.initialContributionsCents
   }
   for (const t of ctx.counted) {
     if (t.date > asOf) break
