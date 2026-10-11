@@ -1,3 +1,4 @@
+import { UpdateFooter } from './UpdateFooter'
 import {
   ArrowLeftRight,
   CalendarClock,
@@ -100,7 +101,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-line px-5 py-3 text-[11px] text-muted">Datos guardados solo en este PC</div>
+        <UpdateFooter />
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1280px] px-8 py-6">{children}</div>

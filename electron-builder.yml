@@ -29,3 +29,8 @@ nsis:
 linux:
   target: [dir]
   icon: resources/icon.png
+publish:
+  provider: github
+  owner: miluclash
+  repo: finanzas-app
+  releaseType: release

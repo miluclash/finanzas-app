@@ -5,6 +5,8 @@ import path from 'node:path'
 import { Db } from './db/db'
 import { createHandlers, type DialogProvider, type Handlers } from './services/api'
 import { AppState, UserError } from './services/state'
+import { createBackup } from './services/backup'
+import { initUpdater } from './updater'
 
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 
@@ -128,6 +130,9 @@ else {
       return
     }
     createWindow()
+    initUpdater(() => {
+      if (state) createBackup(state, 'antes-de-actualizar')
+    })
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })

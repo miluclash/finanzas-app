@@ -36,7 +36,7 @@ export function listBackups(s: AppState): BackupInfo[] {
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
-export function createBackup(s: AppState, kind: 'auto' | 'manual' | 'antes-de-restaurar' | 'antes-de-importar' = 'manual'): BackupInfo {
+export function createBackup(s: AppState, kind: 'auto' | 'manual' | 'antes-de-restaurar' | 'antes-de-importar' | 'antes-de-actualizar' = 'manual'): BackupInfo {
   const dir = s.paths.backupsDir
   if (!dir) throw new UserError('No hay carpeta de copias configurada.')
   fs.mkdirSync(dir, { recursive: true })

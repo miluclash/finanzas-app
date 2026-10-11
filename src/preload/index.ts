@@ -3,6 +3,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 const api = {
   call: (method: string, args: unknown[]) => ipcRenderer.invoke('api', method, args),
+  updateStatus: () => ipcRenderer.invoke('update.status'),
+  checkUpdate: () => ipcRenderer.invoke('update.check'),
+  installUpdate: () => ipcRenderer.invoke('update.install'),
   setTheme: (theme: 'system' | 'light' | 'dark') => ipcRenderer.invoke('theme', theme)
 }
 
