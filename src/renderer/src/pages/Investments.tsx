@@ -16,6 +16,8 @@ import {
 import { BarList, LinesChart } from '../components/charts'
 import { DataTable, type Column } from '../components/DataTable'
 import { useTxEditor } from '../components/TxEditor'
+import { TradeRepublicImportModal } from '../components/TradeRepublicImport'
+import type { TrPreview } from '../../../main/services/importTradeRepublic'
 import {
   Amount,
   Badge,
@@ -38,7 +40,8 @@ import {
   TextArea,
   TextInput
 } from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
+import { api, useApi, useApiMutation } from '../lib/api'
+import { toast } from '../lib/toast'
 import { useCatalog } from '../lib/catalog'
 import type { HoldingRow } from '@shared/domain/investments'
 
@@ -57,6 +60,7 @@ export function InvestmentsPage() {
   const { cat } = useCatalog()
   const [opForm, setOpForm] = useState<Partial<InvestmentOp> | null>(null)
   const [pricesOpen, setPricesOpen] = useState(false)
+  const [trPreview, setTrPreview] = useState<TrPreview | null>(null)
   const navigate = useNavigate()
   const brokers = (cat?.accounts ?? []).filter((a) => a.type === 'INVESTMENT' || a.type === 'CRYPTO')
   return (
@@ -66,6 +70,18 @@ export function InvestmentsPage() {
         description="Posiciones calculadas a partir de tus operaciones. Comprar no es gastar: cambias efectivo por un activo. Las comisiones sí son gasto."
         actions={
           <>
+            <Button
+              onClick={async () => {
+                try {
+                  const p = await api('tr.pick')
+                  if (p) setTrPreview(p)
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : String(e))
+                }
+              }}
+            >
+              Importar de Trade Republic
+            </Button>
             <Button onClick={() => setPricesOpen(true)} disabled={!cat?.instruments.length}>
               Actualizar precios
             </Button>
@@ -75,6 +91,7 @@ export function InvestmentsPage() {
           </>
         }
       />
+      {trPreview && <TradeRepublicImportModal preview={trPreview} onClose={() => setTrPreview(null)} />}
       {brokers.length === 0 ? (
         <EmptyState
           title="Primero crea tu cuenta de bróker"

@@ -55,6 +55,7 @@ function createWindow(): void {
 
 const dialogs: DialogProvider = {
   async openFile(title, filters) {
+    if (process.env.FINANZAS_TEST_OPEN_FILE) return process.env.FINANZAS_TEST_OPEN_FILE
     const r = await dialog.showOpenDialog(mainWindow!, { title, filters, properties: ['openFile'] })
     return r.canceled ? null : r.filePaths[0] ?? null
   },

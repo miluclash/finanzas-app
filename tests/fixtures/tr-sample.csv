@@ -1,0 +1,7 @@
+"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
+"2026-06-02T10:00:00Z","2026-06-02","DEFAULT","CASH","CUSTOMER_INPAYMENT","","","","","","101.000000","-1.00","","EUR","","","","Card Top up","t1","","","",""
+"2026-06-03T10:00:00Z","2026-06-03","DEFAULT","TRADING","BUY","FUND","MSCI World USD (Acc)","IE00BJ0KDQ92","0.5","100.00","-50.00","-1.00","","EUR","","","","Buy trade IE00BJ0KDQ92 Xtrackers (IE) Plc - Xtrackers MSCI World UCITS ETF 1C, quantity: 0.5","t2","","","",""
+"2026-06-04T10:00:00Z","2026-06-04","DEFAULT","TRADING","BUY","STOCK","Chevron","US1667641005","0.2","100.00","-20.00","-1.00","","EUR","","","","Buy trade US1667641005 CHEVRON, quantity: 0.2","t3","","","",""
+"2026-07-10T10:00:00Z","2026-07-10","DEFAULT","CASH","DIVIDEND","STOCK","Chevron","US1667641005","0.2","","0.210000","","-0.06","EUR","0.24","USD","0.86","Cash Dividend","t4","","","",""
+"2026-08-01T10:00:00Z","2026-08-01","DEFAULT","CASH","INTEREST_PAYMENT","","","","","","0.010000","","","EUR","","","","Interest","t5","","","",""
+"2026-08-02T10:00:00Z","2026-08-02","DEFAULT","CASH","SOMETHING_NEW","","","","","","1.0","","","EUR","","","","x","t6","","","",""

@@ -26,6 +26,7 @@ import { schemaVersion } from '../db/migrations'
 import { autoBackup, createBackup, exportCsv, exportJson, exportXlsx, listBackups, restoreBackup } from './backup'
 import * as catalog from './catalog'
 import { applyImport, previewImport } from './importExcel'
+import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from './importTradeRepublic'
 import * as inv from './investments'
 import * as planning from './planning'
 import { UserError, type AppState } from './state'
@@ -151,6 +152,15 @@ export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion 
       if (hasData && replaceExisting && s.paths.backupsDir) backup = createBackup(s, 'antes-de-importar').path
       const res = applyImport(s, token, { replaceExisting })
       return { ...res, backup }
+    },
+    'tr.pick': async () => {
+      const f = await dialogs.openFile('Elige el CSV exportado de Trade Republic', [{ name: 'CSV', extensions: ['csv'] }])
+      if (!f) return null
+      return previewTradeRepublic(s, f)
+    },
+    'tr.apply': (token: string, opts: TrApplyOptions) => {
+      const backup = s.paths.backupsDir ? createBackup(s, 'antes-de-importar').path : null
+      return { ...applyTradeRepublic(s, token, opts), backup }
     },
     'export.json': async () => {
       const f = await dialogs.saveFile('Exportar todo (JSON)', `finanzas-${s.today()}.json`, [{ name: 'JSON', extensions: ['json'] }])

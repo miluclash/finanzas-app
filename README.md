@@ -72,6 +72,7 @@ Esquema y migraciones: `src/main/db/migrations.ts`. Variables de entorno: no hay
 - Objetivos con hucha vinculada o con reservas, ritmo, aportación necesaria y retraso.
 - Patrimonio mes a mes y previsión a 12 meses con escenarios editables y supuestos visibles.
 - Inversiones: activos, operaciones (compra, venta, dividendo, interés, comisión, split), precios manuales con fecha, coste medio o FIFO, plusvalías realizadas y no realizadas, aportado frente a valor, reparto objetivo por bloques y alertas de concentración.
+- Importación del CSV de Trade Republic (*Inversiones → Importar de Trade Republic*): crea activos, compras, dividendos, intereses, recargas y sus comisiones; reimportar un export más nuevo solo añade lo que falta.
 - Configuración editable (categorías, grupos, subcategorías con fusión, ajustes, escenarios), registro de auditoría, importación del Excel con vista previa, exportación y copias.
 
 **Pendiente o fuera de alcance**
