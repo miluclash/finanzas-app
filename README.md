@@ -11,7 +11,7 @@ App de escritorio para Windows que sustituye a `FINANCIAL_MASTER.xlsx`. Un solo 
 2. Ejecútalo. Como el instalador no está firmado, Windows puede mostrar "Windows protegió su PC": pulsa **Más información → Ejecutar de todas formas**.
 3. Al abrir la app por primera vez, elige **Importar mi FINANCIAL_MASTER.xlsx** (verás una vista previa antes de importar nada) o **Empezar de cero**.
 
-Para generar un instalador nuevo: sube un tag de versión (`git tag v0.1.1 && git push --tags`) o lanza el workflow a mano desde la pestaña **Actions**. GitHub lo construye en una máquina Windows y lo publica en Releases.
+Para generar un instalador nuevo: sube la versión en `package.json` y haz push a `main` con `[release]` en el mensaje del commit, o lanza el workflow a mano desde la pestaña **Actions** (*Run workflow*). GitHub lo construye en una máquina Windows y lo publica en Releases.
 
 ## Dónde están tus datos
 
