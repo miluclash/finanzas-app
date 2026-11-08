@@ -10,6 +10,10 @@ files:
 extraResources:
   - from: resources/icon.png
     to: icon.png
+# El servidor MCP se ejecuta con Node fuera de la app: necesita sus archivos sin comprimir en app.asar
+asarUnpack:
+  - out/mcp/**
+  - node_modules/sql.js/**
 npmRebuild: false
 win:
   target:

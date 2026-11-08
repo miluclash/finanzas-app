@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 // Contrato de la API que la interfaz llama por IPC. Todos los métodos se validan aquí o en sus servicios.
 import { dashboardData, computeAlerts } from '@shared/domain/dashboard'
 import { monthSummaries, netWorthSeries, trackedMonths } from '@shared/domain/ledger'
@@ -114,6 +116,16 @@ export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion 
 
     // Inversiones
     'inv.overview': () => inv.investmentsOverview(s),
+    'mcp.config': () => {
+      // Claude Desktop lanza el ejecutable de la app como si fuera Node (ELECTRON_RUN_AS_NODE=1),
+      // así no hace falta tener Node instalado. El script va fuera de app.asar (asarUnpack).
+      const res = (process as { resourcesPath?: string }).resourcesPath ?? ''
+      const packaged = path.join(res, 'app.asar.unpacked', 'out', 'mcp', 'server.cjs')
+      const script = fs.existsSync(packaged) ? packaged : path.resolve('out', 'mcp', 'server.cjs')
+      const env: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1' }
+      if (s.paths.dbPath) env.FINANZAS_DB = s.paths.dbPath
+      return { mcpServers: { finanzas: { command: process.execPath, args: [script], env } } }
+    },
     'inv.plan': () => planReport(s.ctx(), s.snap().settings.investmentPlan),
     'inv.saveBlock': (input: BlockInput) => inv.saveBlock(s, input),
     'inv.deleteBlock': (id: string) => inv.deleteBlock(s, id),
