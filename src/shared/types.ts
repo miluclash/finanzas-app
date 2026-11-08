@@ -280,6 +280,25 @@ export interface Settings {
   investmentIncomeCategoryId: string | null
   lastAccountId: string | null
   lastCategoryId: string | null
+  investmentPlan: InvestmentPlanConfig | null
+}
+
+/** Reglas del plan de inversión que la app vigila (se guarda como ajuste). */
+export interface InvestmentPlanConfig {
+  enabled: boolean
+  startDate: ISODate
+  endDate: ISODate | null
+  monthlyCents: number
+  executionDay: number
+  coreBlockId: string | null
+  satelliteBlockId: string | null
+  maxSatellites: number
+  brokerAccountId: string | null
+  cushionAccountId: string | null
+  cushionCents: number
+  firstReviewDate: ISODate
+  reviewEveryMonths: number
+  theses: Record<string, { text: string; reviewDate: ISODate | null }>
 }
 
 /** Todo el estado de la base de datos cargado en memoria para los cálculos. */

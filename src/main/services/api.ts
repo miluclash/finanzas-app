@@ -28,6 +28,7 @@ import * as catalog from './catalog'
 import { applyImport, previewImport } from './importExcel'
 import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from './importTradeRepublic'
 import * as inv from './investments'
+import { planReport } from '@shared/domain/investmentPlan'
 import * as planning from './planning'
 import { UserError, type AppState } from './state'
 import * as tx from './transactions'
@@ -113,6 +114,7 @@ export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion 
 
     // Inversiones
     'inv.overview': () => inv.investmentsOverview(s),
+    'inv.plan': () => planReport(s.ctx(), s.snap().settings.investmentPlan),
     'inv.saveBlock': (input: BlockInput) => inv.saveBlock(s, input),
     'inv.deleteBlock': (id: string) => inv.deleteBlock(s, id),
     'inv.saveInstrument': (input: InstrumentInput) => inv.saveInstrument(s, input),
