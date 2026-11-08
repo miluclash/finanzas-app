@@ -553,8 +553,38 @@ function DataSettings() {
           </Button>
         </Section>
       )}
+      <ClaudeMcp />
       {preview && <ImportPreviewModal preview={preview} onClose={() => setPreview(null)} />}
     </div>
+  )
+}
+
+function ClaudeMcp() {
+  const q = useApi('mcp.config', [])
+  const json = q.data ? JSON.stringify(q.data, null, 2) : ''
+  return (
+    <Section
+      title="Conectar con Claude (MCP)"
+      description="Claude Desktop podrá leer tus datos (solo lectura) y revisar el plan de inversión. Pega esto en claude_desktop_config.json y reinicia Claude."
+      boxed
+    >
+      <pre className="max-h-60 overflow-auto rounded-md bg-surface-2 p-3 text-[12px]">{json || 'Cargando…'}</pre>
+      <div className="mt-2 flex gap-2">
+        <Button
+          size="sm"
+          disabled={!json}
+          onClick={async () => {
+            await navigator.clipboard.writeText(json)
+            toast.success('Configuración copiada')
+          }}
+        >
+          Copiar configuración
+        </Button>
+      </div>
+      <p className="mt-2 text-[12px] text-muted">
+        En Claude Desktop: Ajustes → Desarrollador → Editar configuración. Si ya tienes otros servidores en «mcpServers», añade solo la entrada «finanzas». Tras actualizar la app, la ruta no cambia.
+      </p>
+    </Section>
   )
 }
 

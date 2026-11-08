@@ -1,7 +1,7 @@
 {
   "name": "finanzas-app",
   "productName": "Finanzas",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "App de escritorio de finanzas personales (uso local, un solo usuario)",
   "main": "./out/main/index.js",
   "author": "Michael",
@@ -9,12 +9,13 @@
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && node scripts/build-mcp.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dist:win": "npm run build && electron-builder --win --x64 --publish never"
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "mcp": "node scripts/build-mcp.mjs && node out/mcp/server.cjs"
   },
   "dependencies": {
     "decimal.js": "^10.6.0",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.1",
     "@types/node": "^22.20.5",
@@ -36,6 +38,7 @@
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "esbuild": "^0.28.2",
     "lucide-react": "^1.55.0",
     "playwright-core": "^1.64.0",
     "react": "^19.3.0",
