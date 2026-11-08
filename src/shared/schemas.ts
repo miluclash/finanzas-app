@@ -296,6 +296,23 @@ export const PriceInput = z.object({
 })
 export type PriceInput = z.input<typeof PriceInput>
 
+export const InvestmentPlanSchema = z.object({
+  enabled: z.boolean(),
+  startDate: isoDate,
+  endDate: isoDate.nullable(),
+  monthlyCents: z.number().int().min(0),
+  executionDay: z.union([z.literal(2), z.literal(16)]),
+  coreBlockId: z.string().nullable(),
+  satelliteBlockId: z.string().nullable(),
+  maxSatellites: z.number().int().min(0).max(20),
+  brokerAccountId: z.string().nullable(),
+  cushionAccountId: z.string().nullable(),
+  cushionCents: z.number().int().min(0),
+  firstReviewDate: isoDate,
+  reviewEveryMonths: z.number().int().min(1).max(24),
+  theses: z.record(z.string(), z.object({ text: z.string().max(4000), reviewDate: isoDate.nullable() }))
+})
+
 export const SettingsInput = z
   .object({
     trackingStart: isoDate,
@@ -311,7 +328,8 @@ export const SettingsInput = z
     investmentFeeCategoryId: z.string().nullable(),
     investmentIncomeCategoryId: z.string().nullable(),
     lastAccountId: z.string().nullable(),
-    lastCategoryId: z.string().nullable()
+    lastCategoryId: z.string().nullable(),
+    investmentPlan: InvestmentPlanSchema.nullable()
   })
   .partial()
 export type SettingsInput = z.input<typeof SettingsInput>

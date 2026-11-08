@@ -43,9 +43,10 @@ import {
 import { api, useApi, useApiMutation } from '../lib/api'
 import { toast } from '../lib/toast'
 import { useCatalog } from '../lib/catalog'
+import { PlanView } from './InvestmentPlan'
 import type { HoldingRow } from '@shared/domain/investments'
 
-type Tab = 'resumen' | 'ops' | 'precios' | 'activos'
+type Tab = 'resumen' | 'plan' | 'ops' | 'precios' | 'activos'
 
 const nf = (v: string | null, max = 6) =>
   v === null ? '—' : new Intl.NumberFormat('es-ES', { maximumFractionDigits: max, useGrouping: 'always' } as Intl.NumberFormatOptions).format(Number(v))
@@ -105,12 +106,14 @@ export function InvestmentsPage() {
             onChange={setTab}
             tabs={[
               { id: 'resumen', label: 'Cartera' },
+              { id: 'plan', label: 'Plan' },
               { id: 'ops', label: 'Operaciones', count: undefined },
               { id: 'precios', label: 'Precios' },
               { id: 'activos', label: 'Activos y reparto objetivo' }
             ]}
           />
           {tab === 'resumen' && <Overview onNewOp={(d) => setOpForm(d)} />}
+          {tab === 'plan' && <PlanView />}
           {tab === 'ops' && <OpsView onEdit={(op) => setOpForm(op)} />}
           {tab === 'precios' && <PricesView />}
           {tab === 'activos' && <AssetsView />}

@@ -36,7 +36,8 @@ export const DEFAULT_SETTINGS: Settings = {
   investmentFeeCategoryId: null,
   investmentIncomeCategoryId: null,
   lastAccountId: null,
-  lastCategoryId: null
+  lastCategoryId: null,
+  investmentPlan: null
 }
 
 export function getSettings(db: Db): Settings {
