@@ -38,7 +38,8 @@ describe('test dorado sintético de finanzas', () => {
     const expected = JSON.parse(fs.readFileSync(GOLDEN, 'utf8')) as Record<string, unknown>
     const diff = diffGolden(expected, actual)
     expect(diff, `Claves del dorado sintético que han cambiado (${diff.length})`).toEqual([])
-    expect(text === fs.readFileSync(GOLDEN, 'utf8')).toBe(true)
+    // Git en Windows puede dejar el archivo con CRLF al cambiar de rama: se compara sin tener en cuenta el fin de línea.
+    expect(text === fs.readFileSync(GOLDEN, 'utf8').replace(/\r\n/g, '\n')).toBe(true)
   })
 
   it('es determinista: dos pasadas dan exactamente lo mismo', { timeout: SLOW }, async () => {
