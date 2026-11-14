@@ -1,11 +1,13 @@
 name: Tests e instalador de Windows
 
-# - En cada push a main: tests.
+# - En cada push a main y en cada pull request: tests (así un PR se ve en verde o en rojo antes del merge).
 # - Instalador de Windows publicado en Releases: al lanzar el workflow a mano (pestaña Actions)
 #   o al hacer push a main con "[release]" en el mensaje del commit. La versión sale de package.json.
+#   Un pull request nunca publica: el job "windows" solo corre con workflow_dispatch o con "[release]" en un push.
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:

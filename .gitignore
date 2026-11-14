@@ -4,27 +4,29 @@ dist/
 release/
 *.log
 .DS_Store
-# Datos reales: nunca al repositorio
+# Datos reales: nunca al repositorio. Las carpetas van ancladas a la raíz (/) para no ignorar
+# código con el mismo nombre, por ejemplo src/main/core/backups/.
 *.sqlite
 *.sqlite-journal
 *.db
-data/
-private/
+/data/
+/private/
 FINANCIAL_MASTER*.xlsx
-backups/
-test-output/
+/backups/
+/test-output/
 # Claves y secretos: van en la carpeta de datos, nunca aquí
 .env
 .env.*
+!.env.example
 # Línea base del test dorado (copia de la base real y sus cifras): vive fuera del repo
 Finanzas-golden/
-# Exportaciones de Hevy (solo se versionan muestras inventadas en tests/fixtures)
+# Exportaciones de Hevy: solo se versionan muestras inventadas llamadas tests/fixtures/hevy-ficticio-*
 *hevy*.csv
 *hevy*.tsv
 *hevy*.xlsx
 workouts*.csv
 workout_data*.csv
-!tests/fixtures/hevy-*.csv
-!tests/fixtures/hevy-*.tsv
-!tests/fixtures/hevy-*.xlsx
+!tests/fixtures/hevy-ficticio-*.csv
+!tests/fixtures/hevy-ficticio-*.tsv
+!tests/fixtures/hevy-ficticio-*.xlsx
 *.tsbuildinfo

@@ -21,7 +21,15 @@ const goldenPath = dir ? path.join(dir, 'golden.json') : ''
 const diffPath = dir ? path.join(dir, 'ultimo-diff.json') : ''
 const update = process.env.FINANZAS_GOLDEN_UPDATE === '1'
 
-const available = !!dir && fs.existsSync(sqlitePath) && fs.existsSync(metaPath)
+// La línea base contiene datos reales: nunca puede estar dentro del repositorio (que es público).
+const repoRoot = path.resolve(__dirname, '..')
+const insideRepo = (() => {
+  if (!dir) return false
+  const rel = path.relative(repoRoot, path.resolve(dir))
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+})()
+
+const available = insideRepo || (!!dir && fs.existsSync(sqlitePath) && fs.existsSync(metaPath))
 const run = available ? describe : describe.skip
 
 interface Meta {
@@ -29,6 +37,7 @@ interface Meta {
   todays: string[]
   dbSha256: string
   commit?: string
+  branch?: string
   dirty?: boolean
   keyCount?: number
   schemaVersion?: number
@@ -36,15 +45,29 @@ interface Meta {
   settingsNotPersisted?: string[]
 }
 
+/** Valida meta.json de verdad (sin fiarse del tipo). */
+function readMeta(file: string): Meta {
+  const m = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>
+  const isDate = (d: unknown) => typeof d === 'string' && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d) && !Number.isNaN(Date.parse(d))
+  if (!m || typeof m !== 'object') throw new Error('meta.json no es un objeto.')
+  if (!Array.isArray(m.todays) || m.todays.length === 0 || !m.todays.every(isDate))
+    throw new Error('meta.json: "todays" debe ser una lista no vacía de fechas YYYY-MM-DD.')
+  if (typeof m.dbSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(m.dbSha256)) throw new Error('meta.json: "dbSha256" debe ser un hash hexadecimal de 64 caracteres.')
+  return m as unknown as Meta
+}
+
 const sha256 = (buf: Uint8Array) => createHash('sha256').update(buf).digest('hex')
 
 run('test dorado de finanzas con datos reales (solo en la máquina de Michael)', () => {
   it(update ? 'captura la línea base' : 'las cifras reales siguen siendo las congeladas', { timeout: 600_000 }, async () => {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as Meta
+    if (insideRepo)
+      throw new Error(`La carpeta dorada (${dir}) está dentro del repositorio, que es público. Usa una carpeta fuera, p. ej. la carpeta Finanzas-golden dentro de %APPDATA%.`)
+    if (update && fs.existsSync(goldenPath))
+      throw new Error(`Ya hay una línea base en ${dir}; usa npm run golden:capture -- --force (no se sobrescribe desde el test).`)
+    const meta = readMeta(metaPath)
     const bytes = fs.readFileSync(sqlitePath)
     if (sha256(bytes) !== meta.dbSha256)
       throw new Error('La copia congelada finanzas.sqlite no coincide con el SHA-256 de meta.json: alguien la ha cambiado. Repite la captura con --force.')
-    if (!Array.isArray(meta.todays) || !meta.todays.length) throw new Error('meta.json no tiene "todays".')
 
     // Se abre solo en memoria: no hay archivo asociado, así que nunca se escribe en disco.
     const db = await Db.openReadOnlyBuffer(new Uint8Array(bytes))

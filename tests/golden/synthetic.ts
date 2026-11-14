@@ -1,24 +1,53 @@
 // Base de datos INVENTADA para el test dorado sintético. Nada de esto son datos reales.
 // Los servicios reales generan ids secuenciales (CAT001, TX0001…); solo `s.now()` depende del reloj, y aquí se fija.
-import { saveAccount, reconcile, saveCategory, saveGroup, saveSubcategory, updateSettings } from '../../src/main/services/catalog'
-import { saveBlock, saveInstrument, saveOp, savePrice } from '../../src/main/services/investments'
-import { copyBudgets, saveAllocation, saveGoal, saveRecurring, saveScenario, setBudget } from '../../src/main/services/planning'
+import { saveAccount as raw_saveAccount, reconcile as raw_reconcile, saveCategory as raw_saveCategory, saveGroup as raw_saveGroup, saveSubcategory as raw_saveSubcategory, updateSettings as raw_updateSettings } from '../../src/main/services/catalog'
+import { saveBlock as raw_saveBlock, saveInstrument as raw_saveInstrument, saveOp as raw_saveOp, savePrice as raw_savePrice } from '../../src/main/services/investments'
+import { copyBudgets as raw_copyBudgets, saveAllocation as raw_saveAllocation, saveGoal as raw_saveGoal, saveRecurring as raw_saveRecurring, saveScenario as raw_saveScenario, setBudget as raw_setBudget } from '../../src/main/services/planning'
 import type { AppState } from '../../src/main/services/state'
-import { dismissDuplicate, saveTransaction, saveTransfer } from '../../src/main/services/transactions'
+import { dismissDuplicate as raw_dismissDuplicate, saveTransaction as raw_saveTransaction, saveTransfer as raw_saveTransfer } from '../../src/main/services/transactions'
 import { DEFAULT_PLAN } from '../../src/shared/domain/investmentPlan'
 import type { AccountInput, TxInput } from '../../src/shared/schemas'
 import { cat } from '../helpers'
 
 const day = (ym: string, d: number) => `${ym}-${String(d).padStart(2, '0')}`
 
-/** Reloj determinista: cada llamada devuelve un instante nuevo, siempre el mismo en cada ejecución. */
+// Reloj por PASO del montaje (no por llamada): cada operación del constructor avanza el paso, y cualquier número
+// de llamadas a s.now() dentro del mismo paso devuelve el mismo instante. Así, si un servicio llama una vez más
+// a s.now(), los createdAt/updatedAt no se desplazan. Los pasos son crecientes (el orden de las operaciones usa created_at).
+let step = 0
 function fixClock(s: AppState): void {
-  let tick = 0
-  s.now = () => new Date(Date.UTC(2026, 0, 1, 12, 0, 0) + tick++ * 1000).toISOString()
+  step = 0
+  s.now = () => new Date(Date.UTC(2026, 0, 1, 12, 0, 0) + step * 1000).toISOString()
 }
 
 export function buildSyntheticApp(s: AppState): void {
   fixClock(s)
+  // Cada llamada de montaje avanza el paso antes de ejecutarse
+  const stepped =
+    <A extends unknown[], R>(f: (s: AppState, ...a: A) => R) =>
+    (_s: AppState, ...a: A): R => {
+      step++
+      return f(s, ...a)
+    }
+  const saveAccount = stepped(raw_saveAccount)
+  const reconcile = stepped(raw_reconcile)
+  const saveCategory = stepped(raw_saveCategory)
+  const saveGroup = stepped(raw_saveGroup)
+  const saveSubcategory = stepped(raw_saveSubcategory)
+  const updateSettings = stepped(raw_updateSettings)
+  const saveBlock = stepped(raw_saveBlock)
+  const saveInstrument = stepped(raw_saveInstrument)
+  const saveOp = stepped(raw_saveOp)
+  const savePrice = stepped(raw_savePrice)
+  const copyBudgets = stepped(raw_copyBudgets)
+  const saveAllocation = stepped(raw_saveAllocation)
+  const saveGoal = stepped(raw_saveGoal)
+  const saveRecurring = stepped(raw_saveRecurring)
+  const saveScenario = stepped(raw_saveScenario)
+  const setBudget = stepped(raw_setBudget)
+  const dismissDuplicate = stepped(raw_dismissDuplicate)
+  const saveTransaction = stepped(raw_saveTransaction)
+  const saveTransfer = stepped(raw_saveTransfer)
   s.todayOverride = '2026-11-25'
 
   updateSettings(s, { trackingStart: '2026-07-01', minLiquidityCents: 150000, emergencyMonths: 3, duplicateWindowDays: 3 })

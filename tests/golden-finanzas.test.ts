@@ -6,6 +6,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { collectGolden, diffGolden } from './golden/collect'
 import { buildSyntheticApp } from './golden/synthetic'
+import { updateSettings } from '../src/main/services/catalog'
+import { previewTradeRepublicText } from '../src/main/services/importTradeRepublic'
+import type { AppState } from '../src/main/services/state'
 import { memoryApp } from './helpers'
 
 const GOLDEN = path.join(__dirname, 'golden', 'sintetico.golden.json')
@@ -23,10 +26,32 @@ async function build() {
   return s
 }
 
+/**
+ * Todo lo que congela este test: el colector general más (a) la vista previa de Trade Republic sobre el CSV inventado
+ * (sin token aleatorio) y (b) las cifras de inversión con el método de coste FIFO, sobre una segunda base idéntica.
+ */
+async function collectAll(s: AppState): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = { ...collectGolden(s, TODAYS) }
+  s.todayOverride = TODAYS[1]
+  const csv = fs.readFileSync(path.join(__dirname, 'fixtures', 'tr-sample.csv'), 'utf8')
+  const { token: _token, ...preview } = previewTradeRepublicText(s, csv, 'tr-sample.csv')
+  void _token
+  out[`${TODAYS[1]}|previewTradeRepublic`] = JSON.parse(JSON.stringify(preview))
+  // costMethod FIFO: segunda base igual, solo claves de inversión
+  const f = await build()
+  updateSettings(f, { costMethod: 'FIFO' })
+  const fifo = collectGolden(f, [TODAYS[1]])
+  for (const k of Object.keys(fifo))
+    if (/[|]inv[.](overview|plan)$/.test(k) || k.includes('|portfolioSummary@2026-11-30')) out[`FIFO|${k}`] = fifo[k]
+  const sorted: Record<string, unknown> = {}
+  for (const k of Object.keys(out).sort()) sorted[k] = out[k]
+  return sorted
+}
+
 describe('test dorado sintético de finanzas', () => {
   it('las cifras coinciden con tests/golden/sintetico.golden.json', { timeout: SLOW }, async () => {
     const s = await getShared()
-    const actual = collectGolden(s, TODAYS)
+    const actual = await collectAll(s)
     const text = JSON.stringify(actual, null, 1) + '\n'
     if (update) {
       fs.writeFileSync(GOLDEN, text)
@@ -44,18 +69,20 @@ describe('test dorado sintético de finanzas', () => {
 
   it('es determinista: dos pasadas dan exactamente lo mismo', { timeout: SLOW }, async () => {
     const s = await getShared()
-    const a = JSON.stringify(collectGolden(s, TODAYS))
-    const b = JSON.stringify(collectGolden(s, TODAYS))
+    const a = JSON.stringify(await collectAll(s))
+    const b = JSON.stringify(await collectAll(s))
     expect(a === b).toBe(true)
     // y reconstruir la base desde cero da el mismo resultado byte a byte
-    const c = JSON.stringify(collectGolden(await build(), TODAYS))
+    const c = JSON.stringify(await collectAll(await build()))
     expect(c === a).toBe(true)
   })
 
   it('cubre las ramas principales (la base inventada no se ha quedado corta)', { timeout: SLOW }, async () => {
     const s = await getShared()
-    const g = collectGolden(s, TODAYS)
+    const g = await collectAll(s)
     expect(Object.keys(g).length).toBeGreaterThan(150)
+    expect(g['2026-11-25|previewTradeRepublic']).toBeTruthy()
+    expect(Object.keys(g).some((k) => k.startsWith('FIFO|'))).toBe(true)
     const ctx = s.ctx()
     expect(ctx.accounts.length).toBeGreaterThanOrEqual(8)
     expect(ctx.ops.length).toBeGreaterThanOrEqual(15)
