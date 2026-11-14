@@ -1,6 +1,6 @@
 ---
 name: ia-local
-description: Implementa el asistente de IA local con Ollama: proveedor intercambiable, herramientas por módulo, propuestas con confirmación y sugerencias. También elimina el servidor MCP antiguo.
+description: "Implementa el asistente de IA local con Ollama (proveedor intercambiable, herramientas por módulo, propuestas con confirmación y sugerencias). También elimina el servidor MCP antiguo."
 model: opus
 effort: high
 tools: Read, Grep, Glob, Edit, Write, Bash
