@@ -18,6 +18,14 @@ npm run build
 
 Datos de prueba separados de los reales: `FINANZAS_DATA_DIR=<carpeta>` antes de `npm run dev`. Nunca pruebes contra `%APPDATA%\Finanzas` sin una copia de seguridad hecha ese mismo día.
 
+### Test dorado de finanzas
+
+- `npm test` ejecuta siempre el dorado sintético (`tests/golden-finanzas.test.ts`, datos inventados) y, si existe la línea base, el dorado real (`tests/golden-finanzas.local.test.ts`).
+- La línea base real (copia congelada de la base, `golden.json` y `meta.json`) vive fuera del repo: `%APPDATA%\Finanzas-golden`, o la carpeta de `FINANZAS_GOLDEN_DIR`. Se crea con `npm run golden:capture`, que solo lee la base original.
+- **Se captura en `main` al empezar una fase y no se vuelve a capturar durante ella.** Si el dorado falla, el resultado cambió: no se recaptura ni se edita la instantánea, se avisa al orquestador.
+- Nadie imprime ni copia al repo el contenido de esa carpeta. Si el dorado real falla, la salida solo nombra las claves que difieren; el detalle queda en `ultimo-diff.json` dentro de la carpeta.
+- Si cambia a propósito la estructura de lo que cubre el dorado (por ejemplo, un handler nuevo), se regenera el sintético con `npm run golden:update` y se explica en el PR.
+
 ## Reglas que no se rompen
 
 1. **El nombre sigue siendo "Finanzas"** durante toda la evolución. No renombres nada (app, repo, appId, carpeta de datos, variables `FINANZAS_*`). El cambio de nombre es un parche aparte. Si añades un sitio nuevo donde aparece el nombre, apúntalo en `docs/NOMBRE_APP.md` (el agente `registro-nombre` lo mantiene).

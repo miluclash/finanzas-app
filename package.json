@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "golden:update": "node scripts/golden-update.mjs",
+    "golden:capture": "node scripts/golden-capture.mjs",
     "dist:win": "npm run build && electron-builder --win --x64 --publish never",
     "mcp": "node scripts/build-mcp.mjs && node out/mcp/server.cjs"
   },

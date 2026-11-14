@@ -13,4 +13,18 @@ private/
 FINANCIAL_MASTER*.xlsx
 backups/
 test-output/
+# Claves y secretos: van en la carpeta de datos, nunca aquí
+.env
+.env.*
+# Línea base del test dorado (copia de la base real y sus cifras): vive fuera del repo
+Finanzas-golden/
+# Exportaciones de Hevy (solo se versionan muestras inventadas en tests/fixtures)
+*hevy*.csv
+*hevy*.tsv
+*hevy*.xlsx
+workouts*.csv
+workout_data*.csv
+!tests/fixtures/hevy-*.csv
+!tests/fixtures/hevy-*.tsv
+!tests/fixtures/hevy-*.xlsx
 *.tsbuildinfo
