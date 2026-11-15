@@ -20,8 +20,9 @@ afterEach(() => {
 
 async function setup(file: string | null = null): Promise<{ db: Db; q: WriteQueue }> {
   const db = await Db.open(file)
-  db.exec('CREATE TABLE prueba (id INTEGER PRIMARY KEY, n INTEGER NOT NULL UNIQUE)')
-  return { db, q: new WriteQueue(() => db) }
+  const q = new WriteQueue(() => db)
+  q.runNow('prueba:montar', () => db.exec('CREATE TABLE prueba (id INTEGER PRIMARY KEY, n INTEGER NOT NULL UNIQUE)'))
+  return { db, q }
 }
 
 function ns(db: Db): number[] {
@@ -198,8 +199,10 @@ describe('cola de escritura', () => {
 
   it('escribe la entrada de auditoría en la misma transacción', async () => {
     const { db, q } = await setup()
-    db.exec(`CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, entity TEXT, entity_id TEXT,
-      action TEXT, summary TEXT, before_json TEXT, after_json TEXT)`)
+    q.runNow('prueba:montar', () =>
+      db.exec(`CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, entity TEXT, entity_id TEXT,
+        action TEXT, summary TEXT, before_json TEXT, after_json TEXT)`)
+    )
     await q.enqueue('prueba:alta', () => db.run('INSERT INTO prueba (n) VALUES (1)'), {
       audit: { entity: 'prueba', entityId: '1', action: 'create', summary: 'Alta', after: { n: 1 } }
     })
@@ -221,9 +224,13 @@ describe('cola de escritura', () => {
     expect(db.exportBytes().length).toBeGreaterThan(0)
   })
 
-  it('con guard activado, escribir fuera de la cola lanza y leer no', async () => {
+  it('la guarda está siempre activa: escribir fuera de la cola lanza y leer no', async () => {
+    // Recién abierta, sin cola ni nada que activar: ya no se puede escribir.
+    const suelta = await Db.open(null)
+    expect('guard' in suelta).toBe(false)
+    expect(() => suelta.exec('CREATE TABLE x (id INTEGER PRIMARY KEY)')).toThrow('Escritura fuera de la cola: CREATE TABLE x')
+    suelta.close()
     const { db, q } = await setup()
-    db.guard = true
     expect(() => db.run('INSERT INTO prueba (n) VALUES (1)')).toThrow('Escritura fuera de la cola')
     expect(() => db.exec('DELETE FROM prueba')).toThrow('Escritura fuera de la cola')
     expect(() => db.tx(() => undefined)).toThrow('Escritura fuera de la cola')

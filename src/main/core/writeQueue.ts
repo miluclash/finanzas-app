@@ -1,4 +1,7 @@
-// Cola de escritura: la única vía para modificar la base de datos.
+// Cola de escritura: la única vía para modificar la base de datos. Fuera de una operación de la
+// cola, `Db.run`/`exec`/`tx` lanzan error (ver db.ts).
+//
+// Etiquetas: `<modulo>:<accion>` (`finanzas:tx.save`, `core:backup.restore`, `core:migrar`…).
 //
 // Las operaciones se ejecutan de una en una, en el orden en que llegan (FIFO), encadenadas
 // con promesas y sin temporizadores. Cada operación es una transacción: si falla se deshace,
@@ -54,6 +57,11 @@ export class WriteQueue {
   /** Hay algo en curso o pendiente. */
   get busy(): boolean {
     return this.pending > 0 || this.syncRunning
+  }
+
+  /** Hay cambios confirmados en memoria que falta guardar en disco (falló un guardado). */
+  get hasPendingSave(): boolean {
+    return this.getDb().hasPendingSave
   }
 
   /** Encola una operación síncrona que se ejecuta dentro de una transacción. */

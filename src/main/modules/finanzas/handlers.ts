@@ -27,6 +27,7 @@ import type { MonthKey, Settings, TxStatus } from '@shared/modules/finanzas/type
 import type { TxDraft } from '@shared/modules/finanzas/validation'
 import { createBackup } from '../../core/backup'
 import type { DialogProvider } from '../../core/handlers'
+import type { OpOptions } from '../../core/writeQueue'
 import { exportCsv, exportJson, exportXlsx } from './exports'
 import * as catalog from './catalog'
 import { applyImport, previewImport } from './importExcel'
@@ -42,35 +43,42 @@ export function isEmpty(s: AppState): boolean {
   return s.snap().accounts.length === 0 && s.snap().transactions.length === 0
 }
 
+/**
+ * Handlers de finanzas. Los de lectura son síncronos y no pasan por la cola. Los que escriben
+ * llaman al servicio (que sigue siendo síncrono) dentro de una operación de la cola de escritura,
+ * con la etiqueta `finanzas:<handler>`, y devuelven su promesa.
+ */
 export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
+  const write = <T>(name: string, fn: () => T, opts?: OpOptions): Promise<T> =>
+    s.core.queue.enqueue(`finanzas:${name}`, fn, opts)
   const h = {
     // Catálogo y ajustes
     'catalog.get': () => catalog.getCatalog(s),
-    'settings.update': (patch: Partial<Settings>) => catalog.updateSettings(s, patch),
+    'settings.update': (patch: Partial<Settings>) => write('settings.update', () => catalog.updateSettings(s, patch)),
     'accounts.list': () => catalog.listAccounts(s),
-    'accounts.save': (input: AccountInput) => catalog.saveAccount(s, input),
-    'accounts.delete': (id: string) => catalog.deleteAccount(s, id),
-    'accounts.reconcile': (input: ReconcileInput) => catalog.reconcile(s, input),
+    'accounts.save': (input: AccountInput) => write('accounts.save', () => catalog.saveAccount(s, input)),
+    'accounts.delete': (id: string) => write('accounts.delete', () => catalog.deleteAccount(s, id)),
+    'accounts.reconcile': (input: ReconcileInput) => write('accounts.reconcile', () => catalog.reconcile(s, input)),
     'accounts.reconciliations': (accountId: string) => catalog.listReconciliations(s, accountId),
-    'accounts.deleteReconciliation': (id: string) => catalog.deleteReconciliation(s, id),
-    'groups.save': (input: GroupInput) => catalog.saveGroup(s, input),
-    'groups.delete': (id: string) => catalog.deleteGroup(s, id),
-    'categories.save': (input: CategoryInput) => catalog.saveCategory(s, input),
+    'accounts.deleteReconciliation': (id: string) => write('accounts.deleteReconciliation', () => catalog.deleteReconciliation(s, id)),
+    'groups.save': (input: GroupInput) => write('groups.save', () => catalog.saveGroup(s, input)),
+    'groups.delete': (id: string) => write('groups.delete', () => catalog.deleteGroup(s, id)),
+    'categories.save': (input: CategoryInput) => write('categories.save', () => catalog.saveCategory(s, input)),
     'categories.usage': (id: string) => catalog.categoryUsage(s, id),
-    'categories.delete': (id: string, reassignTo?: string | null) => catalog.deleteCategory(s, id, reassignTo),
-    'subcategories.save': (input: SubcategoryInput) => catalog.saveSubcategory(s, input),
-    'subcategories.delete': (id: string) => catalog.deleteSubcategory(s, id),
-    'subcategories.merge': (fromId: string, intoId: string) => catalog.mergeSubcategories(s, fromId, intoId),
+    'categories.delete': (id: string, reassignTo?: string | null) => write('categories.delete', () => catalog.deleteCategory(s, id, reassignTo)),
+    'subcategories.save': (input: SubcategoryInput) => write('subcategories.save', () => catalog.saveSubcategory(s, input)),
+    'subcategories.delete': (id: string) => write('subcategories.delete', () => catalog.deleteSubcategory(s, id)),
+    'subcategories.merge': (fromId: string, intoId: string) => write('subcategories.merge', () => catalog.mergeSubcategories(s, fromId, intoId)),
 
     // Movimientos
     'tx.list': (filter: TxFilter) => tx.listTransactions(s, filter),
     'tx.get': (id: string) => tx.getTransaction(s, id),
     'tx.validate': (draft: TxDraft) => tx.validateDraft(s, draft),
-    'tx.save': (input: TxInput) => tx.saveTransaction(s, input),
-    'tx.saveTransfer': (input: TransferInput) => tx.saveTransfer(s, input),
-    'tx.setStatus': (ids: string[], status: TxStatus) => tx.setStatus(s, ids, status),
-    'tx.delete': (id: string) => tx.deleteTransaction(s, id),
-    'tx.dismissDuplicate': (a: string, b: string) => tx.dismissDuplicate(s, a, b),
+    'tx.save': (input: TxInput) => write('tx.save', () => tx.saveTransaction(s, input)),
+    'tx.saveTransfer': (input: TransferInput) => write('tx.saveTransfer', () => tx.saveTransfer(s, input)),
+    'tx.setStatus': (ids: string[], status: TxStatus) => write('tx.setStatus', () => tx.setStatus(s, ids, status)),
+    'tx.delete': (id: string) => write('tx.delete', () => tx.deleteTransaction(s, id)),
+    'tx.dismissDuplicate': (a: string, b: string) => write('tx.dismissDuplicate', () => tx.dismissDuplicate(s, a, b)),
     'tx.reviewQueue': () => tx.reviewQueue(s),
     'tx.suggest': (text: string) => tx.suggestFromHistory(s, text),
 
@@ -90,19 +98,19 @@ export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
     // Planificación
     'budgets.report': (month: MonthKey) => planning.getBudgetReport(s, month),
     'budgets.set': (input: { month: string; categoryId: string; amountCents?: number | null; alertPct?: number | null }) =>
-      planning.setBudget(s, input),
-    'budgets.copy': (fromMonth: MonthKey, toMonth: MonthKey, overwrite?: boolean) => planning.copyBudgets(s, fromMonth, toMonth, overwrite),
+      write('budgets.set', () => planning.setBudget(s, input)),
+    'budgets.copy': (fromMonth: MonthKey, toMonth: MonthKey, overwrite?: boolean) => write('budgets.copy', () => planning.copyBudgets(s, fromMonth, toMonth, overwrite)),
     'recurring.list': () => planning.listRecurring(s),
-    'recurring.save': (input: RecurringInput) => planning.saveRecurring(s, input),
-    'recurring.delete': (id: string) => planning.deleteRecurring(s, id),
+    'recurring.save': (input: RecurringInput) => write('recurring.save', () => planning.saveRecurring(s, input)),
+    'recurring.delete': (id: string) => write('recurring.delete', () => planning.deleteRecurring(s, id)),
     'goals.list': () => planning.listGoals(s),
-    'goals.save': (input: GoalInput) => planning.saveGoal(s, input),
-    'goals.delete': (id: string) => planning.deleteGoal(s, id),
-    'goals.allocate': (input: AllocationInput) => planning.saveAllocation(s, input),
-    'goals.deleteAllocation': (id: string) => planning.deleteAllocation(s, id),
+    'goals.save': (input: GoalInput) => write('goals.save', () => planning.saveGoal(s, input)),
+    'goals.delete': (id: string) => write('goals.delete', () => planning.deleteGoal(s, id)),
+    'goals.allocate': (input: AllocationInput) => write('goals.allocate', () => planning.saveAllocation(s, input)),
+    'goals.deleteAllocation': (id: string) => write('goals.deleteAllocation', () => planning.deleteAllocation(s, id)),
     'forecast.run': (months?: number) => planning.runForecasts(s, months),
-    'scenarios.save': (input: ScenarioInput) => planning.saveScenario(s, input),
-    'scenarios.delete': (id: string) => planning.deleteScenario(s, id),
+    'scenarios.save': (input: ScenarioInput) => write('scenarios.save', () => planning.saveScenario(s, input)),
+    'scenarios.delete': (id: string) => write('scenarios.delete', () => planning.deleteScenario(s, id)),
 
     // Inversiones
     'inv.overview': () => inv.investmentsOverview(s),
@@ -117,14 +125,14 @@ export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
       return { mcpServers: { finanzas: { command: process.execPath, args: [script], env } } }
     },
     'inv.plan': () => planReport(s.ctx(), s.snap().settings.investmentPlan),
-    'inv.saveBlock': (input: BlockInput) => inv.saveBlock(s, input),
-    'inv.deleteBlock': (id: string) => inv.deleteBlock(s, id),
-    'inv.saveInstrument': (input: InstrumentInput) => inv.saveInstrument(s, input),
-    'inv.deleteInstrument': (id: string) => inv.deleteInstrument(s, id),
-    'inv.saveOp': (input: OpInput) => inv.saveOp(s, input),
-    'inv.deleteOp': (id: string) => inv.deleteOp(s, id),
-    'inv.savePrice': (input: PriceInput) => inv.savePrice(s, input),
-    'inv.deletePrice': (id: string) => inv.deletePrice(s, id),
+    'inv.saveBlock': (input: BlockInput) => write('inv.saveBlock', () => inv.saveBlock(s, input)),
+    'inv.deleteBlock': (id: string) => write('inv.deleteBlock', () => inv.deleteBlock(s, id)),
+    'inv.saveInstrument': (input: InstrumentInput) => write('inv.saveInstrument', () => inv.saveInstrument(s, input)),
+    'inv.deleteInstrument': (id: string) => write('inv.deleteInstrument', () => inv.deleteInstrument(s, id)),
+    'inv.saveOp': (input: OpInput) => write('inv.saveOp', () => inv.saveOp(s, input)),
+    'inv.deleteOp': (id: string) => write('inv.deleteOp', () => inv.deleteOp(s, id)),
+    'inv.savePrice': (input: PriceInput) => write('inv.savePrice', () => inv.savePrice(s, input)),
+    'inv.deletePrice': (id: string) => write('inv.deletePrice', () => inv.deletePrice(s, id)),
     'inv.ops': () => s.snap().ops,
     'inv.prices': () => s.snap().prices,
 
@@ -135,11 +143,21 @@ export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
       return previewImport(s, f)
     },
     'import.apply': (token: string, replaceExisting: boolean) => {
-      const hasData = !isEmpty(s)
       let backup: string | null = null
-      if (hasData && replaceExisting && s.paths.backupsDir) backup = createBackup(s, 'antes-de-importar').path
-      const res = applyImport(s, token, { replaceExisting })
-      return { ...res, backup }
+      return write(
+        'import.apply',
+        () => {
+          const res = applyImport(s, token, { replaceExisting })
+          return { ...res, backup }
+        },
+        {
+          // En su turno y fuera de la transacción: comprobar si hay datos y, si toca, la copia.
+          before: () => {
+            const hasData = !isEmpty(s)
+            if (hasData && replaceExisting && s.paths.backupsDir) backup = createBackup(s, 'antes-de-importar').path
+          }
+        }
+      )
     },
     'tr.pick': async () => {
       const f = await dialogs.openFile('Elige el CSV exportado de Trade Republic', [{ name: 'CSV', extensions: ['csv'] }])
@@ -147,8 +165,12 @@ export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
       return previewTradeRepublic(s, f)
     },
     'tr.apply': (token: string, opts: TrApplyOptions) => {
-      const backup = s.paths.backupsDir ? createBackup(s, 'antes-de-importar').path : null
-      return { ...applyTradeRepublic(s, token, opts), backup }
+      let backup: string | null = null
+      return write('tr.apply', () => ({ ...applyTradeRepublic(s, token, opts), backup }), {
+        before: () => {
+          backup = s.paths.backupsDir ? createBackup(s, 'antes-de-importar').path : null
+        }
+      })
     },
     'export.json': async () => {
       const f = await dialogs.saveFile('Exportar todo (JSON)', `finanzas-${s.today()}.json`, [{ name: 'JSON', extensions: ['json'] }])

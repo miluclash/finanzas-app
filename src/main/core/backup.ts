@@ -1,5 +1,10 @@
 // Copias de seguridad (archivo SQLite completo) y restauración (copia .sqlite o exportación JSON
 // de un módulo).
+//
+// `createBackup` y `autoBackup` no escriben en la base y no se encolan solas: quien las llama
+// decide el turno (los handlers usan un turno exclusivo de la cola; el arranque, el paso previo de
+// la primera migración). Nunca dentro de una operación: `exportBytes` lanza con una transacción
+// abierta.
 import fs from 'node:fs'
 import path from 'node:path'
 import { audit } from './audit'
@@ -42,7 +47,7 @@ export function listBackups(s: BackupSource): BackupInfo[] {
 
 export function createBackup(
   s: BackupSource,
-  kind: 'auto' | 'manual' | 'antes-de-restaurar' | 'antes-de-importar' | 'antes-de-actualizar' = 'manual'
+  kind: 'auto' | 'manual' | 'antes-de-restaurar' | 'antes-de-importar' | 'antes-de-actualizar' | 'antes-de-migrar' = 'manual'
 ): BackupInfo {
   const dir = s.paths.backupsDir
   if (!dir) throw new UserError('No hay carpeta de copias configurada.')
@@ -88,29 +93,57 @@ function restoreJson(ref: CoreRef, obj: unknown): void {
   throw new UserError('El JSON no es una exportación de esta app.')
 }
 
-/** Restaura una copia (.sqlite o .json exportado). Antes guarda una copia del estado actual. */
-export async function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBackup: string | null }> {
+/** Etiqueta de la cola para restaurar una copia. */
+const RESTORE_LABEL = 'core:backup.restore'
+
+/**
+ * Restaura una copia (.sqlite o .json exportado). Antes guarda una copia del estado actual.
+ *
+ * Se encola a sí misma en un turno exclusivo de la cola (`enqueueTask`): quien la llama no tiene
+ * que envolverla en otra tarea (eso bloquearía la cola, ver writeQueue.ts).
+ *
+ * Con una copia `.sqlite`, la base nueva sustituye a la actual (`replaceDb`) antes de migrarla, y
+ * la vieja se cierra al final. Si algo falla antes de `replaceDb`, la base actual sigue intacta.
+ */
+export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBackup: string | null }> {
   const s = coreOf(ref)
-  if (!fs.existsSync(file)) throw new UserError('El archivo no existe.')
-  const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
-  if (file.toLowerCase().endsWith('.json')) {
-    restoreJson(s, JSON.parse(fs.readFileSync(file, 'utf8')))
-    return { safetyBackup: safety }
-  }
-  const buf = new Uint8Array(fs.readFileSync(file))
-  await validateSqlite(buf, s.registry.requiredTables)
-  if (!s.paths.dbPath) {
-    const db = await Db.openReadOnlyBuffer(buf)
-    migrate(db, s.registry.migrations)
+  return s.queue.enqueueTask(RESTORE_LABEL, async ({ runOp }) => {
+    if (!fs.existsSync(file)) throw new UserError('El archivo no existe.')
+    const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
+    if (file.toLowerCase().endsWith('.json')) {
+      const obj: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
+      runOp(RESTORE_LABEL, () => restoreJson(s, obj))
+      return { safetyBackup: safety }
+    }
+    const buf = new Uint8Array(fs.readFileSync(file))
+    await validateSqlite(buf, s.registry.requiredTables)
+    if (!s.paths.dbPath) {
+      const db = await Db.openReadOnlyBuffer(buf)
+      s.replaceDb(db)
+      migrate(db, s.registry.migrations, runOp)
+      return { safetyBackup: safety }
+    }
+    // La base nueva se abre desde los bytes ya validados ANTES de tocar el archivo: si no se puede
+    // abrir, el archivo y la base actual siguen intactos. sql.js no mantiene el archivo abierto,
+    // así que se puede sustituir con la base vieja aún en memoria.
+    const db = await Db.fromBuffer(buf, s.paths.dbPath)
+    fs.writeFileSync(s.paths.dbPath + '.restore', Buffer.from(buf))
+    try {
+      fs.renameSync(s.paths.dbPath + '.restore', s.paths.dbPath)
+    } catch (e) {
+      db.close()
+      fs.rmSync(s.paths.dbPath + '.restore', { force: true })
+      throw e
+    }
+    const old = s.db
     s.replaceDb(db)
+    try {
+      migrate(db, s.registry.migrations, runOp)
+      const name = path.basename(file)
+      runOp(RESTORE_LABEL, () => audit(db, 'backup', name, 'restore', `Restaurada copia ${name}`, null, null))
+    } finally {
+      old.close()
+    }
     return { safetyBackup: safety }
-  }
-  fs.writeFileSync(s.paths.dbPath + '.restore', Buffer.from(buf))
-  s.db.close()
-  fs.renameSync(s.paths.dbPath + '.restore', s.paths.dbPath)
-  const db = await Db.open(s.paths.dbPath)
-  migrate(db, s.registry.migrations)
-  s.replaceDb(db)
-  audit(s.db, 'backup', path.basename(file), 'restore', `Restaurada copia ${path.basename(file)}`, null, null)
-  return { safetyBackup: safety }
+  })
 }

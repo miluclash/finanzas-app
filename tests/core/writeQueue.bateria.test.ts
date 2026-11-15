@@ -25,8 +25,9 @@ const AUDIT_SQL = `CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT,
 
 async function setup(file: string | null = null): Promise<{ db: Db; q: WriteQueue }> {
   const db = await Db.open(file)
-  db.exec('CREATE TABLE prueba (id INTEGER PRIMARY KEY AUTOINCREMENT, n INTEGER NOT NULL)')
-  return { db, q: new WriteQueue(() => db) }
+  const q = new WriteQueue(() => db)
+  q.runNow('bateria:montar', () => db.exec('CREATE TABLE prueba (id INTEGER PRIMARY KEY AUTOINCREMENT, n INTEGER NOT NULL)'))
+  return { db, q }
 }
 
 function ns(db: Db): number[] {
@@ -298,7 +299,7 @@ describe('batería de la cola de escritura', () => {
 
   it('la auditoría entra en la misma transacción: aparece si confirma y no si fn lanza', async () => {
     const { db, q } = await setup()
-    db.exec(AUDIT_SQL)
+    q.runNow('bateria:montar', () => db.exec(AUDIT_SQL))
     await q.enqueue('bateria:ok', () => insertar(db, 1), {
       audit: { entity: 'prueba', entityId: '1', action: 'create', summary: 'Alta', before: null, after: { n: 1 } }
     })
@@ -443,9 +444,9 @@ describe('batería de la cola de escritura', () => {
     vi.useRealTimers()
   })
 
-  it('con guard activo: run, exec y tx fuera de la cola lanzan; all/get funcionan; dentro de enqueue se escribe', async () => {
+  it('la guarda está siempre activa: run, exec y tx fuera de la cola lanzan; all/get funcionan; dentro de enqueue se escribe', async () => {
     const { db, q } = await setup()
-    db.guard = true
+    expect('guard' in db).toBe(false)
     expect(() => insertar(db, 1)).toThrow('Escritura fuera de la cola')
     expect(() => db.exec('DELETE FROM prueba')).toThrow('Escritura fuera de la cola')
     expect(() => db.tx(() => undefined)).toThrow('Escritura fuera de la cola')

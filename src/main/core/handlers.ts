@@ -1,5 +1,7 @@
 // Handlers IPC del núcleo: información de la app, auditoría, copias de seguridad y carpeta de datos.
 // Los de cada módulo los construye su `ipc` (ver registry.ts) y se juntan en la raíz de composición.
+// Los de lectura son síncronos y no pasan por la cola; los que escriben (o necesitan turno)
+// devuelven una promesa de la cola de escritura.
 import { autoBackup, createBackup, listBackups, restoreBackup } from './backup'
 import type { CoreContext } from './context'
 import { UserError } from './errors'
@@ -41,10 +43,11 @@ export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, ap
         entity ? [entity] : undefined
       ),
 
-    // Copias
+    // Copias. No escriben en la base, pero van en un turno exclusivo de la cola para no ver nunca
+    // una base a medio restaurar. Restaurar se encola sola (ver backup.ts).
     'backup.list': () => listBackups(ctx),
-    'backup.create': () => createBackup(ctx, 'manual'),
-    'backup.auto': () => autoBackup(ctx),
+    'backup.create': () => ctx.queue.enqueueTask('core:backup.create', async () => createBackup(ctx, 'manual')),
+    'backup.auto': () => ctx.queue.enqueueTask('core:backup.auto', async () => autoBackup(ctx)),
     'backup.restore': async (file?: string) => {
       const f =
         file ??

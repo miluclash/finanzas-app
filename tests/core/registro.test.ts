@@ -1,16 +1,18 @@
 // Registro de módulos, ejecutor de migraciones por rangos, contexto del núcleo y copias del núcleo.
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { APP_MODULES, createAppHandlers, createAppRegistry } from '../../src/main/app'
 import { createBackup, restoreBackup, validateSqlite } from '../../src/main/core/backup'
 import { createCoreContext, initCore } from '../../src/main/core/context'
 import { Db } from '../../src/main/core/db'
 import { UserError } from '../../src/main/core/errors'
 import type { DialogProvider } from '../../src/main/core/handlers'
-import { MIGRATION_RANGES, migrate, schemaVersion, type Migration } from '../../src/main/core/migrations'
+import { MIGRATION_RANGES, migrate, pendingMigrations, schemaVersion, type Migration, type OpRunner } from '../../src/main/core/migrations'
 import { createRegistry, defineModule, mergeHandlers, type AppModule } from '../../src/main/core/registry'
+import { WriteQueue } from '../../src/main/core/writeQueue'
 import { exportJsonObject } from '../../src/main/modules/finanzas/exports'
 import { finanzasModule } from '../../src/main/modules/finanzas'
 import { MIGRATIONS } from '../../src/main/modules/finanzas/migrations'
@@ -24,6 +26,7 @@ function tmpDir(): string {
   return d
 }
 afterEach(() => {
+  vi.restoreAllMocks()
   for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true })
 })
 
@@ -48,6 +51,14 @@ function moduloPrueba(migrations: Migration[], extra: Partial<AppModule> = {}): 
   })
 }
 
+/** Ejecutor de migraciones por una cola propia de la base (como el arranque, con runNow). */
+function porCola(db: Db): OpRunner {
+  const q = new WriteQueue(() => db)
+  return (label, fn) => q.runNow(label, fn)
+}
+
+const sha = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+
 const tablas = (db: Db) => db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").map((r) => r.name)
 
 describe('migraciones', () => {
@@ -57,12 +68,15 @@ describe('migraciones', () => {
       { version: 2, name: 'b', up: 'CREATE TABLE b (id INTEGER PRIMARY KEY, a_id INTEGER REFERENCES a(id));' },
       { version: 1, name: 'a', up: 'CREATE TABLE a (id INTEGER PRIMARY KEY);' }
     ]
-    expect(migrate(db, desordenadas)).toBe(2)
+    const run = porCola(db)
+    expect(pendingMigrations(db, desordenadas).map((m) => m.version)).toEqual([1, 2])
+    expect(migrate(db, desordenadas, run)).toBe(2)
     expect(db.all('SELECT version, name FROM schema_migrations ORDER BY rowid')).toEqual([
       { version: 1, name: 'a' },
       { version: 2, name: 'b' }
     ])
-    expect(migrate(db, desordenadas)).toBe(0)
+    expect(pendingMigrations(db, desordenadas)).toEqual([])
+    expect(migrate(db, desordenadas, run)).toBe(0)
     expect(schemaVersion(db)).toBe(2)
   })
 
@@ -72,17 +86,21 @@ describe('migraciones', () => {
       { version: 1, name: 'buena', up: 'CREATE TABLE a (id INTEGER PRIMARY KEY);' },
       { version: 2, name: 'mala', up: 'CREATE TABLE c (id INTEGER PRIMARY KEY); ESTO NO ES SQL;' }
     ]
-    expect(() => migrate(db, malas)).toThrow()
+    expect(() => migrate(db, malas, porCola(db))).toThrow()
     expect(tablas(db)).toEqual(['a', 'schema_migrations'])
     expect(schemaVersion(db)).toBe(1)
   })
 
   it('schemaVersion por rango: la de cada dueño; sin rango, la más alta', async () => {
     const db = await Db.open(null)
-    migrate(db, [
-      { version: 1, name: 'f', up: 'CREATE TABLE f (id INTEGER PRIMARY KEY);' },
-      { version: 2000, name: 'e', up: 'CREATE TABLE trn_e (id INTEGER PRIMARY KEY);' }
-    ])
+    migrate(
+      db,
+      [
+        { version: 1, name: 'f', up: 'CREATE TABLE f (id INTEGER PRIMARY KEY);' },
+        { version: 2000, name: 'e', up: 'CREATE TABLE trn_e (id INTEGER PRIMARY KEY);' }
+      ],
+      porCola(db)
+    )
     expect(schemaVersion(db, MIGRATION_RANGES.finanzas)).toBe(1)
     expect(schemaVersion(db, MIGRATION_RANGES.entreno)).toBe(2000)
     expect(schemaVersion(db, MIGRATION_RANGES.core)).toBe(0)
@@ -131,6 +149,100 @@ describe('migraciones', () => {
     expect(schemaVersion(db)).toBe(2000)
     expect(AppState.for(ctx).snap().accounts.map((x) => x.id)).toEqual([a.id])
     expect(exportJsonObject(AppState.for(ctx)).schemaVersion).toBe(1)
+  })
+
+  it('abrir una base que ya está al día no guarda nada (ni mtime ni contenido cambian)', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const backups = path.join(dir, 'backups')
+    const s1 = AppState.init(await Db.open(file), { dbPath: file, backupsDir: backups })
+    account(s1, { name: 'Corriente', openingBalanceCents: 1000 })
+    s1.db.close()
+    const antes = { sha: sha(file), mtime: fs.statSync(file).mtimeMs }
+    await new Promise((r) => setTimeout(r, 30))
+    const persist = vi.spyOn(Db.prototype, 'persist')
+    const s2 = AppState.init(await Db.open(file), { dbPath: file, backupsDir: backups })
+    expect(persist).not.toHaveBeenCalled()
+    expect(s2.core.queue.busy).toBe(false)
+    expect({ sha: sha(file), mtime: fs.statSync(file).mtimeMs }).toEqual(antes)
+    expect(fs.existsSync(backups) ? fs.readdirSync(backups) : []).toEqual([])
+    s2.db.close()
+  })
+
+  it('base nueva: crea el archivo sin copia antes de migrar; la escritura queda en disco', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const backups = path.join(dir, 'backups')
+    const s = AppState.init(await Db.open(file), { dbPath: file, backupsDir: backups })
+    expect(fs.existsSync(file)).toBe(true)
+    expect(fs.existsSync(backups) ? fs.readdirSync(backups) : []).toEqual([])
+    s.db.close()
+    const r = await Db.open(file)
+    expect(schemaVersion(r)).toBe(1)
+    expect(r.get<{ n: number }>('SELECT COUNT(*) AS n FROM categories')!.n).toBeGreaterThan(0)
+    r.close()
+  })
+
+  it('base con datos y migraciones pendientes: copia antes-de-migrar con el estado previo, y una sola', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const backups = path.join(dir, 'backups')
+    const s1 = AppState.init(await Db.open(file), { dbPath: file, backupsDir: backups })
+    const a = account(s1, { name: 'Corriente', openingBalanceCents: 1000 })
+    s1.db.close()
+
+    const registro = createRegistry([
+      finanzasModule,
+      moduloPrueba([
+        { version: 2000, name: 'prueba', up: 'CREATE TABLE trn_prueba (id INTEGER PRIMARY KEY);' },
+        { version: 2001, name: 'prueba 2', up: 'CREATE TABLE trn_prueba2 (id INTEGER PRIMARY KEY);' }
+      ])
+    ])
+    const ctx = createCoreContext(await Db.open(file), { dbPath: file, backupsDir: backups }, registro)
+    initCore(ctx)
+    const copias = fs.readdirSync(backups)
+    expect(copias).toHaveLength(1)
+    expect(copias[0]).toMatch(/^finanzas-\d{8}-\d{6}-antes-de-migrar\.sqlite$/)
+    // La copia es el estado de antes de migrar.
+    const copia = await Db.open(path.join(backups, copias[0]))
+    expect(copia.all('SELECT version FROM schema_migrations')).toEqual([{ version: 1 }])
+    expect(tablas(copia)).not.toContain('trn_prueba')
+    expect(copia.all<{ id: string }>('SELECT id FROM accounts').map((r) => r.id)).toEqual([a.id])
+    copia.close()
+    // Y el archivo ya está migrado.
+    ctx.db.close()
+    const r = await Db.open(file)
+    expect(r.all('SELECT version FROM schema_migrations ORDER BY version')).toEqual([{ version: 1 }, { version: 2000 }, { version: 2001 }])
+    r.close()
+    // Al volver a abrir ya no hay pendientes: ni copia nueva ni guardado.
+    const ctx2 = createCoreContext(await Db.open(file), { dbPath: file, backupsDir: backups }, registro)
+    initCore(ctx2)
+    expect(fs.readdirSync(backups)).toHaveLength(1)
+    ctx2.db.close()
+  })
+
+  it('una migración que falla al arrancar deja aplicadas las anteriores y la copia hecha', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const backups = path.join(dir, 'backups')
+    AppState.init(await Db.open(file), { dbPath: file, backupsDir: backups }).db.close()
+    const registro = createRegistry([
+      finanzasModule,
+      moduloPrueba([
+        { version: 2000, name: 'buena', up: 'CREATE TABLE trn_a (id INTEGER PRIMARY KEY);' },
+        { version: 2001, name: 'mala', up: 'CREATE TABLE trn_b (id INTEGER PRIMARY KEY); ESTO NO ES SQL;' }
+      ])
+    ])
+    const ctx = createCoreContext(await Db.open(file), { dbPath: file, backupsDir: backups }, registro)
+    expect(() => initCore(ctx)).toThrow()
+    expect(ctx.queue.busy).toBe(false)
+    expect(ctx.db.inOp).toBe(false)
+    expect(fs.readdirSync(backups).filter((f) => f.endsWith('-antes-de-migrar.sqlite'))).toHaveLength(1)
+    ctx.db.close()
+    const r = await Db.open(file)
+    expect(r.all('SELECT version FROM schema_migrations ORDER BY version')).toEqual([{ version: 1 }, { version: 2000 }])
+    expect(tablas(r)).not.toContain('trn_b')
+    r.close()
   })
 
   it('el SQL de finanzas sigue siendo una sola migración, la 1', () => {
@@ -199,23 +311,27 @@ describe('contexto y copias del núcleo', () => {
     let b = 0
     ctx.onChange(() => a++)
     const baja = ctx.onChange(() => b++)
-    db1.exec('CREATE TABLE x (id INTEGER PRIMARY KEY)')
-    expect([a, b]).toEqual([1, 1])
+    // Una escritura suelta avisa al hacerse y otra vez al confirmar la operación.
+    ctx.queue.runNow('prueba:x', () => db1.exec('CREATE TABLE x (id INTEGER PRIMARY KEY)'))
+    expect([a, b]).toEqual([2, 2])
     baja()
     const db2 = await Db.open(null)
     ctx.replaceDb(db2)
-    expect([a, b]).toEqual([2, 1])
+    expect([a, b]).toEqual([3, 2])
     expect(ctx.db).toBe(db2)
     expect(db1.onChange).toBeNull()
-    db2.exec('CREATE TABLE y (id INTEGER PRIMARY KEY)')
-    expect(a).toBe(3)
+    // La cola escribe ya en la base nueva.
+    ctx.queue.runNow('prueba:y', () => db2.exec('CREATE TABLE y (id INTEGER PRIMARY KEY)'))
+    expect(a).toBe(5)
+    expect(tablas(db2)).toContain('y')
+    expect(tablas(db1)).not.toContain('y')
   })
 
   it('valida las copias con las tablas exigidas por el registro', async () => {
     const s = await memoryApp()
     await expect(validateSqlite(s.db.exportBytes(), s.core.registry.requiredTables)).resolves.toBeUndefined()
     const vacia = await Db.open(null)
-    vacia.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)')
+    new WriteQueue(() => vacia).runNow('prueba:montar', () => vacia.exec('CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)'))
     await expect(validateSqlite(vacia.exportBytes(), s.core.registry.requiredTables)).rejects.toThrow('El archivo no es una copia de seguridad de esta app.')
     await expect(validateSqlite(new Uint8Array([1, 2, 3]), s.core.registry.requiredTables)).rejects.toBeInstanceOf(UserError)
   })
@@ -240,6 +356,44 @@ describe('contexto y copias del núcleo', () => {
     await escribirTarea(s, () => restoreBackup(s.core, json))
     expect(s.ctx().transactions.length).toBe(1)
     expect(s.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM audit_log WHERE entity = 'backup' AND entity_id = 'json'")?.n).toBe(1)
+  })
+
+  it('restaurar un .sqlite: sustituye la base, una fila de auditoría, la vieja cerrada y el archivo al día', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const s = AppState.init(await Db.open(file), { dbPath: file, backupsDir: path.join(dir, 'backups') })
+    const a = account(s, { name: 'Corriente', openingBalanceCents: 5000 })
+    const copia = createBackup(s, 'manual')
+    tx(s, { accountId: a.id, amountCents: -999 })
+    const vieja = s.db
+    const auditAntes = s.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM audit_log')!.n
+
+    // Un archivo que no es una copia no toca nada: la base actual sigue siendo la misma y usable.
+    const malo = path.join(dir, 'malo.sqlite')
+    fs.writeFileSync(malo, 'no es sqlite')
+    await expect(restoreBackup(s, malo)).rejects.toBeInstanceOf(UserError)
+    expect(s.db).toBe(vieja)
+    tx(s, { accountId: a.id, amountCents: -1 })
+    expect(s.ctx().transactions.length).toBe(2)
+
+    const res = await restoreBackup(s, copia.path)
+    expect(res.safetyBackup).toMatch(/-antes-de-restaurar\.sqlite$/)
+    expect(s.db).not.toBe(vieja)
+    expect(() => vieja.all('SELECT 1')).toThrow()
+    expect(s.core.queue.busy).toBe(false)
+    expect(s.ctx().transactions.length).toBe(0)
+    const filas = s.db.all<{ entity: string; entity_id: string; action: string }>(
+      "SELECT entity, entity_id, action FROM audit_log WHERE entity = 'backup'"
+    )
+    expect(filas).toEqual([{ entity: 'backup', entity_id: copia.name, action: 'restore' }])
+    // La copia tenía las filas de antes del movimiento; ahora hay esas más la de restaurar.
+    expect(s.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM audit_log')!.n).toBe(auditAntes - 1 + 1)
+    // Lo restaurado (con su auditoría) está en disco.
+    s.db.close()
+    const r = await Db.open(file)
+    expect(r.get<{ n: number }>("SELECT COUNT(*) AS n FROM audit_log WHERE entity = 'backup'")!.n).toBe(1)
+    expect(r.get<{ n: number }>('SELECT COUNT(*) AS n FROM transactions')!.n).toBe(0)
+    r.close()
   })
 
   it('createBackup acepta el contexto y el AppState', async () => {

@@ -63,7 +63,10 @@ export interface AppModule<H extends HandlerMap = HandlerMap> {
   aiTools: readonly AiToolDef[]
   importers?: readonly ImporterDef[]
   exporters?: readonly ExporterDef[]
-  /** Datos iniciales. Se llama al arrancar, después de migrar; tiene que ser idempotente. */
+  /**
+   * Datos iniciales. Se llama al arrancar, después de migrar, dentro de su propia operación de la
+   * cola (`<modulo>:semilla`); tiene que ser idempotente y no escribir nada si no hace falta.
+   */
   seed?(db: Db): void
   /** El módulo no tiene datos del usuario (para la pantalla de bienvenida). */
   isEmpty?(ctx: CoreContext): boolean
@@ -71,7 +74,7 @@ export interface AppModule<H extends HandlerMap = HandlerMap> {
   requiredTables?: readonly string[]
   /**
    * Restaura una exportación JSON. Devuelve `false` si el JSON no es de este módulo (y no toca
-   * nada) y `true` si lo reconoce y lo ha restaurado.
+   * nada) y `true` si lo reconoce y lo ha restaurado. Se llama dentro de una operación de la cola.
    */
   restoreJson?(ctx: CoreContext, obj: unknown): boolean
 }

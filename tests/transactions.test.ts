@@ -39,14 +39,10 @@ describe('movimientos (integración)', () => {
     const s = await memoryApp()
     const a = account(s, { name: 'Corriente' })
     expect(() =>
-      escribir(s, () =>
-        escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-01', description: 'X', amountCents: 500, type: 'EXPENSE', categoryId: cat(s, 'Alimentación') }))
-      )
+      escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-01', description: 'X', amountCents: 500, type: 'EXPENSE', categoryId: cat(s, 'Alimentación') }))
     ).toThrow(/restar dinero/)
     expect(() =>
-      escribir(s, () =>
-        escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-01', description: 'X', amountCents: 500, type: 'INCOME', categoryId: cat(s, 'Alimentación') }))
-      )
+      escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-01', description: 'X', amountCents: 500, type: 'INCOME', categoryId: cat(s, 'Alimentación') }))
     ).toThrow(/categoría de gastos/)
     expect(() => escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-01', description: 'X', amountCents: -500, type: 'EXPENSE' }))).toThrow(/categoría/)
   })

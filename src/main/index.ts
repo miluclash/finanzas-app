@@ -5,7 +5,7 @@ import path from 'node:path'
 import { createAppHandlers, createAppRegistry, type Handlers } from './app'
 import { createBackup } from './core/backup'
 import { createCoreContext, initCore, type CoreContext } from './core/context'
-import { Db } from './core/db'
+import { Db, SaveError } from './core/db'
 import { UserError } from './core/errors'
 import type { DialogProvider } from './core/handlers'
 import { initUpdater } from './core/updater'
@@ -89,10 +89,19 @@ async function initData(): Promise<void> {
   initCore(core)
   handlers = createAppHandlers(core, dialogs, app.getVersion())
   try {
-    handlers['backup.auto']()
+    await handlers['backup.auto']()
   } catch (e) {
     console.error('No se pudo hacer la copia automática', e)
   }
+}
+
+/**
+ * Espera a que la cola de escritura termine y, en un turno propio, reintenta el guardado en disco
+ * que hubiera quedado pendiente (lanza si vuelve a fallar).
+ */
+async function settleWrites(c: CoreContext): Promise<void> {
+  await c.queue.onIdle()
+  await c.queue.enqueueTask('core:cerrar', async () => c.queue.flush())
 }
 
 ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
@@ -104,6 +113,11 @@ ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
     return { ok: true, data }
   } catch (e) {
     if (e instanceof UserError) return { ok: false, error: e.message, user: true }
+    // Los cambios están hechos en memoria; el mensaje es para Michael (se reintenta al guardar).
+    if (e instanceof SaveError) {
+      console.error(`[api] ${method}`, e)
+      return { ok: false, error: e.message, user: true }
+    }
     console.error(`[api] ${method}`, e)
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
@@ -134,8 +148,18 @@ else {
       return
     }
     createWindow()
-    initUpdater(() => {
-      if (core) createBackup(core, 'antes-de-actualizar')
+    initUpdater({
+      beforeInstall: async () => {
+        const c = core
+        if (!c) return
+        await c.queue.onIdle()
+        await c.queue.enqueueTask('core:backup.actualizar', async () => {
+          createBackup(c, 'antes-de-actualizar')
+        })
+      },
+      settle: async () => {
+        if (core) await settleWrites(core)
+      }
     })
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -143,5 +167,23 @@ else {
   })
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
+  })
+  // Al cerrar no se puede perder nada: si la cola está trabajando o hay un guardado pendiente, se
+  // espera, se reintenta el guardado y se vuelve a pedir el cierre (una sola vez).
+  let readyToQuit = false
+  let settling = false
+  app.on('before-quit', (e) => {
+    const c = core
+    if (readyToQuit || !c) return
+    if (!c.queue.busy && !c.queue.hasPendingSave) return
+    e.preventDefault()
+    if (settling) return
+    settling = true
+    void settleWrites(c)
+      .catch((err) => console.error('No se pudieron guardar los últimos cambios al cerrar', err))
+      .finally(() => {
+        readyToQuit = true
+        app.quit()
+      })
   })
 }

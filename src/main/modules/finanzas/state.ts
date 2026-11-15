@@ -1,9 +1,12 @@
 // Estado de finanzas en el proceso principal: snapshot y contexto cacheados sobre la base del núcleo.
 import { buildCtx, type Ctx } from '@shared/modules/finanzas/ctx'
 import type { DataSnapshot } from '@shared/modules/finanzas/types'
-import { createAppRegistry } from '../../app'
 import { createCoreContext, initCore, type CoreContext, type CorePaths } from '../../core/context'
 import type { Db } from '../../core/db'
+import { createRegistry } from '../../core/registry'
+// Ciclo dentro del módulo (index.ts importa AppState): inofensivo, porque ninguno de los dos usa
+// al otro al cargarse, solo dentro de funciones.
+import { finanzasModule } from './index'
 import { loadSnapshot } from './store'
 
 /** Un único `AppState` por contexto del núcleo (lo comparten los handlers y quien lo cree). */
@@ -27,9 +30,13 @@ export class AppState {
     return s
   }
 
-  /** Crea el contexto del núcleo con los módulos de la app, migra, siembra y devuelve el estado. */
+  /**
+   * Crea un contexto del núcleo con solo el módulo de finanzas, migra, siembra y devuelve el
+   * estado (tests, línea base del dorado). Un módulo no importa la raíz de composición (`app.ts`):
+   * la app arranca con su propio registro en `index.ts`.
+   */
   static init(db: Db, paths: CorePaths): AppState {
-    const core = createCoreContext(db, paths, createAppRegistry())
+    const core = createCoreContext(db, paths, createRegistry([finanzasModule]))
     initCore(core)
     return AppState.for(core)
   }

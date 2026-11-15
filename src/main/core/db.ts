@@ -44,31 +44,25 @@ interface OpMarks {
 }
 
 /*
- * Dos modos de escritura conviven mientras dura la migración a la cola:
+ * Escrituras: solo dentro de una operación de la cola de escritura (`beginOp` … `commitOp` /
+ * `rollbackOp`, que abre `WriteQueue`). Fuera de una operación, `run`, `exec` y `tx` lanzan
+ * siempre "Escritura fuera de la cola: …". Las lecturas (`all`, `get`) son libres.
  *
- * - Modo antiguo (fuera de una operación): cada `run`/`exec` suelto se guarda en disco al
- *   momento y `tx` de nivel superior guarda al hacer COMMIT. Se elimina cuando todo pase
- *   por la cola.
- * - Operación de la cola (`beginOp` … `commitOp`/`rollbackOp`): una única transacción
- *   externa. Dentro, `tx` usa siempre SAVEPOINT y nada se guarda en disco hasta `commitOp`.
- *   `onChange` se sigue llamando en los mismos momentos que en el modo antiguo (al cerrar
- *   la `tx` de servicio más externa o tras un `run`/`exec` suelto) para que las cachés se
- *   invaliden igual que antes.
- *
- * Con `guard = true`, cualquier escritura fuera de una operación de la cola lanza error.
+ * Dentro de una operación hay una única transacción externa; `tx` usa siempre SAVEPOINT y nada
+ * se guarda en disco hasta `commitOp`, que guarda una sola vez y solo si hubo cambios.
+ * `onChange` se llama en los mismos momentos que antes de la cola (al cerrar la `tx` de servicio
+ * más externa o tras un `run`/`exec` suelto), y además al confirmar o deshacer la operación, para
+ * que las cachés se invaliden igual que siempre.
  */
 export class Db {
   /** Niveles de `tx` abiertos (sin contar la transacción externa de la cola). */
   private depth = 0
-  private dirty = false
   /** Operación de la cola en curso (null si no hay ninguna). */
   private op: OpMarks | null = null
   /** Hay cambios confirmados en memoria que no se han podido guardar en disco. */
   private pendingPersist = false
   /** Se llama tras cada escritura confirmada (para invalidar cachés). */
   onChange: (() => void) | null = null
-  /** Si está activa, las escrituras fuera de la cola de escritura lanzan error. */
-  guard = false
 
   private constructor(
     private db: Database,
@@ -89,6 +83,15 @@ export class Db {
   }
 
   /** Abre un archivo SQLite sin vincularlo (para validar copias antes de restaurar). */
+  /**
+   * Abre una base a partir de sus bytes y la vincula a `filePath` (sin leer ni escribir el archivo).
+   * Se usa al restaurar una copia: la base nueva existe antes de sustituir el archivo.
+   */
+  static async fromBuffer(buf: Uint8Array, filePath: string): Promise<Db> {
+    const SQL = await loadSql()
+    return new Db(new SQL.Database(buf), filePath)
+  }
+
   static async openReadOnlyBuffer(buf: Uint8Array): Promise<Db> {
     const SQL = await loadSql()
     return new Db(new SQL.Database(buf), null)
@@ -119,14 +122,19 @@ export class Db {
     return this.op !== null
   }
 
+  /** Hay cambios confirmados en memoria que falta guardar en disco (falló un guardado). */
+  get hasPendingSave(): boolean {
+    return this.pendingPersist
+  }
+
   run(sql: string, params?: Params): void {
-    this.checkGuard(sql)
+    this.checkInOp(sql)
     this.db.run(sql, params as never)
     this.afterWrite()
   }
 
   exec(sql: string): void {
-    this.checkGuard(sql)
+    this.checkInOp(sql)
     this.db.exec(sql)
     this.afterWrite()
   }
@@ -135,82 +143,40 @@ export class Db {
     return this.db.getRowsModified()
   }
 
-  private checkGuard(what: string): void {
-    if (this.guard && !this.op) {
+  /** Fuera de una operación de la cola no se puede escribir, nunca. */
+  private checkInOp(what: string): void {
+    if (!this.op) {
       const resumen = what.replace(/\s+/g, ' ').trim().slice(0, 80)
       throw new Error(`Escritura fuera de la cola: ${resumen}`)
     }
   }
 
   private afterWrite(): void {
-    if (this.depth > 0) {
-      // Dentro de una tx: se guarda (modo antiguo) o se avisa (operación) al cerrarla.
-      if (!this.op) this.dirty = true
-    } else if (this.op) {
-      // Escritura suelta dentro de una operación: se invalida como en el autocommit de antes,
-      // pero el guardado en disco espera a `commitOp`.
-      this.onChange?.()
-    } else {
-      this.commitWrite()
-    }
+    // Dentro de una tx de servicio se avisa al cerrarla. Una escritura suelta avisa al momento
+    // (como hacía el autocommit de antes); el guardado en disco espera a `commitOp`.
+    if (this.depth === 0) this.onChange?.()
   }
 
-  /** Ejecuta `fn` dentro de una transacción (anidable con SAVEPOINT). Si falla, deshace todo. */
+  /** Ejecuta `fn` dentro de una transacción (SAVEPOINT, anidable). Si falla, deshace su parte. */
   tx<T>(fn: () => T): T {
-    this.checkGuard('transacción')
+    this.checkInOp('transacción')
     const level = this.depth
     const sp = `sp${level}`
-    // Solo el modo antiguo abre una transacción real; dentro de una operación todo es SAVEPOINT.
-    const outer = level === 0 && !this.op
-    if (outer) this.db.run('BEGIN')
-    else this.db.run(`SAVEPOINT ${sp}`)
+    this.db.run(`SAVEPOINT ${sp}`)
     this.depth = level + 1
     let result: T
     try {
       result = fn()
     } catch (e) {
       this.depth = level
-      if (outer) {
-        this.db.run('ROLLBACK')
-        this.dirty = false
-      } else this.db.run(`ROLLBACK TO ${sp}; RELEASE ${sp}`)
+      this.db.run(`ROLLBACK TO ${sp}; RELEASE ${sp}`)
       throw e
     }
     this.depth = level
-    if (outer) {
-      try {
-        this.db.run('COMMIT')
-      } catch (e) {
-        this.dirty = false
-        try {
-          this.db.run('ROLLBACK')
-        } catch {
-          // Si SQLite ya cerró la transacción no hay nada que deshacer.
-        }
-        throw e
-      }
-      if (this.dirty) {
-        this.dirty = false
-        this.commitWrite()
-      }
-    } else {
-      this.db.run(`RELEASE ${sp}`)
-      // Fin de la tx de servicio más externa dentro de una operación: invalidar sin guardar.
-      if (this.op && level === 0) this.onChange?.()
-    }
+    this.db.run(`RELEASE ${sp}`)
+    // Fin de la tx de servicio más externa: invalidar cachés (el guardado lo hace `commitOp`).
+    if (level === 0) this.onChange?.()
     return result
-  }
-
-  private commitWrite(): void {
-    try {
-      this.persist()
-    } catch (e) {
-      // Igual que antes, el error sale tal cual; además se apunta para que el siguiente
-      // guardado de la cola lo reintente aunque no haya cambios.
-      this.pendingPersist = true
-      throw e
-    }
-    this.onChange?.()
   }
 
   private marks(): OpMarks {
@@ -278,7 +244,6 @@ export class Db {
     if (!this.op) throw new Error('No hay ninguna operación de la cola abierta.')
     this.op = null
     this.depth = 0
-    this.dirty = false
     try {
       this.db.run('ROLLBACK')
     } finally {
@@ -301,7 +266,10 @@ export class Db {
     if (this.op || this.depth > 0) throw new Error(`No se puede ${what} con una transacción abierta.`)
   }
 
-  /** Guarda en disco de forma atómica (archivo temporal + renombrado). */
+  /**
+   * Guarda en disco de forma atómica (archivo temporal + renombrado). No es para uso general:
+   * solo la llaman `commitOp` y `flush`. Es pública únicamente para poder espiarla en los tests.
+   */
   persist(): void {
     this.assertNoTransaction('guardar en disco')
     if (!this.filePath) {
