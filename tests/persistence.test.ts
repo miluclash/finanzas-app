@@ -8,7 +8,8 @@ import { createBackup, exportCsv, exportJsonObject, exportXlsx, restoreBackup, r
 import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
 import { AppState } from '../src/main/modules/finanzas/state'
 import { accountBalance } from '../src/shared/modules/finanzas/ledger'
-import { account, memoryApp, transfer, tx } from './helpers'
+import { saveTransaction } from '../src/main/modules/finanzas/transactions'
+import { account, cat, escribir, escribirTarea, memoryApp, transfer, tx } from './helpers'
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'finanzas-test-'))
@@ -30,10 +31,13 @@ describe('persistencia y copias', () => {
     const s = await memoryApp()
     const a = account(s, { name: 'Corriente' })
     expect(() =>
-      s.db.tx(() => {
-        tx(s, { accountId: a.id, amountCents: -100 })
-        throw new Error('fallo')
-      })
+      escribir(s, () =>
+        s.db.tx(() => {
+          // el servicio directamente: dentro de una escritura no se abre otra
+          saveTransaction(s, { date: '2026-10-01', description: 'Movimiento', type: 'EXPENSE', categoryId: cat(s, 'Alimentación'), accountId: a.id, amountCents: -100 })
+          throw new Error('fallo')
+        })
+      )
     ).toThrow('fallo')
     expect(s.ctx().transactions.length).toBe(0)
   })
@@ -49,11 +53,11 @@ describe('persistencia y copias', () => {
     const backup = createBackup(s, 'manual')
     tx(s, { accountId: a.id, amountCents: -999 })
     expect(s.ctx().transactions.length).toBe(3)
-    restoreFromJson(s, JSON.parse(JSON.stringify(json)))
+    escribir(s, () => restoreFromJson(s, JSON.parse(JSON.stringify(json))))
     expect(s.ctx().transactions.length).toBe(2)
     expect(s.ctx().transactions[0].transferId).toBe(s.ctx().transactions[1].transferId)
     tx(s, { accountId: a.id, amountCents: -999 })
-    await restoreBackup(s, backup.path)
+    await escribirTarea(s, () => restoreBackup(s, backup.path))
     expect(s.ctx().transactions.length).toBe(2)
     expect(accountBalance(s.ctx(), h.id)).toBe(1000)
     // exportaciones a Excel y CSV
@@ -136,7 +140,7 @@ describe('importación del Excel', () => {
     expect(p.errors).toEqual([])
     expect(p.balanceCheck.every((b) => b.ok)).toBe(true)
     expect(p.recurringLinked).toBe(1)
-    applyImport(s, p.token, { replaceExisting: false })
+    escribir(s, () => applyImport(s, p.token, { replaceExisting: false }))
     const ctx = s.ctx()
     expect(accountBalance(ctx, 'ACC001')).toBe(99955)
     expect(ctx.transactions.find((t) => t.id === 'TX00003')!.linkedTxId).toBe('TX00002')
@@ -147,6 +151,6 @@ describe('importación del Excel', () => {
     expect(ctx.scenarios[0].variableMonthlyCents).toBe(15000)
     // segunda importación: exige confirmar el reemplazo
     const p2 = await previewImport(s, file)
-    expect(() => applyImport(s, p2.token, { replaceExisting: false })).toThrow(/reemplazar/)
+    expect(() => escribir(s, () => applyImport(s, p2.token, { replaceExisting: false }))).toThrow(/reemplazar/)
   })
 })

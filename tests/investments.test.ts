@@ -3,7 +3,7 @@ import { computeHoldings, portfolioSummary } from '../src/shared/modules/finanza
 import { accountBalance, monthSummary, positionAt } from '../src/shared/modules/finanzas/ledger'
 import { deleteOp, saveBlock, saveInstrument, saveOp, savePrice } from '../src/main/modules/finanzas/investments'
 import type { InvestmentOp } from '../src/shared/modules/finanzas/types'
-import { account, memoryApp, transfer } from './helpers'
+import { account, escribir, memoryApp, transfer } from './helpers'
 
 function op(p: Partial<InvestmentOp>): InvestmentOp {
   return {
@@ -62,14 +62,14 @@ describe('inversiones (integración)', () => {
     const s = await memoryApp('2026-10-20')
     const a = account(s, { name: 'Corriente', openingBalanceCents: 100000 })
     const b = account(s, { name: 'Bróker', type: 'INVESTMENT', includeLiquidity: false, openingDate: '2026-10-01', openingBalanceCents: 155, initialContributionsCents: 32017 })
-    const blk = saveBlock(s, { name: 'Núcleo', targetPct: '80', maxPct: null })
-    const i = saveInstrument(s, { name: 'MSCI World', isin: 'ie00bj0kdq92', assetClass: 'ETF', blockId: blk.id, accountId: b.id })
+    const blk = escribir(s, () => saveBlock(s, { name: 'Núcleo', targetPct: '80', maxPct: null }))
+    const i = escribir(s, () => saveInstrument(s, { name: 'MSCI World', isin: 'ie00bj0kdq92', assetClass: 'ETF', blockId: blk.id, accountId: b.id }))
     // posición previa a la apertura: cuenta para unidades pero no mueve efectivo
-    saveOp(s, { date: '2026-03-01', accountId: b.id, instrumentId: i.id, type: 'BUY', quantity: '1.5', price: '113.36', feeCents: 100 })
+    escribir(s, () => saveOp(s, { date: '2026-03-01', accountId: b.id, instrumentId: i.id, type: 'BUY', quantity: '1.5', price: '113.36', feeCents: 100 }))
     // aportación y compra después de la apertura
     transfer(s, a.id, b.id, 31300, '2026-10-16')
-    const buy = saveOp(s, { date: '2026-10-16', accountId: b.id, instrumentId: i.id, type: 'BUY', quantity: '2', price: '141', feeCents: 0 })
-    savePrice(s, { instrumentId: i.id, date: '2026-10-20', price: '142.5' })
+    const buy = escribir(s, () => saveOp(s, { date: '2026-10-16', accountId: b.id, instrumentId: i.id, type: 'BUY', quantity: '2', price: '141', feeCents: 0 }))
+    escribir(s, () => savePrice(s, { instrumentId: i.id, date: '2026-10-20', price: '142.5' }))
     const ctx = s.ctx()
     expect(i.isin).toBe('IE00BJ0KDQ92')
     const m = monthSummary(ctx, '2026-10')
@@ -85,19 +85,19 @@ describe('inversiones (integración)', () => {
     expect(accountBalance(ctx, b.id)).toBe(3255 + 49875)
     expect(positionAt(ctx, '2026-10-20').investmentsCents).toBe(3255 + 49875)
     // borrar la operación borra sus apuntes de efectivo
-    deleteOp(s, buy.id)
+    escribir(s, () => deleteOp(s, buy.id))
     expect(s.ctx().transactions.some((t) => t.investmentOpId === buy.id)).toBe(false)
   })
 
   it('dividendos netos como ingreso y comisiones como gasto', async () => {
     const s = await memoryApp('2026-10-20')
     const b = account(s, { name: 'Bróker', type: 'INVESTMENT', includeLiquidity: false, openingDate: '2026-01-01' })
-    const i = saveInstrument(s, { name: 'Chevron', assetClass: 'STOCK', accountId: b.id })
-    saveOp(s, { date: '2026-09-10', accountId: b.id, instrumentId: i.id, type: 'DIVIDEND', amountCents: 81, taxCents: 24 })
-    saveOp(s, { date: '2026-09-11', accountId: b.id, instrumentId: null, type: 'FEE', amountCents: 100 })
+    const i = escribir(s, () => saveInstrument(s, { name: 'Chevron', assetClass: 'STOCK', accountId: b.id }))
+    escribir(s, () => saveOp(s, { date: '2026-09-10', accountId: b.id, instrumentId: i.id, type: 'DIVIDEND', amountCents: 81, taxCents: 24 }))
+    escribir(s, () => saveOp(s, { date: '2026-09-11', accountId: b.id, instrumentId: null, type: 'FEE', amountCents: 100 }))
     const m = monthSummary(s.ctx(), '2026-09')
     expect(m.incomeCents).toBe(57)
     expect(m.totalExpensesCents).toBe(-100)
-    expect(() => saveOp(s, { date: '2026-09-12', accountId: b.id, instrumentId: i.id, type: 'SELL', quantity: '1', price: '10' })).toThrow(/supera/)
+    expect(() => escribir(s, () => saveOp(s, { date: '2026-09-12', accountId: b.id, instrumentId: i.id, type: 'SELL', quantity: '1', price: '10' }))).toThrow(/supera/)
   })
 })

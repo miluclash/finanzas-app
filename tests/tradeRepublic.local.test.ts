@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { allBalances } from '../src/shared/modules/finanzas/ledger'
 import { applyTradeRepublic, previewTradeRepublicText } from '../src/main/modules/finanzas/importTradeRepublic'
-import { account, memoryApp } from './helpers'
+import { account, escribir, memoryApp } from './helpers'
 
 const file = '/home/claude/private/trade_republic.csv'
 describe.skipIf(!fs.existsSync(file))('CSV real de Trade Republic', () => {
@@ -19,7 +19,7 @@ describe.skipIf(!fs.existsSync(file))('CSV real de Trade Republic', () => {
       US1667641005: '0.136351'
     })
     expect(p.totals.cashCents).toBe(155)
-    const r = applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: san.id })
+    const r = escribir(s, () => applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: san.id }))
     const ctx = s.ctx()
     const b = ctx.accountById.get(r.brokerAccountId)!
     expect(b.initialContributionsCents).toBe(32017)

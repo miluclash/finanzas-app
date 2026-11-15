@@ -7,7 +7,7 @@ import type { AppState } from '../../src/main/modules/finanzas/state'
 import { dismissDuplicate as raw_dismissDuplicate, saveTransaction as raw_saveTransaction, saveTransfer as raw_saveTransfer } from '../../src/main/modules/finanzas/transactions'
 import { DEFAULT_PLAN } from '../../src/shared/modules/finanzas/investmentPlan'
 import type { AccountInput, TxInput } from '../../src/shared/modules/finanzas/schemas'
-import { cat } from '../helpers'
+import { cat, escribir } from '../helpers'
 
 const day = (ym: string, d: number) => `${ym}-${String(d).padStart(2, '0')}`
 
@@ -27,7 +27,7 @@ export function buildSyntheticApp(s: AppState): void {
     <A extends unknown[], R>(f: (s: AppState, ...a: A) => R) =>
     (_s: AppState, ...a: A): R => {
       step++
-      return f(s, ...a)
+      return escribir(s, () => f(s, ...a))
     }
   const saveAccount = stepped(raw_saveAccount)
   const reconcile = stepped(raw_reconcile)

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { allBalances } from '../src/shared/modules/finanzas/ledger'
 import { portfolioSummary } from '../src/shared/modules/finanzas/investments'
 import { applyTradeRepublic, parseCsv, previewTradeRepublicText } from '../src/main/modules/finanzas/importTradeRepublic'
-import { account, memoryApp } from './helpers'
+import { account, escribir, memoryApp } from './helpers'
 
 const sample = fs.readFileSync(path.join(__dirname, 'fixtures/tr-sample.csv'), 'utf8')
 
@@ -30,7 +30,7 @@ describe('importador de Trade Republic', () => {
     const s = await memoryApp()
     const santander = account(s, { name: 'Santander', openingBalanceCents: 100000, openingDate: '2026-06-01' })
     const p = previewTradeRepublicText(s, sample, 'x.csv')
-    const r = applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: santander.id })
+    const r = escribir(s, () => applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: santander.id }))
     expect(r.created).toBe(5)
     const ctx = s.ctx()
     const bal = new Map(allBalances(ctx).map((b) => [b.accountId, b.cashCents]))
@@ -40,14 +40,14 @@ describe('importador de Trade Republic', () => {
     expect(portfolioSummary(ctx).cashCents).toBe(2816)
     const again = previewTradeRepublicText(s, sample, 'x.csv')
     expect(again.rows.every((x) => x.duplicate)).toBe(true)
-    expect(applyTradeRepublic(s, again.token, { brokerAccountId: r.brokerAccountId, sourceAccountId: santander.id }).created).toBe(0)
+    expect(escribir(s, () => applyTradeRepublic(s, again.token, { brokerAccountId: r.brokerAccountId, sourceAccountId: santander.id })).created).toBe(0)
   })
 
   it('lo anterior a la cuenta de origen va al saldo inicial del bróker', async () => {
     const s = await memoryApp()
     const santander = account(s, { name: 'Santander', openingBalanceCents: 0, openingDate: '2026-07-01' })
     const p = previewTradeRepublicText(s, sample, 'x.csv')
-    const r = applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: santander.id })
+    const r = escribir(s, () => applyTradeRepublic(s, p.token, { brokerAccountId: null, sourceAccountId: santander.id }))
     const ctx = s.ctx()
     const broker = ctx.accountById.get(r.brokerAccountId)!
     expect(broker.openingDate).toBe('2026-07-01')
