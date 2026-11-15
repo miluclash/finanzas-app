@@ -2,7 +2,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Info, XCircle } from 'lucide-
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { addMonthsToMonth, formatDate, formatMonth, monthOf, todayISO } from '@shared/dates'
-import { GOAL_HEALTH_LABEL } from '@shared/domain/goals'
+import { GOAL_HEALTH_LABEL } from '@shared/modules/finanzas/goals'
 import { formatEur, formatPct } from '@shared/money'
 import { BarList, IncomeExpenseChart, LinesChart } from '../components/charts'
 import { useTxEditor } from '../components/TxEditor'

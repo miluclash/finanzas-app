@@ -1,7 +1,7 @@
 // Validaciones de movimientos (equivalente a la columna Checks del Excel, pero al guardar).
-import { diffDays, isISODate } from '../dates'
-import { formatEur } from '../money'
-import type { Transaction, TxType } from '../types'
+import { diffDays, isISODate } from '../../dates'
+import { formatEur } from '../../money'
+import type { Transaction, TxType } from './types'
 import { categoryKind, type Ctx } from './ctx'
 
 export interface Issue {

@@ -1,6 +1,6 @@
 // Presupuestos por mes y categoría.
-import { addMonthsToMonth, daysInMonth, monthOf, parts } from '../dates'
-import type { MonthKey } from '../types'
+import { addMonthsToMonth, daysInMonth, monthOf, parts } from '../../dates'
+import type { MonthKey } from './types'
 import { categoryKind, type Ctx } from './ctx'
 import { monthSummaries } from './ledger'
 

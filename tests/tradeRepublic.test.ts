@@ -1,9 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { allBalances } from '../src/shared/domain/ledger'
-import { portfolioSummary } from '../src/shared/domain/investments'
-import { applyTradeRepublic, parseCsv, previewTradeRepublicText } from '../src/main/services/importTradeRepublic'
+import { allBalances } from '../src/shared/modules/finanzas/ledger'
+import { portfolioSummary } from '../src/shared/modules/finanzas/investments'
+import { applyTradeRepublic, parseCsv, previewTradeRepublicText } from '../src/main/modules/finanzas/importTradeRepublic'
 import { account, memoryApp } from './helpers'
 
 const sample = fs.readFileSync(path.join(__dirname, 'fixtures/tr-sample.csv'), 'utf8')

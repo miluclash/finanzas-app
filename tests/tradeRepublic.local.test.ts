@@ -1,8 +1,8 @@
 // Solo en local: tu CSV real de Trade Republic en ../private/trade_republic.csv
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { allBalances } from '../src/shared/domain/ledger'
-import { applyTradeRepublic, previewTradeRepublicText } from '../src/main/services/importTradeRepublic'
+import { allBalances } from '../src/shared/modules/finanzas/ledger'
+import { applyTradeRepublic, previewTradeRepublicText } from '../src/main/modules/finanzas/importTradeRepublic'
 import { account, memoryApp } from './helpers'
 
 const file = '/home/claude/private/trade_republic.csv'

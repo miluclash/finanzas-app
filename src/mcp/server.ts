@@ -4,7 +4,7 @@
 // Por eso NUNCA se escribe nada en stdout con console.log: rompería el protocolo.
 // Los mensajes de diagnóstico van a stderr (console.error), que Claude Desktop guarda en sus logs.
 //
-// Lee el mismo archivo finanzas.sqlite que la app y reutiliza sus cálculos (src/shared/domain),
+// Lee el mismo archivo finanzas.sqlite que la app y reutiliza sus cálculos (src/shared/modules/finanzas),
 // así que las cifras son idénticas a las de la pantalla. Nunca escribe en la base de datos.
 import fs from 'node:fs'
 import os from 'node:os'
@@ -12,15 +12,15 @@ import path from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { Db } from '../main/db/db'
-import { loadSnapshot } from '../main/db/store'
+import { Db } from '../main/core/db'
+import { loadSnapshot } from '../main/modules/finanzas/store'
 import { addMonthsToMonth, monthOf, todayISO } from '../shared/dates'
-import { budgetReport } from '../shared/domain/budgets'
-import { buildCtx, type Ctx } from '../shared/domain/ctx'
-import { goalProgress } from '../shared/domain/goals'
-import { planReport } from '../shared/domain/investmentPlan'
-import { portfolioSummary } from '../shared/domain/investments'
-import { allBalances, monthSummary } from '../shared/domain/ledger'
+import { budgetReport } from '../shared/modules/finanzas/budgets'
+import { buildCtx, type Ctx } from '../shared/modules/finanzas/ctx'
+import { goalProgress } from '../shared/modules/finanzas/goals'
+import { planReport } from '../shared/modules/finanzas/investmentPlan'
+import { portfolioSummary } from '../shared/modules/finanzas/investments'
+import { allBalances, monthSummary } from '../shared/modules/finanzas/ledger'
 
 // ---------- Acceso a los datos ----------
 

@@ -1,6 +1,6 @@
 // Esquemas de entrada (validados en la interfaz y otra vez en el proceso principal).
 import { z } from 'zod'
-import { isISODate } from './dates'
+import { isISODate } from '../../dates'
 import {
   ACCOUNT_TYPES,
   ASSET_CLASSES,

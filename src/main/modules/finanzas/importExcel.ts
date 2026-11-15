@@ -4,9 +4,9 @@
 import ExcelJS from 'exceljs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { buildCtx } from '@shared/domain/ctx'
-import { accountCashBalance } from '@shared/domain/ledger'
-import { allDuplicatePairs, transactionIssues } from '@shared/domain/validation'
+import { buildCtx } from '@shared/modules/finanzas/ctx'
+import { accountCashBalance } from '@shared/modules/finanzas/ledger'
+import { allDuplicatePairs, transactionIssues } from '@shared/modules/finanzas/validation'
 import { isISODate } from '@shared/dates'
 import { eurosToCents, formatEur } from '@shared/money'
 import type {
@@ -31,10 +31,10 @@ import type {
   Transaction,
   TxStatus,
   TxType
-} from '@shared/types'
-import { TX_TYPES } from '@shared/types'
-import { audit, DEFAULT_SETTINGS, getSettings, setSettings } from '../db/store'
-import { entityToRow, insertRow, TABLE_ORDER, type TableName } from '../db/tables'
+} from '@shared/modules/finanzas/types'
+import { TX_TYPES } from '@shared/modules/finanzas/types'
+import { audit, DEFAULT_SETTINGS, getSettings, setSettings } from './store'
+import { entityToRow, insertRow, TABLE_ORDER, type TableName } from './tables'
 import { UserError, type AppState } from './state'
 
 type Cell = string | number | boolean | Date | null

@@ -1,8 +1,8 @@
 // Seguimiento del plan de inversión: reparto de la próxima aportación, ejecuciones mensuales
 // frente a lo previsto y comprobación de las reglas del plan (sin vender, sin compras manuales,
 // límites de satélites, tesis escritas, colchón, revisiones).
-import { addMonths, addMonthsToMonth, daysInMonth, diffDays, makeDate, monthOf, parts } from '../dates'
-import type { ISODate, InvestmentPlanConfig, MonthKey } from '../types'
+import { addMonths, addMonthsToMonth, daysInMonth, diffDays, makeDate, monthOf, parts } from '../../dates'
+import type { ISODate, InvestmentPlanConfig, MonthKey } from './types'
 import type { Ctx } from './ctx'
 import { accountCashBalance } from './ledger'
 import { dec, eurToCents, portfolioSummary, type PortfolioSummary } from './investments'

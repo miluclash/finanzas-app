@@ -1,6 +1,6 @@
 // Saldos, resúmenes mensuales, patrimonio y liquidez. Funciones puras sobre el contexto.
-import { addMonthsToMonth, monthEnd, monthOf } from '../dates'
-import type { ISODate, MonthKey, Nature, Transaction } from '../types'
+import { addMonthsToMonth, monthEnd, monthOf } from '../../dates'
+import type { ISODate, MonthKey, Nature, Transaction } from './types'
 import { accountRole, categoryKind, type Ctx } from './ctx'
 import { holdingsValueByAccount } from './investments'
 

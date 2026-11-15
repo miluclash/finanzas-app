@@ -1,12 +1,12 @@
 // Base de datos INVENTADA para el test dorado sintético. Nada de esto son datos reales.
 // Los servicios reales generan ids secuenciales (CAT001, TX0001…); solo `s.now()` depende del reloj, y aquí se fija.
-import { saveAccount as raw_saveAccount, reconcile as raw_reconcile, saveCategory as raw_saveCategory, saveGroup as raw_saveGroup, saveSubcategory as raw_saveSubcategory, updateSettings as raw_updateSettings } from '../../src/main/services/catalog'
-import { saveBlock as raw_saveBlock, saveInstrument as raw_saveInstrument, saveOp as raw_saveOp, savePrice as raw_savePrice } from '../../src/main/services/investments'
-import { copyBudgets as raw_copyBudgets, saveAllocation as raw_saveAllocation, saveGoal as raw_saveGoal, saveRecurring as raw_saveRecurring, saveScenario as raw_saveScenario, setBudget as raw_setBudget } from '../../src/main/services/planning'
-import type { AppState } from '../../src/main/services/state'
-import { dismissDuplicate as raw_dismissDuplicate, saveTransaction as raw_saveTransaction, saveTransfer as raw_saveTransfer } from '../../src/main/services/transactions'
-import { DEFAULT_PLAN } from '../../src/shared/domain/investmentPlan'
-import type { AccountInput, TxInput } from '../../src/shared/schemas'
+import { saveAccount as raw_saveAccount, reconcile as raw_reconcile, saveCategory as raw_saveCategory, saveGroup as raw_saveGroup, saveSubcategory as raw_saveSubcategory, updateSettings as raw_updateSettings } from '../../src/main/modules/finanzas/catalog'
+import { saveBlock as raw_saveBlock, saveInstrument as raw_saveInstrument, saveOp as raw_saveOp, savePrice as raw_savePrice } from '../../src/main/modules/finanzas/investments'
+import { copyBudgets as raw_copyBudgets, saveAllocation as raw_saveAllocation, saveGoal as raw_saveGoal, saveRecurring as raw_saveRecurring, saveScenario as raw_saveScenario, setBudget as raw_setBudget } from '../../src/main/modules/finanzas/planning'
+import type { AppState } from '../../src/main/modules/finanzas/state'
+import { dismissDuplicate as raw_dismissDuplicate, saveTransaction as raw_saveTransaction, saveTransfer as raw_saveTransfer } from '../../src/main/modules/finanzas/transactions'
+import { DEFAULT_PLAN } from '../../src/shared/modules/finanzas/investmentPlan'
+import type { AccountInput, TxInput } from '../../src/shared/modules/finanzas/schemas'
 import { cat } from '../helpers'
 
 const day = (ym: string, d: number) => `${ym}-${String(d).padStart(2, '0')}`

@@ -1,5 +1,5 @@
 // Definición de columnas por tabla para mapear filas SQL <-> objetos (snake_case <-> camelCase).
-import type { Db } from './db'
+import type { Db } from '../../core/db'
 
 type ColType = 'text' | 'int' | 'bool'
 

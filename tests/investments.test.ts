@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { computeHoldings, portfolioSummary } from '../src/shared/domain/investments'
-import { accountBalance, monthSummary, positionAt } from '../src/shared/domain/ledger'
-import { deleteOp, saveBlock, saveInstrument, saveOp, savePrice } from '../src/main/services/investments'
-import type { InvestmentOp } from '../src/shared/types'
+import { computeHoldings, portfolioSummary } from '../src/shared/modules/finanzas/investments'
+import { accountBalance, monthSummary, positionAt } from '../src/shared/modules/finanzas/ledger'
+import { deleteOp, saveBlock, saveInstrument, saveOp, savePrice } from '../src/main/modules/finanzas/investments'
+import type { InvestmentOp } from '../src/shared/modules/finanzas/types'
 import { account, memoryApp, transfer } from './helpers'
 
 function op(p: Partial<InvestmentOp>): InvestmentOp {

@@ -2,9 +2,9 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
-import { FREQUENCY_LABEL, RECURRING_KIND_LABEL } from '@shared/labels'
+import { FREQUENCY_LABEL, RECURRING_KIND_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
-import { FREQUENCIES, RECURRING_KINDS, type Frequency, type RecurringKind, type RecurringRule } from '@shared/types'
+import { FREQUENCIES, RECURRING_KINDS, type Frequency, type RecurringKind, type RecurringRule } from '@shared/modules/finanzas/types'
 import { DataTable, type Column } from '../components/DataTable'
 import {
   Amount,

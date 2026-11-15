@@ -2,11 +2,11 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import { Db } from './db/db'
+import { Db } from './core/db'
 import { createHandlers, type DialogProvider, type Handlers } from './services/api'
-import { AppState, UserError } from './services/state'
+import { AppState, UserError } from './modules/finanzas/state'
 import { createBackup } from './services/backup'
-import { initUpdater } from './updater'
+import { initUpdater } from './core/updater'
 
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 

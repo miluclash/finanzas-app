@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatDate } from '@shared/dates'
 import { formatEur } from '@shared/money'
-import type { TrKind, TrPreview } from '../../../main/services/importTradeRepublic'
+import type { TrKind, TrPreview } from '../../../main/modules/finanzas/importTradeRepublic'
 import { Badge, Button, Field, Modal, Notice, Select } from './ui'
 import { useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'

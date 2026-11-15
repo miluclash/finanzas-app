@@ -1,9 +1,9 @@
 import { FolderOpen, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatDate } from '@shared/dates'
-import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/labels'
+import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
-import { COST_METHODS, NATURES, type Category, type CategoryGroup, type CostMethod, type GroupKind, type Nature, type Settings } from '@shared/types'
+import { COST_METHODS, NATURES, type Category, type CategoryGroup, type CostMethod, type GroupKind, type Nature, type Settings } from '@shared/modules/finanzas/types'
 import {
   Badge,
   Button,
@@ -28,7 +28,7 @@ import {
 import { api, useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 import { toast } from '../lib/toast'
-import type { ImportPreview } from '../../../main/services/importExcel'
+import type { ImportPreview } from '../../../main/modules/finanzas/importExcel'
 
 type Tab = 'general' | 'categorias' | 'datos' | 'auditoria'
 

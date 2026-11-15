@@ -17,8 +17,8 @@ import type {
   Settings,
   Subcategory,
   Transaction
-} from '@shared/types'
-import type { Db } from './db'
+} from '@shared/modules/finanzas/types'
+import type { Db } from '../../core/db'
 import { insertRow, selectAll } from './tables'
 
 export const DEFAULT_SETTINGS: Settings = {

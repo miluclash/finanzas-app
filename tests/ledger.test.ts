@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { availableCash } from '../src/shared/domain/available'
-import { accountBalance, monthSummary, positionAt } from '../src/shared/domain/ledger'
-import { saveTransaction, setStatus } from '../src/main/services/transactions'
+import { availableCash } from '../src/shared/modules/finanzas/available'
+import { accountBalance, monthSummary, positionAt } from '../src/shared/modules/finanzas/ledger'
+import { saveTransaction, setStatus } from '../src/main/modules/finanzas/transactions'
 import { account, cat, memoryApp, transfer, tx } from './helpers'
 
 describe('saldos y métricas', () => {

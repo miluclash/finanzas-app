@@ -2,12 +2,12 @@
 // Solo se ejecuta con FINANCIAL_MASTER_PATH y METRICS_OUT definidos.
 import fs from 'node:fs'
 import { describe, it } from 'vitest'
-import { dashboardData } from '../src/shared/domain/dashboard'
-import { forecast } from '../src/shared/domain/forecast'
-import { monthSummaries, netWorthSeries, trackedMonths } from '../src/shared/domain/ledger'
-import { ruleStatus } from '../src/shared/domain/recurring'
-import { goalProgress } from '../src/shared/domain/goals'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
+import { dashboardData } from '../src/shared/modules/finanzas/dashboard'
+import { forecast } from '../src/shared/modules/finanzas/forecast'
+import { monthSummaries, netWorthSeries, trackedMonths } from '../src/shared/modules/finanzas/ledger'
+import { ruleStatus } from '../src/shared/modules/finanzas/recurring'
+import { goalProgress } from '../src/shared/modules/finanzas/goals'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
 import { memoryApp } from './helpers'
 
 const file = process.env.FINANCIAL_MASTER_PATH

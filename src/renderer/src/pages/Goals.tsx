@@ -2,10 +2,10 @@ import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate, formatMonth, todayISO } from '@shared/dates'
-import { GOAL_HEALTH_LABEL } from '@shared/domain/goals'
-import { GOAL_STATUS_LABEL, GOAL_TYPE_LABEL, PRIORITY_LABEL } from '@shared/labels'
+import { GOAL_HEALTH_LABEL } from '@shared/modules/finanzas/goals'
+import { GOAL_STATUS_LABEL, GOAL_TYPE_LABEL, PRIORITY_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur, formatPct } from '@shared/money'
-import { GOAL_STATUSES, GOAL_TYPES, PRIORITIES, type Goal, type GoalStatus, type GoalType, type Priority } from '@shared/types'
+import { GOAL_STATUSES, GOAL_TYPES, PRIORITIES, type Goal, type GoalStatus, type GoalType, type Priority } from '@shared/modules/finanzas/types'
 import { useTxEditor } from '../components/TxEditor'
 import {
   Badge,

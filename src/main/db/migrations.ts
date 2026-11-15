@@ -1,5 +1,5 @@
 // Migraciones del esquema. Cada una se aplica una sola vez, en orden, dentro de una transacción.
-import type { Db } from './db'
+import type { Db } from '../core/db'
 
 export interface Migration {
   version: number

@@ -2,7 +2,7 @@
 // (el archivo nunca se guarda en el repositorio).
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
 import { memoryApp } from './helpers'
 
 const file = process.env.FINANCIAL_MASTER_PATH

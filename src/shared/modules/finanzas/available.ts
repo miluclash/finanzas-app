@@ -1,6 +1,6 @@
 // Dinero realmente disponible para gastar hoy.
 // disponible = liquidez − reservas de objetivos en cuentas líquidas − cargos recurrentes pendientes este mes
-import { formatDate, monthEnd, monthOf } from '../dates'
+import { formatDate, monthEnd, monthOf } from '../../dates'
 import { accountRole, type Ctx } from './ctx'
 import { goalProgress } from './goals'
 import { liquidityAt } from './ledger'

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PLAN, nextExecutionDate, planReport } from '../src/shared/domain/investmentPlan'
-import { updateSettings } from '../src/main/services/catalog'
-import { saveBlock, saveInstrument, saveOp } from '../src/main/services/investments'
+import { DEFAULT_PLAN, nextExecutionDate, planReport } from '../src/shared/modules/finanzas/investmentPlan'
+import { updateSettings } from '../src/main/modules/finanzas/catalog'
+import { saveBlock, saveInstrument, saveOp } from '../src/main/modules/finanzas/investments'
 import { account, memoryApp, transfer } from './helpers'
 
 async function setup(today: string) {

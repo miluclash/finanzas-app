@@ -1,10 +1,10 @@
 // Estado del proceso principal: base de datos abierta + snapshot y contexto cacheados.
-import { buildCtx, type Ctx } from '@shared/domain/ctx'
+import { buildCtx, type Ctx } from '@shared/modules/finanzas/ctx'
 import { todayISO } from '@shared/dates'
-import type { DataSnapshot } from '@shared/types'
-import type { Db } from '../db/db'
-import { migrate } from '../db/migrations'
-import { loadSnapshot, seedIfEmpty } from '../db/store'
+import type { DataSnapshot } from '@shared/modules/finanzas/types'
+import type { Db } from '../../core/db'
+import { migrate } from '../../db/migrations'
+import { loadSnapshot, seedIfEmpty } from './store'
 
 export class UserError extends Error {
   constructor(message: string) {

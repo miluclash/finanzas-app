@@ -9,7 +9,7 @@ import type {
   RecurringRule,
   Subcategory,
   Transaction
-} from '../types'
+} from './types'
 
 /** Snapshot + índices para cálculos rápidos. Se reconstruye tras cada cambio. */
 export interface Ctx extends DataSnapshot {

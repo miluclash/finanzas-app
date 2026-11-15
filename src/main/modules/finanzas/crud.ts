@@ -1,7 +1,7 @@
 // Ayudantes genéricos de alta/edición/borrado con auditoría.
-import { firstError } from '@shared/schemas'
-import { audit } from '../db/store'
-import { entityToRow, insertRow, nextId, selectById, updateRow, type TableName } from '../db/tables'
+import { firstError } from '@shared/modules/finanzas/schemas'
+import { audit } from './store'
+import { entityToRow, insertRow, nextId, selectById, updateRow, type TableName } from './tables'
 import { UserError, type AppState } from './state'
 
 export function parseInput<T>(schema: { parse: (v: unknown) => T }, v: unknown): T {

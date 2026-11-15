@@ -1,12 +1,12 @@
 // Añade una cartera de ejemplo (cifras inventadas) a una base de datos local para revisar la pantalla de inversiones.
 import fs from 'node:fs'
 import { describe, it } from 'vitest'
-import { Db } from '../src/main/db/db'
-import { saveAccount } from '../src/main/services/catalog'
-import { saveBlock, saveInstrument, saveOp, savePrice } from '../src/main/services/investments'
-import { saveRecurring } from '../src/main/services/planning'
-import { saveTransfer } from '../src/main/services/transactions'
-import { AppState } from '../src/main/services/state'
+import { Db } from '../src/main/core/db'
+import { saveAccount } from '../src/main/modules/finanzas/catalog'
+import { saveBlock, saveInstrument, saveOp, savePrice } from '../src/main/modules/finanzas/investments'
+import { saveRecurring } from '../src/main/modules/finanzas/planning'
+import { saveTransfer } from '../src/main/modules/finanzas/transactions'
+import { AppState } from '../src/main/modules/finanzas/state'
 const file = process.env.DEMO_DB_PATH
 const run = file && fs.existsSync(file) ? describe : describe.skip
 run('demo inversiones', () => {

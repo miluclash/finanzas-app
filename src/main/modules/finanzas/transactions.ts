@@ -1,13 +1,13 @@
 // Alta, edición, anulación y consulta de movimientos (incluidas transferencias de dos apuntes).
-import { categoryKind } from '@shared/domain/ctx'
-import { effectiveNature } from '@shared/domain/ledger'
-import { suggestRule } from '@shared/domain/recurring'
-import { allDuplicatePairs, transactionIssues, validateTransaction, type TxDraft, type ValidationResult } from '@shared/domain/validation'
+import { categoryKind } from '@shared/modules/finanzas/ctx'
+import { effectiveNature } from '@shared/modules/finanzas/ledger'
+import { suggestRule } from '@shared/modules/finanzas/recurring'
+import { allDuplicatePairs, transactionIssues, validateTransaction, type TxDraft, type ValidationResult } from '@shared/modules/finanzas/validation'
 import { monthOf } from '@shared/dates'
-import { firstError, TransferInput, TxFilter, TxInput } from '@shared/schemas'
-import type { Transaction, TxStatus } from '@shared/types'
-import { audit, setSettings } from '../db/store'
-import { entityToRow, insertRow, nextId, nextSequence, selectById, updateRow } from '../db/tables'
+import { firstError, TransferInput, TxFilter, TxInput } from '@shared/modules/finanzas/schemas'
+import type { Transaction, TxStatus } from '@shared/modules/finanzas/types'
+import { audit, setSettings } from './store'
+import { entityToRow, insertRow, nextId, nextSequence, selectById, updateRow } from './tables'
 import { UserError, type AppState } from './state'
 
 export interface TxRow extends Transaction {

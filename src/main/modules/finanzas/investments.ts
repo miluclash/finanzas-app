@@ -1,10 +1,10 @@
 // Inversiones: bloques de reparto, activos, operaciones (con sus apuntes de efectivo) y precios.
-import { cashEffects, computeHoldings, investmentSeries, portfolioSummary } from '@shared/domain/investments'
+import { cashEffects, computeHoldings, investmentSeries, portfolioSummary } from '@shared/modules/finanzas/investments'
 import { addMonthsToMonth, monthOf } from '@shared/dates'
-import { BlockInput, InstrumentInput, OpInput, PriceInput } from '@shared/schemas'
-import type { Account, AllocationBlock, Instrument, InvestmentOp, Price, Transaction } from '@shared/types'
-import { audit } from '../db/store'
-import { entityToRow, insertRow, nextId, rowToEntity, selectById, updateRow } from '../db/tables'
+import { BlockInput, InstrumentInput, OpInput, PriceInput } from '@shared/modules/finanzas/schemas'
+import type { Account, AllocationBlock, Instrument, InvestmentOp, Price, Transaction } from '@shared/modules/finanzas/types'
+import { audit } from './store'
+import { entityToRow, insertRow, nextId, rowToEntity, selectById, updateRow } from './tables'
 import { deleteEntity, friendlySqlError, parseInput, saveEntity } from './crud'
 import { UserError, type AppState } from './state'
 

@@ -1,7 +1,7 @@
 // Previsión de caja a 12 meses. Son estimaciones, no certezas: cada supuesto queda listado.
-import { addMonthsToMonth, monthEnd, monthOf, monthStart } from '../dates'
-import { formatEur } from '../money'
-import type { MonthKey, Scenario } from '../types'
+import { addMonthsToMonth, monthEnd, monthOf, monthStart } from '../../dates'
+import { formatEur } from '../../money'
+import type { MonthKey, Scenario } from './types'
 import { accountRole, type Ctx } from './ctx'
 import { goalProgress } from './goals'
 import { effectiveNature, liquidityAt } from './ledger'

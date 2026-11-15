@@ -1,6 +1,6 @@
 // Cuentas, conciliaciones, grupos, categorías, subcategorías y ajustes.
-import { accountCashBalance, allBalances } from '@shared/domain/ledger'
-import { holdingsValueByAccount } from '@shared/domain/investments'
+import { accountCashBalance, allBalances } from '@shared/modules/finanzas/ledger'
+import { holdingsValueByAccount } from '@shared/modules/finanzas/investments'
 import {
   AccountInput,
   CategoryInput,
@@ -8,10 +8,10 @@ import {
   ReconcileInput,
   SettingsInput,
   SubcategoryInput
-} from '@shared/schemas'
-import type { Account, Category, CategoryGroup, Reconciliation, Settings, Subcategory } from '@shared/types'
-import { audit, getSettings, setSettings } from '../db/store'
-import { insertRow, nextId } from '../db/tables'
+} from '@shared/modules/finanzas/schemas'
+import type { Account, Category, CategoryGroup, Reconciliation, Settings, Subcategory } from '@shared/modules/finanzas/types'
+import { audit, getSettings, setSettings } from './store'
+import { insertRow, nextId } from './tables'
 import { deleteEntity, friendlySqlError, parseInput, saveEntity } from './crud'
 import { UserError, type AppState } from './state'
 

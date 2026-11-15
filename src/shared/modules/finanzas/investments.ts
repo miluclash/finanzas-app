@@ -1,8 +1,8 @@
 // Módulo de inversiones: posiciones, coste, rentabilidad realizada y no realizada, reparto y alertas.
 // Cantidades y precios con decimal.js (exactos); los importes finales se redondean a céntimos.
 import Decimal from 'decimal.js'
-import { addMonthsToMonth, diffDays, monthEnd, monthOf } from '../dates'
-import type { AssetClass, CostMethod, ISODate, InvestmentOp, MonthKey, Price } from '../types'
+import { addMonthsToMonth, diffDays, monthEnd, monthOf } from '../../dates'
+import type { AssetClass, CostMethod, ISODate, InvestmentOp, MonthKey, Price } from './types'
 import type { Ctx } from './ctx'
 
 Decimal.set({ precision: 40, rounding: Decimal.ROUND_HALF_UP })

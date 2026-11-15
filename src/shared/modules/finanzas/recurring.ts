@@ -1,7 +1,7 @@
 // Recurrentes: fechas previstas, equivalente mensual y emparejamiento con movimientos reales.
 // Un cargo previsto nunca crea un movimiento real: solo se empareja con los que tú registras.
-import { addDays, addMonths, diffDays, parts } from '../dates'
-import type { ISODate, RecurringRule, Transaction } from '../types'
+import { addDays, addMonths, diffDays, parts } from '../../dates'
+import type { ISODate, RecurringRule, Transaction } from './types'
 import type { Ctx } from './ctx'
 
 const STEP_MONTHS: Record<string, number> = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 }

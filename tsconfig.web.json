@@ -31,6 +31,8 @@
     "src/renderer/src/**/*",
     "src/shared/**/*",
     "src/main/services/**/*",
-    "src/main/db/**/*"
+    "src/main/db/**/*",
+    "src/main/modules/**/*",
+    "src/main/core/**/*"
   ]
 }

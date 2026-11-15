@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import { formatMonth } from '@shared/dates'
 import { formatEur, formatPct } from '@shared/money'
-import type { MonthKey } from '@shared/types'
+import type { MonthKey } from '@shared/modules/finanzas/types'
 import { cx } from './ui'
 
 const compact = new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 })

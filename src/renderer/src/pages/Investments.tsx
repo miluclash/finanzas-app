@@ -2,7 +2,7 @@ import { AlertTriangle, Plus, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate, todayISO } from '@shared/dates'
-import { ASSET_CLASS_LABEL, OP_TYPE_LABEL } from '@shared/labels'
+import { ASSET_CLASS_LABEL, OP_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur, formatPct } from '@shared/money'
 import {
   ASSET_CLASSES,
@@ -12,12 +12,12 @@ import {
   type Instrument,
   type InvestmentOp,
   type InvestmentOpType
-} from '@shared/types'
+} from '@shared/modules/finanzas/types'
 import { BarList, LinesChart } from '../components/charts'
 import { DataTable, type Column } from '../components/DataTable'
 import { useTxEditor } from '../components/TxEditor'
 import { TradeRepublicImportModal } from '../components/TradeRepublicImport'
-import type { TrPreview } from '../../../main/services/importTradeRepublic'
+import type { TrPreview } from '../../../main/modules/finanzas/importTradeRepublic'
 import {
   Amount,
   Badge,
@@ -44,7 +44,7 @@ import { api, useApi, useApiMutation } from '../lib/api'
 import { toast } from '../lib/toast'
 import { useCatalog } from '../lib/catalog'
 import { PlanView } from './InvestmentPlan'
-import type { HoldingRow } from '@shared/domain/investments'
+import type { HoldingRow } from '@shared/modules/finanzas/investments'
 
 type Tab = 'resumen' | 'plan' | 'ops' | 'precios' | 'activos'
 

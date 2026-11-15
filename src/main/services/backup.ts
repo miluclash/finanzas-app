@@ -2,13 +2,13 @@
 import ExcelJS from 'exceljs'
 import fs from 'node:fs'
 import path from 'node:path'
-import { monthSummaries, trackedMonths } from '@shared/domain/ledger'
-import { Db } from '../db/db'
+import { monthSummaries, trackedMonths } from '@shared/modules/finanzas/ledger'
+import { Db } from '../core/db'
 import { migrate, schemaVersion } from '../db/migrations'
-import { audit } from '../db/store'
-import { insertRow, TABLE_ORDER, TABLES, type TableName } from '../db/tables'
-import { wipeData } from './importExcel'
-import { UserError, type AppState } from './state'
+import { audit } from '../modules/finanzas/store'
+import { insertRow, TABLE_ORDER, TABLES, type TableName } from '../modules/finanzas/tables'
+import { wipeData } from '../modules/finanzas/importExcel'
+import { UserError, type AppState } from '../modules/finanzas/state'
 
 function stamp(d = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0')

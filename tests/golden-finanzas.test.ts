@@ -6,9 +6,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { collectGolden, diffGolden } from './golden/collect'
 import { buildSyntheticApp } from './golden/synthetic'
-import { updateSettings } from '../src/main/services/catalog'
-import { previewTradeRepublicText } from '../src/main/services/importTradeRepublic'
-import type { AppState } from '../src/main/services/state'
+import { updateSettings } from '../src/main/modules/finanzas/catalog'
+import { previewTradeRepublicText } from '../src/main/modules/finanzas/importTradeRepublic'
+import type { AppState } from '../src/main/modules/finanzas/state'
 import { memoryApp } from './helpers'
 
 const GOLDEN = path.join(__dirname, 'golden', 'sintetico.golden.json')

@@ -1,9 +1,9 @@
 // Colector del test dorado de finanzas: recoge TODAS las cifras que la app enseña, en forma canónica,
 // para poder compararlas antes y después de cada refactorización. No modifica la base de datos.
 import Decimal from 'decimal.js'
-import { computeAlerts } from '../../src/shared/domain/dashboard'
-import { availableCash } from '../../src/shared/domain/available'
-import { goalProgress } from '../../src/shared/domain/goals'
+import { computeAlerts } from '../../src/shared/modules/finanzas/dashboard'
+import { availableCash } from '../../src/shared/modules/finanzas/available'
+import { goalProgress } from '../../src/shared/modules/finanzas/goals'
 import {
   cashEffects,
   computeHoldings,
@@ -12,16 +12,16 @@ import {
   investmentAccountIds,
   investmentSeries,
   portfolioSummary
-} from '../../src/shared/domain/investments'
-import { DEFAULT_PLAN, nextExecutionDate, splitContribution } from '../../src/shared/domain/investmentPlan'
-import { allBalances, effectiveNature, liquidityAt, positionAt, trackedMonths } from '../../src/shared/domain/ledger'
-import { matchOccurrences, pendingOccurrences, ruleStatus, suggestRule } from '../../src/shared/domain/recurring'
-import { allDuplicatePairs } from '../../src/shared/domain/validation'
+} from '../../src/shared/modules/finanzas/investments'
+import { DEFAULT_PLAN, nextExecutionDate, splitContribution } from '../../src/shared/modules/finanzas/investmentPlan'
+import { allBalances, effectiveNature, liquidityAt, positionAt, trackedMonths } from '../../src/shared/modules/finanzas/ledger'
+import { matchOccurrences, pendingOccurrences, ruleStatus, suggestRule } from '../../src/shared/modules/finanzas/recurring'
+import { allDuplicatePairs } from '../../src/shared/modules/finanzas/validation'
 import { addDays, addMonthsToMonth, monthEnd, monthOf } from '../../src/shared/dates'
 import { exportJsonObject } from '../../src/main/services/backup'
-import type { TxDraft } from '../../src/shared/domain/validation'
+import type { TxDraft } from '../../src/shared/modules/finanzas/validation'
 import { createHandlers, type DialogProvider } from '../../src/main/services/api'
-import type { AppState } from '../../src/main/services/state'
+import type { AppState } from '../../src/main/modules/finanzas/state'
 
 /** Diálogos falsos: las lecturas que se recogen nunca los usan. */
 const noDialogs: DialogProvider = {

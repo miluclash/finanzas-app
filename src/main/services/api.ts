@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 // Contrato de la API que la interfaz llama por IPC. Todos los métodos se validan aquí o en sus servicios.
-import { dashboardData, computeAlerts } from '@shared/domain/dashboard'
-import { monthSummaries, netWorthSeries, trackedMonths } from '@shared/domain/ledger'
+import { dashboardData, computeAlerts } from '@shared/modules/finanzas/dashboard'
+import { monthSummaries, netWorthSeries, trackedMonths } from '@shared/modules/finanzas/ledger'
 import { addMonthsToMonth, monthOf } from '@shared/dates'
 import type {
   AccountInput,
@@ -21,19 +21,19 @@ import type {
   TransferInput,
   TxFilter,
   TxInput
-} from '@shared/schemas'
-import type { MonthKey, Settings, TxStatus } from '@shared/types'
-import type { TxDraft } from '@shared/domain/validation'
+} from '@shared/modules/finanzas/schemas'
+import type { MonthKey, Settings, TxStatus } from '@shared/modules/finanzas/types'
+import type { TxDraft } from '@shared/modules/finanzas/validation'
 import { schemaVersion } from '../db/migrations'
 import { autoBackup, createBackup, exportCsv, exportJson, exportXlsx, listBackups, restoreBackup } from './backup'
-import * as catalog from './catalog'
-import { applyImport, previewImport } from './importExcel'
-import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from './importTradeRepublic'
-import * as inv from './investments'
-import { planReport } from '@shared/domain/investmentPlan'
-import * as planning from './planning'
-import { UserError, type AppState } from './state'
-import * as tx from './transactions'
+import * as catalog from '../modules/finanzas/catalog'
+import { applyImport, previewImport } from '../modules/finanzas/importExcel'
+import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from '../modules/finanzas/importTradeRepublic'
+import * as inv from '../modules/finanzas/investments'
+import { planReport } from '@shared/modules/finanzas/investmentPlan'
+import * as planning from '../modules/finanzas/planning'
+import { UserError, type AppState } from '../modules/finanzas/state'
+import * as tx from '../modules/finanzas/transactions'
 
 export interface DialogProvider {
   openFile(title: string, filters: Array<{ name: string; extensions: string[] }>): Promise<string | null>

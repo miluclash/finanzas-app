@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatMonth } from '@shared/dates'
 import { formatEur, parseEurToCents } from '@shared/money'
-import type { Scenario } from '@shared/types'
+import type { Scenario } from '@shared/modules/finanzas/types'
 import { LinesChart } from '../components/charts'
 import { Amount, Badge, Button, confirmDialog, cx, ErrorBox, Field, Loading, Modal, MoneyInput, Notice, PageHeader, Section, TextInput } from '../components/ui'
 import { useApi, useApiMutation } from '../lib/api'

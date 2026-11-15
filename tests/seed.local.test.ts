@@ -3,9 +3,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it } from 'vitest'
-import { Db } from '../src/main/db/db'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
-import { AppState } from '../src/main/services/state'
+import { Db } from '../src/main/core/db'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
+import { AppState } from '../src/main/modules/finanzas/state'
 
 const file = process.env.FINANCIAL_MASTER_PATH
 const out = process.env.SEED_DB_PATH

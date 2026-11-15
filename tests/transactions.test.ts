@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { accountBalance, monthSummary } from '../src/shared/domain/ledger'
-import { budgetReport } from '../src/shared/domain/budgets'
-import { setBudget } from '../src/main/services/planning'
+import { accountBalance, monthSummary } from '../src/shared/modules/finanzas/ledger'
+import { budgetReport } from '../src/shared/modules/finanzas/budgets'
+import { setBudget } from '../src/main/modules/finanzas/planning'
 import {
   deleteTransaction,
   dismissDuplicate,
@@ -11,7 +11,7 @@ import {
   saveTransfer,
   setStatus,
   validateDraft
-} from '../src/main/services/transactions'
+} from '../src/main/modules/finanzas/transactions'
 import { account, cat, memoryApp, transfer, tx } from './helpers'
 
 describe('movimientos (integración)', () => {

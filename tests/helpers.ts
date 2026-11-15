@@ -1,8 +1,8 @@
-import { Db } from '../src/main/db/db'
-import { saveAccount } from '../src/main/services/catalog'
-import { AppState } from '../src/main/services/state'
-import { saveTransaction, saveTransfer } from '../src/main/services/transactions'
-import type { AccountInput, TxInput } from '../src/shared/schemas'
+import { Db } from '../src/main/core/db'
+import { saveAccount } from '../src/main/modules/finanzas/catalog'
+import { AppState } from '../src/main/modules/finanzas/state'
+import { saveTransaction, saveTransfer } from '../src/main/modules/finanzas/transactions'
+import type { AccountInput, TxInput } from '../src/shared/modules/finanzas/schemas'
 
 /** App en memoria (sin archivo) con la fecha de hoy fijada. */
 export async function memoryApp(today = '2026-10-11'): Promise<AppState> {

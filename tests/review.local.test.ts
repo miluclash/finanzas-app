@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import { describe, it } from 'vitest'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
-import { reviewQueue } from '../src/main/services/transactions'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
+import { reviewQueue } from '../src/main/modules/finanzas/transactions'
 import { memoryApp } from './helpers'
 const file = process.env.FINANCIAL_MASTER_PATH
 const out = process.env.REVIEW_OUT

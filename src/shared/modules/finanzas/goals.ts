@@ -2,8 +2,8 @@
 // - Con cuenta vinculada (hucha real): el progreso es el saldo de esa cuenta. No se suman aportaciones aparte.
 // - Sin cuenta vinculada: el progreso son las asignaciones (reservas) registradas en la app.
 // El dinero reservado sigue siendo patrimonio; solo deja de estar "disponible" si está en una cuenta líquida.
-import { addMonthsToMonth, monthOf, monthsBetween } from '../dates'
-import type { Goal, ISODate } from '../types'
+import { addMonthsToMonth, monthOf, monthsBetween } from '../../dates'
+import type { Goal, ISODate } from './types'
 import { accountRole, type Ctx } from './ctx'
 import { accountBalance } from './ledger'
 

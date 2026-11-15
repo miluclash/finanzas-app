@@ -1,7 +1,7 @@
 // Agregados para el panel principal y la bandeja de alertas.
-import { addDays, addMonthsToMonth, formatDate, formatMonth, monthOf } from '../dates'
-import { formatEur } from '../money'
-import type { MonthKey, Transaction } from '../types'
+import { addDays, addMonthsToMonth, formatDate, formatMonth, monthOf } from '../../dates'
+import { formatEur } from '../../money'
+import type { MonthKey, Transaction } from './types'
 import { availableCash, type AvailableCash } from './available'
 import { budgetReport } from './budgets'
 import type { Ctx } from './ctx'
