@@ -5,6 +5,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { APP_MODULES, createAppRegistry } from '../../src/main/app'
+import { MIGRATION_RANGES } from '../../src/main/core/migrations'
+import { createRegistry, type Registry } from '../../src/main/core/registry'
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const SRC = path.join(ROOT, 'src')
@@ -206,20 +208,40 @@ describe('reglas de arquitectura: IA solo local (regla 8)', () => {
   })
 })
 
-describe('reglas de arquitectura: prefijos de tablas (regla 6)', () => {
-  it('las tablas creadas por módulos que no son finanzas llevan prefijo trn_ o core_', () => {
-    const registro = createAppRegistry()
-    const malos: string[] = []
-    for (const m of registro.modules) {
-      if (m.id === 'finanzas') continue
-      for (const mig of m.migrations) {
-        const sql = typeof mig.up === 'string' ? mig.up : ''
-        for (const t of sql.matchAll(/CREATE\s+(?:VIRTUAL\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)/gi)) {
-          if (!/^(trn_|core_)/.test(t[1])) malos.push(`módulo «${m.id}», migración ${mig.version} (${mig.name}): tabla «${t[1]}»`)
-        }
-      }
+/**
+ * Tablas sin prefijo `trn_`/`core_` creadas por migraciones que no son de finanzas: las del núcleo
+ * (rango 1000-1999) y las de los demás módulos. El dueño sale del rango de versiones.
+ */
+function tablasSinPrefijo(registro: Registry): string[] {
+  const propietarioDe = (v: number) =>
+    (Object.entries(MIGRATION_RANGES) as Array<[string, readonly [number, number]]>).find(([, r]) => v >= r[0] && v <= r[1])?.[0] ?? '¿?'
+  const malos: string[] = []
+  for (const mig of registro.migrations) {
+    const quien = propietarioDe(mig.version)
+    if (quien === 'finanzas') continue
+    const sql = typeof mig.up === 'string' ? mig.up : ''
+    for (const t of sql.matchAll(/CREATE\s+(?:VIRTUAL\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)/gi)) {
+      if (!/^(trn_|core_)/.test(t[1])) malos.push(`${quien === 'core' ? 'núcleo' : `módulo «${quien}»`}, migración ${mig.version} (${mig.name}): tabla «${t[1]}»`)
     }
+  }
+  return malos
+}
+
+describe('reglas de arquitectura: prefijos de tablas (regla 6)', () => {
+  it('las tablas creadas por el núcleo y por módulos que no son finanzas llevan prefijo trn_ o core_', () => {
+    const malos = tablasSinPrefijo(createAppRegistry())
     expect(malos, `Regla rota (regla 6): las tablas nuevas llevan prefijo trn_ o core_.\n${malos.join('\n')}`).toEqual([])
+  })
+
+  it('la regla de prefijos mira también las migraciones del núcleo (control)', () => {
+    const registro = createRegistry(
+      [],
+      [
+        { version: 1000, name: 'buena', up: 'CREATE TABLE core_bien (id INTEGER PRIMARY KEY);' },
+        { version: 1001, name: 'mala', up: 'CREATE TABLE IF NOT EXISTS ajustes (id INTEGER PRIMARY KEY);' }
+      ]
+    )
+    expect(tablasSinPrefijo(registro)).toEqual(['núcleo, migración 1001 (mala): tabla «ajustes»'])
   })
 
   it('el registro de la app incluye los módulos esperados (control)', () => {

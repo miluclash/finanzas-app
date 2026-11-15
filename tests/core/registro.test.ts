@@ -17,7 +17,7 @@ import { exportJsonObject } from '../../src/main/modules/finanzas/exports'
 import { finanzasModule } from '../../src/main/modules/finanzas'
 import { MIGRATIONS } from '../../src/main/modules/finanzas/migrations'
 import { AppState } from '../../src/main/modules/finanzas/state'
-import { account, escribirTarea, memoryApp, tx } from '../helpers'
+import { account, memoryApp, tx } from '../helpers'
 
 const dirs: string[] = []
 function tmpDir(): string {
@@ -366,7 +366,7 @@ describe('contexto y copias del núcleo', () => {
     await expect(restoreBackup(s, ajeno)).rejects.toThrow('El JSON no es una exportación de esta app.')
     expect(s.ctx().transactions.length).toBe(2)
 
-    await escribirTarea(s, () => restoreBackup(s.core, json))
+    await restoreBackup(s.core, json)
     expect(s.ctx().transactions.length).toBe(1)
     expect(s.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM audit_log WHERE entity = 'backup' AND entity_id = 'json'")?.n).toBe(1)
   })

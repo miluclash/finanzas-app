@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface FinanzasBridge {
-  call: (method: string, args: unknown[]) => Promise<{ ok: boolean; data?: unknown; error?: string; user?: boolean }>
+  call: (method: string, args: unknown[]) => Promise<{ ok: boolean; data?: unknown; error?: string; user?: boolean; saved?: boolean }>
   updateStatus: () => Promise<UpdateStatus>
   checkUpdate: () => Promise<unknown>
   installUpdate: () => Promise<unknown>

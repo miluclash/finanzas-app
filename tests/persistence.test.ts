@@ -10,7 +10,7 @@ import { applyImport, previewImport } from '../src/main/modules/finanzas/importE
 import { AppState } from '../src/main/modules/finanzas/state'
 import { accountBalance } from '../src/shared/modules/finanzas/ledger'
 import { saveTransaction } from '../src/main/modules/finanzas/transactions'
-import { account, cat, escribir, escribirTarea, memoryApp, transfer, tx } from './helpers'
+import { account, cat, escribir, memoryApp, transfer, tx } from './helpers'
 
 function tmp(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'finanzas-test-'))
@@ -58,7 +58,8 @@ describe('persistencia y copias', () => {
     expect(s.ctx().transactions.length).toBe(2)
     expect(s.ctx().transactions[0].transferId).toBe(s.ctx().transactions[1].transferId)
     tx(s, { accountId: a.id, amountCents: -999 })
-    await escribirTarea(s, () => restoreBackup(s, backup.path))
+    // restoreBackup se encola sola en la cola de escritura.
+    await restoreBackup(s, backup.path)
     expect(s.ctx().transactions.length).toBe(2)
     expect(accountBalance(s.ctx(), h.id)).toBe(1000)
     // exportaciones a Excel y CSV

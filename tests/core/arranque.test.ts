@@ -47,12 +47,20 @@ function buscar(h: Mapa, sufijo: string): { clave: string; fn: Fn } {
   return { clave: claves[0], fn: h[claves[0]] }
 }
 
-/** Llama al handler con esos argumentos y espera a que acabe, bien o mal. */
+/** El error es el de la guarda de db.ts: alguien ha intentado escribir sin pasar por la cola. */
+function esEscrituraFuera(e: unknown): boolean {
+  return (e instanceof Error ? e.message : String(e)).includes('Escritura fuera de la cola')
+}
+
+/**
+ * Llama al handler con esos argumentos y espera a que acabe, bien o mal. Que falle da igual (solo
+ * importa por dónde ha pasado), salvo si es porque ha escrito fuera de la cola: eso se relanza.
+ */
 async function llamar(fn: Fn, ...args: unknown[]): Promise<void> {
   try {
     await fn(...args)
-  } catch {
-    // Da igual: solo importa por dónde ha pasado.
+  } catch (e) {
+    if (esEscrituraFuera(e)) throw e
   }
 }
 
@@ -170,18 +178,42 @@ describe('las lecturas siguen siendo síncronas', () => {
       'accounts.reconciliations': [id],
       'categories.usage': ['no-existe']
     }
+    const beginOp = vi.spyOn(s.core.db, 'beginOp')
     const promesas: string[] = []
+    const escriben: string[] = []
     for (const sufijo of LECTURA) {
       const { fn } = buscar(h, sufijo)
+      beginOp.mockClear()
       let r: unknown
+      let error: unknown = null
       try {
         r = fn(...(args[sufijo] ?? []))
-      } catch {
-        continue // Lanzar síncronamente tampoco es una promesa.
+      } catch (e) {
+        error = e // Lanzar síncronamente no es una promesa, pero no puede ser por escribir.
       }
-      if (esPromesa(r)) promesas.push(sufijo)
+      if (esPromesa(r)) {
+        promesas.push(sufijo)
+        await Promise.resolve(r).catch((e: unknown) => (error = e))
+      }
+      if (error !== null && esEscrituraFuera(error)) escriben.push(`${sufijo} (escritura fuera de la cola)`)
+      if (beginOp.mock.calls.length > 0) escriben.push(`${sufijo} (abre una operación de la cola)`)
     }
     expect(promesas, `Estas lecturas devuelven una promesa y deberían ser síncronas: ${promesas.join(', ')}`).toEqual([])
+    expect(escriben, `Estas lecturas escriben: ${escriben.join(', ')}`).toEqual([])
+    expect(s.core.db.inOp).toBe(false)
+  })
+
+  it('control: el test de lecturas detecta una lectura que escribe fuera de la cola', async () => {
+    const s = await memoryApp()
+    const lecturaQueEscribe = () => s.db.run("UPDATE settings SET value = value WHERE 1 = 0")
+    let error: unknown = null
+    try {
+      lecturaQueEscribe()
+    } catch (e) {
+      error = e
+    }
+    expect(esEscrituraFuera(error)).toBe(true)
+    await expect(llamar(lecturaQueEscribe)).rejects.toThrow('Escritura fuera de la cola')
   })
 })
 

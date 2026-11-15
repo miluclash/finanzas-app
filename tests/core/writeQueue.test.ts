@@ -238,4 +238,29 @@ describe('cola de escritura', () => {
     await q.enqueue('prueba:alta', () => db.tx(() => db.run('INSERT INTO prueba (n) VALUES (1)')))
     expect(ns(db)).toEqual([1])
   })
+
+  it('commitOp con una tx de servicio abierta deshace la operación y no la deja abierta', async () => {
+    const { db } = await setup()
+    db.beginOp()
+    db.run('INSERT INTO prueba (n) VALUES (1)')
+    let error: unknown = null
+    // Al volver de la tx su SAVEPOINT ya no existe (lo ha deshecho commitOp): también lanza.
+    expect(() =>
+      db.tx(() => {
+        try {
+          db.commitOp()
+        } catch (e) {
+          error = e
+        }
+      })
+    ).toThrow()
+    expect(String(error)).toContain('transacción de servicio abierta')
+    expect(db.inOp).toBe(false)
+    expect(ns(db)).toEqual([])
+    // La base sigue usable: se puede abrir otra operación.
+    db.beginOp()
+    db.run('INSERT INTO prueba (n) VALUES (2)')
+    db.commitOp()
+    expect(ns(db)).toEqual([2])
+  })
 })

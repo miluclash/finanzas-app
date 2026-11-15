@@ -82,7 +82,6 @@ export class Db {
     return new Db(db, filePath)
   }
 
-  /** Abre un archivo SQLite sin vincularlo (para validar copias antes de restaurar). */
   /**
    * Abre una base a partir de sus bytes y la vincula a `filePath` (sin leer ni escribir el archivo).
    * Se usa al restaurar una copia: la base nueva existe antes de sustituir el archivo.
@@ -92,6 +91,11 @@ export class Db {
     return new Db(new SQL.Database(buf), filePath)
   }
 
+  /**
+   * Abre una base a partir de sus bytes, en memoria y sin archivo: guardar no escribe nada en disco.
+   * No es de solo lectura (dentro de la cola se puede escribir en ella). Se usa para validar copias
+   * antes de restaurar y para restaurar sin `dbPath`.
+   */
   static async openReadOnlyBuffer(buf: Uint8Array): Promise<Db> {
     const SQL = await loadSql()
     return new Db(new SQL.Database(buf), null)
@@ -203,12 +207,20 @@ export class Db {
   /**
    * Confirma la operación de la cola. Si ha cambiado algo (o había un guardado pendiente),
    * guarda en disco. Si el guardado falla, los cambios quedan confirmados en memoria y se
-   * lanza `SaveError`.
+   * lanza `SaveError`. Si queda una `tx` de servicio abierta, deshace la operación y lanza.
    */
   commitOp(): void {
     const start = this.op
     if (!start) throw new Error('No hay ninguna operación de la cola abierta.')
-    if (this.depth > 0) throw new Error('No se puede cerrar la operación con una transacción de servicio abierta.')
+    if (this.depth > 0) {
+      // Se deshace la operación para no dejarla abierta para siempre (bloquearía la base).
+      try {
+        this.rollbackOp()
+      } catch {
+        // Se conserva el error de abajo, que es el que explica qué ha pasado.
+      }
+      throw new Error('No se puede cerrar la operación con una transacción de servicio abierta.')
+    }
     const end = this.marks()
     const changed =
       end.totalChanges !== start.totalChanges ||

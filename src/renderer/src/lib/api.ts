@@ -6,7 +6,9 @@ import { toast } from './toast'
 export class ApiError extends Error {
   constructor(
     message: string,
-    public user: boolean
+    public user: boolean,
+    /** Los cambios sí están hechos (en memoria), aunque no se hayan podido guardar en disco. */
+    public saved = false
   ) {
     super(message)
   }
@@ -14,7 +16,7 @@ export class ApiError extends Error {
 
 export async function api<K extends ApiMethod>(method: K, ...args: ApiArgs<K>): Promise<ApiResult<K>> {
   const res = await window.finanzas.call(method, args as unknown[])
-  if (!res.ok) throw new ApiError(res.error ?? 'Error desconocido', !!res.user)
+  if (!res.ok) throw new ApiError(res.error ?? 'Error desconocido', !!res.user, !!res.saved)
   return res.data as ApiResult<K>
 }
 
@@ -48,8 +50,10 @@ export function useApiMutation<K extends ApiMethod>(
       if (msg) toast.success(msg)
       opts.onSuccess?.(r)
     },
-    onError: (e) => {
+    onError: async (e) => {
       if (!opts.silentError) toast.error(e.message)
+      // El cambio está hecho aunque no se haya guardado en disco: que la pantalla lo muestre.
+      if (e.saved) await qc.invalidateQueries()
     }
   })
 }

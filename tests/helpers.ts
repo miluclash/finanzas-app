@@ -15,19 +15,12 @@ export async function memoryApp(today = '2026-10-11'): Promise<AppState> {
 /**
  * Ejecuta una escritura como una operación de la cola (`runNow`: síncrona, con la cola libre):
  * transacción, guardado en disco si hay archivo e invalidación de la caché, igual que en la app.
+ *
+ * Para restaurar una copia no hace falta ayuda: `restoreBackup` ya se encola sola; se llama con
+ * `await restoreBackup(s, …)` y no se envuelve en otra tarea (bloquearía la cola).
  */
 export function escribir<T>(s: AppState, fn: () => T): T {
   return s.core.queue.runNow('test:escribir', fn)
-}
-
-/**
- * Para escrituras asíncronas (restaurar una copia). Llama a `fn` tal cual: `restoreBackup` ya se
- * encola sola en un turno exclusivo de la cola, y envolverla en otra tarea bloquearía la cola (la
- * tarea de fuera esperaría a la de dentro, que espera a que acabe la de fuera).
- */
-export async function escribirTarea<T>(s: AppState, fn: () => Promise<T>): Promise<T> {
-  void s
-  return fn()
 }
 
 export function account(s: AppState, a: Partial<AccountInput> & { name: string }) {

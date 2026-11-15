@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from '../lib/toast'
 
 /** Pie de la barra lateral: versión y estado de la actualización automática. */
 export function UpdateFooter() {
@@ -25,7 +26,11 @@ export function UpdateFooter() {
         <div className="text-muted">Se instala al cerrar la app. Tus datos no cambian.</div>
         <button
           className="mt-2 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
-          onClick={() => window.finanzas.installUpdate()}
+          onClick={async () => {
+            // Si no se ha podido guardar antes de instalar, no se instala y llega el motivo.
+            const r = (await window.finanzas.installUpdate()) as { ok?: boolean; error?: string } | null
+            if (r && r.ok === false && r.error) toast.error(r.error)
+          }}
         >
           Reiniciar y actualizar
         </button>

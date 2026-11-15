@@ -104,6 +104,82 @@ async function settleWrites(c: CoreContext): Promise<void> {
   await c.queue.enqueueTask('core:cerrar', async () => c.queue.flush())
 }
 
+type GuardadoFinal = { kind: 'guardado' } | { kind: 'copia'; path: string } | { kind: 'fallo' }
+
+/**
+ * Antes de cerrar o de instalar una actualización: intenta dejar todo guardado y, si el archivo
+ * no se puede guardar, vuelca la base en memoria a una copia `sin-guardar` (en un turno de la cola).
+ */
+async function guardarOCopiar(c: CoreContext): Promise<GuardadoFinal> {
+  try {
+    await settleWrites(c)
+    return { kind: 'guardado' }
+  } catch (e) {
+    console.error('No se pudieron guardar los últimos cambios', e)
+  }
+  if (!c.paths.backupsDir) return { kind: 'fallo' }
+  try {
+    const copia = await c.queue.enqueueTask('core:backup.sin-guardar', async () => createBackup(c, 'sin-guardar'))
+    return { kind: 'copia', path: copia.path }
+  } catch (e) {
+    console.error('Tampoco se pudo hacer la copia sin-guardar', e)
+    return { kind: 'fallo' }
+  }
+}
+
+/** Aviso (bloqueante) de que los cambios no se guardaron en el archivo pero sí en una copia. */
+function avisarCopiaSinGuardar(copia: string): void {
+  dialog.showMessageBoxSync({
+    type: 'warning',
+    title: 'Finanzas',
+    message: 'No se han podido guardar tus últimos cambios en el archivo de datos',
+    detail:
+      `No se ha perdido nada: está todo en esta copia de seguridad:\n${copia}\n\n` +
+      'Al volver a abrir la app, restáurala desde Ajustes → Copias de seguridad.',
+    buttons: ['Entendido'],
+    noLink: true
+  })
+}
+
+/** Pregunta si reintentar el guardado (true) o cerrar sin guardar (false). */
+function preguntarReintentar(): boolean {
+  const r = dialog.showMessageBoxSync({
+    type: 'error',
+    title: 'Finanzas',
+    message: 'No se han podido guardar tus últimos cambios',
+    detail:
+      'Tampoco se ha podido hacer una copia de seguridad con ellos. Si cierras ahora, se perderán los ' +
+      'cambios que no se hayan guardado. Comprueba que queda espacio en el disco y vuelve a intentarlo.',
+    buttons: ['Reintentar', 'Cerrar sin guardar'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true
+  })
+  return r === 0
+}
+
+/** Al cerrar: guarda, o hace la copia `sin-guardar` y avisa, o pregunta hasta que se guarde o Michael decida cerrar. */
+async function cerrarSinPerder(c: CoreContext): Promise<void> {
+  const r = await guardarOCopiar(c)
+  if (r.kind === 'guardado') return
+  if (r.kind === 'copia') {
+    avisarCopiaSinGuardar(r.path)
+    return
+  }
+  while (preguntarReintentar()) {
+    try {
+      await settleWrites(c)
+      return
+    } catch (e) {
+      console.error('El reintento de guardado ha vuelto a fallar', e)
+    }
+  }
+}
+
+// Una vez decidido el cierre (todo guardado, copia `sin-guardar` hecha o "Cerrar sin guardar"),
+// `before-quit` deja salir sin volver a intentarlo: así no hay bucles ni diálogos repetidos.
+let readyToQuit = false
+
 ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
   if (!handlers) return { ok: false, error: 'La base de datos aún no está lista.' }
   const fn = (handlers as Record<string, (...a: unknown[]) => unknown>)[method]
@@ -113,10 +189,11 @@ ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
     return { ok: true, data }
   } catch (e) {
     if (e instanceof UserError) return { ok: false, error: e.message, user: true }
-    // Los cambios están hechos en memoria; el mensaje es para Michael (se reintenta al guardar).
+    // Los cambios están hechos en memoria (`saved: true`: la interfaz refresca los datos para no
+    // repetirlos); el mensaje es para Michael (se reintenta al guardar).
     if (e instanceof SaveError) {
       console.error(`[api] ${method}`, e)
-      return { ok: false, error: e.message, user: true }
+      return { ok: false, error: e.message, user: true, saved: true }
     }
     console.error(`[api] ${method}`, e)
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -158,7 +235,21 @@ else {
         })
       },
       settle: async () => {
-        if (core) await settleWrites(core)
+        const c = core
+        if (!c) return { ok: true }
+        const r = await guardarOCopiar(c)
+        if (r.kind === 'fallo')
+          return {
+            ok: false,
+            error:
+              'No se han podido guardar tus últimos cambios (ni hacer una copia con ellos), así que la actualización no se ha instalado. Comprueba que queda espacio en el disco y vuelve a intentarlo.'
+          }
+        if (r.kind === 'copia') {
+          avisarCopiaSinGuardar(r.path)
+          // El guardado pendiente sigue fallando: que el cierre de la instalación no lo repita.
+          readyToQuit = true
+        }
+        return { ok: true }
       }
     })
     app.on('activate', () => {
@@ -169,8 +260,8 @@ else {
     if (process.platform !== 'darwin') app.quit()
   })
   // Al cerrar no se puede perder nada: si la cola está trabajando o hay un guardado pendiente, se
-  // espera, se reintenta el guardado y se vuelve a pedir el cierre (una sola vez).
-  let readyToQuit = false
+  // espera y se reintenta el guardado; si falla, copia `sin-guardar` o diálogo (`cerrarSinPerder`).
+  // Después se vuelve a pedir el cierre, una sola vez (`readyToQuit`).
   let settling = false
   app.on('before-quit', (e) => {
     const c = core
@@ -179,7 +270,7 @@ else {
     e.preventDefault()
     if (settling) return
     settling = true
-    void settleWrites(c)
+    void cerrarSinPerder(c)
       .catch((err) => console.error('No se pudieron guardar los últimos cambios al cerrar', err))
       .finally(() => {
         readyToQuit = true
