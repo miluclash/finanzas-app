@@ -33,10 +33,10 @@ export function BudgetsPage() {
 function BudgetView() {
   const current = monthOf(todayISO())
   const [month, setMonth] = useState(current)
-  const q = useApi('budgets.report', [month])
+  const q = useApi('finanzas:budgets.report', [month])
   const { cat, maps } = useCatalog()
   const navigate = useNavigate()
-  const copy = useApiMutation('budgets.copy', { success: (n) => `${n} presupuesto(s) copiados` })
+  const copy = useApiMutation('finanzas:budgets.copy', { success: (n) => `${n} presupuesto(s) copiados` })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const r = q.data!
@@ -120,7 +120,7 @@ function BudgetView() {
 function BudgetRow({ line: l, month, name, onOpen }: { line: BudgetLine; month: string; name: string; onOpen: () => void }) {
   const [value, setValue] = useState<number | null>(l.budgetCents)
   useEffect(() => setValue(l.budgetCents), [l.budgetCents])
-  const set = useApiMutation('budgets.set', { silentError: false })
+  const set = useApiMutation('finanzas:budgets.set', { silentError: false })
   const commit = () => {
     if (value === l.budgetCents) return
     set.mutate([{ month, categoryId: l.categoryId, amountCents: value }])
@@ -162,7 +162,7 @@ function BudgetRow({ line: l, month, name, onOpen }: { line: BudgetLine; month: 
 }
 
 function MonthsView() {
-  const q = useApi('monthly.summaries', [12])
+  const q = useApi('finanzas:monthly.summaries', [12])
   const { cat, groupName } = useCatalog()
   const navigate = useNavigate()
   if (q.isLoading) return <Loading />

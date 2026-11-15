@@ -31,10 +31,10 @@ import { useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 import type { ApiResult } from '../../../main/app'
 
-type Row = ApiResult<'goals.list'>[number]
+type Row = ApiResult<'finanzas:goals.list'>[number]
 
 export function GoalsPage() {
-  const q = useApi('goals.list', [])
+  const q = useApi('finanzas:goals.list', [])
   const [editing, setEditing] = useState<Goal | 'new' | null>(null)
   const [allocating, setAllocating] = useState<Row | null>(null)
   if (q.isLoading) return <Loading />
@@ -162,8 +162,8 @@ function GoalForm({ goal, onClose }: { goal: Goal | null; onClose: () => void })
   const [linked, setLinked] = useState(goal?.linkedAccountId ?? '')
   const [planned, setPlanned] = useState<number | null>(goal?.plannedMonthlyCents ?? null)
   const [notes, setNotes] = useState(goal?.notes ?? '')
-  const save = useApiMutation('goals.save', { success: (g) => `Objetivo guardado: ${g.name}`, onSuccess: onClose })
-  const del = useApiMutation('goals.delete', { success: 'Objetivo borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:goals.save', { success: (g) => `Objetivo guardado: ${g.name}`, onSuccess: onClose })
+  const del = useApiMutation('finanzas:goals.delete', { success: 'Objetivo borrado', onSuccess: onClose })
   return (
     <Modal
       open
@@ -270,8 +270,8 @@ function AllocationModal({ row, onClose }: { row: Row; onClose: () => void }) {
   const [date, setDate] = useState(todayISO())
   const [accountId, setAccountId] = useState(cat?.accounts.find((a) => a.includeLiquidity)?.id ?? '')
   const [notes, setNotes] = useState('')
-  const save = useApiMutation('goals.allocate', { success: 'Reserva guardada', onSuccess: onClose })
-  const del = useApiMutation('goals.deleteAllocation', { success: 'Reserva borrada' })
+  const save = useApiMutation('finanzas:goals.allocate', { success: 'Reserva guardada', onSuccess: onClose })
+  const del = useApiMutation('finanzas:goals.deleteAllocation', { success: 'Reserva borrada' })
   return (
     <Modal
       open

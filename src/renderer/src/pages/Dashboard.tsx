@@ -27,8 +27,8 @@ export function MonthPicker({ month, onChange, max }: { month: string; onChange:
 export function DashboardPage() {
   const current = monthOf(todayISO())
   const [month, setMonth] = useState(current)
-  const q = useApi('dashboard.get', [month])
-  const nw = useApi('networth.series', [])
+  const q = useApi('finanzas:dashboard.get', [month])
+  const nw = useApi('finanzas:networth.series', [])
   const { cat, categoryName, accountName, maps } = useCatalog()
   const { openEdit, openNew } = useTxEditor()
   const navigate = useNavigate()

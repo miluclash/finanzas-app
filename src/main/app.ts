@@ -21,10 +21,19 @@ export function createAppRegistry(): Registry {
 
 type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void ? I : never
 
-/** Handlers de los módulos de la app, con su tipo exacto. */
-type ModuleHandlers = UnionToIntersection<ReturnType<(typeof APP_MODULES)[number]['ipc']>>
+/** Antepone `<P>:` a cada nombre de handler. */
+type Prefixed<P extends string, H> = { [K in keyof H & string as `${P}:${K}`]: H[K] }
 
-export type Handlers = CoreHandlers & ModuleHandlers
+/** Handlers de un módulo con el prefijo de su id (cada módulo de APP_MODULES). */
+type PrefixedModules = UnionToIntersection<
+  (typeof APP_MODULES)[number] extends infer M
+    ? M extends { id: infer I extends string; ipc: (...a: never[]) => infer H }
+      ? Prefixed<I, H>
+      : never
+    : never
+>
+
+export type Handlers = Prefixed<'core', CoreHandlers> & PrefixedModules
 export type ApiMethod = keyof Handlers
 export type ApiResult<K extends ApiMethod> = Awaited<ReturnType<Handlers[K]>>
 export type ApiArgs<K extends ApiMethod> = Parameters<Handlers[K]>

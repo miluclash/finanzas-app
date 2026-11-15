@@ -28,10 +28,10 @@ import { useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 import type { ApiResult } from '../../../main/app'
 
-type Row = ApiResult<'recurring.list'>[number]
+type Row = ApiResult<'finanzas:recurring.list'>[number]
 
 export function RecurringPage() {
-  const q = useApi('recurring.list', [])
+  const q = useApi('finanzas:recurring.list', [])
   const { accountName, categoryName } = useCatalog()
   const [editing, setEditing] = useState<RecurringRule | 'new' | null>(null)
   const navigate = useNavigate()
@@ -181,8 +181,8 @@ function RecurringForm({ rule, onClose }: { rule: RecurringRule | null; onClose:
   const [min, setMin] = useState<number | null>(rule?.minCents ?? null)
   const [max, setMax] = useState<number | null>(rule?.maxCents ?? null)
   const [notes, setNotes] = useState(rule?.notes ?? '')
-  const save = useApiMutation('recurring.save', { success: (r) => `Recurrente guardado: ${r.concept}`, onSuccess: onClose })
-  const del = useApiMutation('recurring.delete', { success: 'Recurrente borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:recurring.save', { success: (r) => `Recurrente guardado: ${r.concept}`, onSuccess: onClose })
+  const del = useApiMutation('finanzas:recurring.delete', { success: 'Recurrente borrado', onSuccess: onClose })
   const wantKind = kind === 'INCOME' ? 'INCOME' : 'EXPENSE'
   const accounts = (cat?.accounts ?? []).filter((a) => a.active || a.id === accountId || a.id === toAccountId)
   return (

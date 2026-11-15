@@ -24,7 +24,7 @@ export function TradeRepublicImportModal({ preview: p, onClose }: { preview: TrP
   const sources = accounts.filter((a) => a.includeLiquidity && a.type !== 'CASH')
   const [broker, setBroker] = useState<string>(brokers.find((b) => /trade/i.test(b.name))?.id ?? '')
   const [source, setSource] = useState<string>(sources.find((a) => /santander/i.test(a.name))?.id ?? sources[0]?.id ?? '')
-  const apply = useApiMutation('tr.apply', {
+  const apply = useApiMutation('finanzas:tr.apply', {
     success: (r) => `Importadas ${r.created} filas de Trade Republic${r.skippedDuplicates ? ` (${r.skippedDuplicates} ya estaban)` : ''}`,
     onSuccess: onClose
   })

@@ -74,7 +74,7 @@ export function InvestmentsPage() {
             <Button
               onClick={async () => {
                 try {
-                  const p = await api('tr.pick')
+                  const p = await api('finanzas:tr.pick')
                   if (p) setTrPreview(p)
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : String(e))
@@ -126,7 +126,7 @@ export function InvestmentsPage() {
 }
 
 function Overview({ onNewOp }: { onNewOp: (d: Partial<InvestmentOp>) => void }) {
-  const q = useApi('inv.overview', [])
+  const q = useApi('finanzas:inv.overview', [])
   const { maps } = useCatalog()
   const { openTransfer } = useTxEditor()
   if (q.isLoading) return <Loading />
@@ -329,7 +329,7 @@ function Fig({ label, value, sub, border, tone }: { label: string; value: string
 }
 
 function OpsView({ onEdit }: { onEdit: (op: InvestmentOp) => void }) {
-  const q = useApi('inv.ops', [])
+  const q = useApi('finanzas:inv.ops', [])
   const { maps, accountName } = useCatalog()
   if (q.isLoading) return <Loading />
   const cols: Column<InvestmentOp>[] = [
@@ -381,8 +381,8 @@ function OpForm({ initial, onClose }: { initial: Partial<InvestmentOp>; onClose:
   const [ratio, setRatio] = useState(initial.splitRatio ?? '')
   const [affectsCash, setAffectsCash] = useState(initial.affectsCash ?? true)
   const [notes, setNotes] = useState(initial.notes ?? '')
-  const save = useApiMutation('inv.saveOp', { success: 'Operación guardada', onSuccess: onClose })
-  const del = useApiMutation('inv.deleteOp', { success: 'Operación borrada', onSuccess: onClose })
+  const save = useApiMutation('finanzas:inv.saveOp', { success: 'Operación guardada', onSuccess: onClose })
+  const del = useApiMutation('finanzas:inv.deleteOp', { success: 'Operación borrada', onSuccess: onClose })
   const needsQty = type === 'BUY' || type === 'SELL'
   const gross = needsQty && quantity && price ? Number(quantity.replace(',', '.')) * Number(price.replace(',', '.')) : null
   const acc = cat?.accounts.find((a) => a.id === accountId)
@@ -532,10 +532,10 @@ function OpForm({ initial, onClose }: { initial: Partial<InvestmentOp>; onClose:
 }
 
 function PricesView() {
-  const q = useApi('inv.prices', [])
+  const q = useApi('finanzas:inv.prices', [])
   const { cat, maps } = useCatalog()
   const [inst, setInst] = useState<string>('')
-  const del = useApiMutation('inv.deletePrice', { success: 'Precio borrado' })
+  const del = useApiMutation('finanzas:inv.deletePrice', { success: 'Precio borrado' })
   const rows = (q.data ?? []).filter((p) => !inst || p.instrumentId === inst).sort((a, b) => (a.date < b.date ? 1 : -1))
   return (
     <div className="flex flex-col gap-3">
@@ -579,7 +579,7 @@ function BulkPrices({ onClose }: { onClose: () => void }) {
   const { cat } = useCatalog()
   const [date, setDate] = useState(todayISO())
   const [values, setValues] = useState<Record<string, string>>({})
-  const save = useApiMutation('inv.savePrice', { silentError: false })
+  const save = useApiMutation('finanzas:inv.savePrice', { silentError: false })
   const [saving, setSaving] = useState(false)
   const instruments = (cat?.instruments ?? []).filter((i) => i.active)
   const submit = async () => {
@@ -731,8 +731,8 @@ function InstrumentForm({ instrument: i, onClose }: { instrument: Instrument | n
   const [accountId, setAccountId] = useState(i?.accountId ?? cat?.accounts.find((a) => a.type === 'INVESTMENT')?.id ?? '')
   const [active, setActive] = useState(i?.active ?? true)
   const [notes, setNotes] = useState(i?.notes ?? '')
-  const save = useApiMutation('inv.saveInstrument', { success: (x) => `Activo guardado: ${x.name}`, onSuccess: onClose })
-  const del = useApiMutation('inv.deleteInstrument', { success: 'Activo borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:inv.saveInstrument', { success: (x) => `Activo guardado: ${x.name}`, onSuccess: onClose })
+  const del = useApiMutation('finanzas:inv.deleteInstrument', { success: 'Activo borrado', onSuccess: onClose })
   return (
     <Modal
       open
@@ -844,8 +844,8 @@ function BlockForm({ block: b, onClose }: { block: AllocationBlock | null; onClo
   const [target, setTarget] = useState(b?.targetPct?.replace('.', ',') ?? '')
   const [max, setMax] = useState(b?.maxPct?.replace('.', ',') ?? '')
   const [notes, setNotes] = useState(b?.notes ?? '')
-  const save = useApiMutation('inv.saveBlock', { success: 'Bloque guardado', onSuccess: onClose })
-  const del = useApiMutation('inv.deleteBlock', { success: 'Bloque borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:inv.saveBlock', { success: 'Bloque guardado', onSuccess: onClose })
+  const del = useApiMutation('finanzas:inv.deleteBlock', { success: 'Bloque borrado', onSuccess: onClose })
   return (
     <Modal
       open

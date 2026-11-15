@@ -281,24 +281,37 @@ describe('registro de módulos', () => {
     ).toThrow(/repetida/)
   })
 
-  it('rechaza nombres de handler repetidos entre núcleo y módulos', () => {
+  it('antepone el id del dueño y deja pasar el mismo nombre en dueños distintos', () => {
+    const m = mergeHandlers([
+      { owner: 'core', handlers: { 'app.info': () => 1 } },
+      { owner: 'entreno', handlers: { 'app.info': () => 2 } }
+    ])
+    expect(Object.keys(m)).toEqual(['core:app.info', 'entreno:app.info'])
+  })
+
+  it('rechaza nombres de handler repetidos (mismo dueño dos veces)', () => {
     expect(() =>
       mergeHandlers([
         { owner: 'core', handlers: { 'app.info': () => 1 } },
-        { owner: 'entreno', handlers: { 'app.info': () => 2 } }
+        { owner: 'core', handlers: { 'app.info': () => 2 } }
       ])
     ).toThrow(/repetido/)
+  })
+
+  it('rechaza un nombre ya prefijado y un id de dueño con «:»', () => {
+    expect(() => mergeHandlers([{ owner: 'core', handlers: { 'core:app.info': () => 1 } }])).toThrow(/sin prefijo/)
+    expect(() => mergeHandlers([{ owner: 'co:re', handlers: { x: () => 1 } }])).toThrow(/no válido/)
   })
 
   it('los handlers de la app no chocan y usan el mismo AppState', async () => {
     const s = await memoryApp('2026-10-11')
     const h = createAppHandlers(s.core, noDialogs, '9.9.9')
     expect(AppState.for(s.core)).toBe(s)
-    const info = h['app.info']()
+    const info = h['core:app.info']()
     expect(info).toMatchObject({ version: '9.9.9', today: '2026-10-11', isEmpty: true, schemaVersion: 1, dbPath: null, backupsDir: null })
     account(s, { name: 'Corriente' })
-    expect(h['app.info']().isEmpty).toBe(false)
-    expect(h['accounts.list']().length).toBe(1)
+    expect(h['core:app.info']().isEmpty).toBe(false)
+    expect(h['finanzas:accounts.list']().length).toBe(1)
   })
 })
 

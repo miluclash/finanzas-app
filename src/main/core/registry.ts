@@ -51,8 +51,8 @@ export interface ExporterDef {
   name: string
 }
 
-export interface AppModule<H extends HandlerMap = HandlerMap> {
-  id: ModuleId
+export interface AppModule<H extends HandlerMap = HandlerMap, I extends ModuleId = ModuleId> {
+  id: I
   /** Nombre visible de la sección. */
   name: string
   /** Migraciones del módulo; sus versiones tienen que caer en su rango de `MIGRATION_RANGES`. */
@@ -80,7 +80,7 @@ export interface AppModule<H extends HandlerMap = HandlerMap> {
 }
 
 /** Ayuda para declarar un módulo conservando el tipo exacto de sus handlers. */
-export function defineModule<H extends HandlerMap>(m: AppModule<H>): AppModule<H> {
+export function defineModule<H extends HandlerMap, const I extends ModuleId>(m: AppModule<H, I>): AppModule<H, I> {
   return m
 }
 
@@ -131,18 +131,23 @@ export function createRegistry(modules: readonly AppModule[], coreMigrations: re
 }
 
 /**
- * Junta handlers de varios dueños (núcleo y módulos) en un solo objeto. Lanza error si dos
- * dueños usan el mismo nombre.
+ * Junta handlers de varios dueños (núcleo y módulos) en un solo objeto. Los handlers de cada dueño
+ * se definen sin prefijo; aquí se publican como `<dueño>:<nombre>` (`finanzas:tx.save`). Lanza
+ * error si dos dueños usan el mismo nombre, si el id de un dueño contiene `:` o si un handler ya
+ * viene con el prefijo de su dueño (o con otro).
  */
 export function mergeHandlers(groups: ReadonlyArray<{ owner: string; handlers: HandlerMap }>): HandlerMap {
   const out: HandlerMap = {}
   const owners = new Map<string, string>()
   for (const g of groups) {
+    if (!g.owner || g.owner.includes(':')) throw new Error(`Id de dueño no válido: «${g.owner}» (no puede estar vacío ni contener «:»).`)
     for (const [name, fn] of Object.entries(g.handlers)) {
-      const prev = owners.get(name)
-      if (prev) throw new Error(`Handler «${name}» repetido (${prev} y ${g.owner}).`)
-      owners.set(name, g.owner)
-      out[name] = fn
+      if (name.includes(':')) throw new Error(`Handler «${name}» de ${g.owner}: el nombre se define sin prefijo, lo añade el registro.`)
+      const full = `${g.owner}:${name}`
+      const prev = owners.get(full)
+      if (prev) throw new Error(`Handler «${full}» repetido (${prev} y ${g.owner}).`)
+      owners.set(full, g.owner)
+      out[full] = fn
     }
   }
   return out

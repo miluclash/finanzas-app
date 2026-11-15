@@ -8,11 +8,11 @@ import { useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 
 export function ForecastPage() {
-  const q = useApi('forecast.run', [12])
+  const q = useApi('finanzas:forecast.run', [12])
   const { cat } = useCatalog()
   const [selected, setSelected] = useState<string | null>(null)
   const [editing, setEditing] = useState<Scenario | 'new' | null>(null)
-  const setSettings = useApiMutation('settings.update', { success: 'Escenario principal cambiado' })
+  const setSettings = useApiMutation('finanzas:settings.update', { success: 'Escenario principal cambiado' })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const results = q.data!
@@ -132,8 +132,8 @@ function ScenarioForm({ scenario, onClose, canDelete }: { scenario: Scenario | n
   const [inc, setInc] = useState(String(Math.round(Number(scenario?.incomeFactor ?? '1') * 100)))
   const [exp, setExp] = useState(String(Math.round(Number(scenario?.expenseFactor ?? '1') * 100)))
   const [variable, setVariable] = useState<number | null>(scenario?.variableMonthlyCents ?? 20000)
-  const save = useApiMutation('scenarios.save', { success: 'Escenario guardado', onSuccess: onClose })
-  const del = useApiMutation('scenarios.delete', { success: 'Escenario borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:scenarios.save', { success: 'Escenario guardado', onSuccess: onClose })
+  const del = useApiMutation('finanzas:scenarios.delete', { success: 'Escenario borrado', onSuccess: onClose })
   const pctOk = (s: string) => parseEurToCents(s) !== null
   return (
     <Modal

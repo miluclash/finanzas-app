@@ -7,8 +7,8 @@ import { useApi } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 
 export function NetWorthPage() {
-  const series = useApi('networth.series', [])
-  const dash = useApi('dashboard.get', [undefined])
+  const series = useApi('finanzas:networth.series', [])
+  const dash = useApi('finanzas:dashboard.get', [undefined])
   const { maps } = useCatalog()
   if (series.isLoading || dash.isLoading) return <Loading />
   if (series.error) return <ErrorBox error={series.error} />

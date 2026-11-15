@@ -23,7 +23,7 @@ export function WelcomePage() {
             onClick={async () => {
               setPicking(true)
               try {
-                const p = await api('import.pick')
+                const p = await api('finanzas:import.pick')
                 if (p) setPreview(p)
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : String(e))

@@ -89,7 +89,7 @@ async function initData(): Promise<void> {
   initCore(core)
   handlers = createAppHandlers(core, dialogs, app.getVersion())
   try {
-    await handlers['backup.auto']()
+    await handlers['core:backup.auto']()
   } catch (e) {
     console.error('No se pudo hacer la copia automática', e)
   }

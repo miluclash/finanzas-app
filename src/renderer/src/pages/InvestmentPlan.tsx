@@ -26,7 +26,7 @@ const EXEC_LABEL: Record<PlanExecutionMonth['status'], { text: string; tone: 'po
 }
 
 export function PlanView() {
-  const q = useApi('inv.plan', [])
+  const q = useApi('finanzas:inv.plan', [])
   const [cfgOpen, setCfgOpen] = useState(false)
   const [thesisFor, setThesisFor] = useState<string | null>(null)
   if (q.isLoading) return <Loading />
@@ -188,7 +188,7 @@ function PlanForm({ cfg, onClose }: { cfg: InvestmentPlanConfig; onClose: () => 
   const { cat } = useCatalog()
   const [c, setC] = useState<InvestmentPlanConfig>({ ...DEFAULT_PLAN, ...cfg, enabled: true })
   const set = <K extends keyof InvestmentPlanConfig>(k: K, v: InvestmentPlanConfig[K]) => setC((p) => ({ ...p, [k]: v }))
-  const save = useApiMutation('settings.update', { success: 'Plan guardado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:settings.update', { success: 'Plan guardado', onSuccess: onClose })
   const accounts = cat?.accounts ?? []
   const blocks = cat?.blocks ?? []
   return (
@@ -257,7 +257,7 @@ function ThesisForm({ cfg, instrumentId, onClose }: { cfg: InvestmentPlanConfig;
   const cur = cfg.theses[instrumentId]
   const [text, setText] = useState(cur?.text ?? '')
   const [review, setReview] = useState(cur?.reviewDate ?? '')
-  const save = useApiMutation('settings.update', { success: 'Tesis guardada', onSuccess: onClose })
+  const save = useApiMutation('finanzas:settings.update', { success: 'Tesis guardada', onSuccess: onClose })
   const name = maps.instrument.get(instrumentId)?.name ?? instrumentId
   const write = (t: string) => {
     const theses = { ...cfg.theses }

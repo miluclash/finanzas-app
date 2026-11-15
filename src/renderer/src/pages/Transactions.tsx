@@ -18,7 +18,7 @@ const PAGE = 300
 export function TransactionsPage() {
   const [params, setParams] = useSearchParams()
   const view = params.get('vista') === 'revision' ? 'revision' : 'todos'
-  const review = useApi('tx.reviewQueue', [])
+  const review = useApi('finanzas:tx.reviewQueue', [])
   const reviewCount = (review.data?.pending.length ?? 0) + (review.data?.issues.length ?? 0) + (review.data?.duplicates.length ?? 0)
   const { openNew, openTransfer } = useTxEditor()
   return (
@@ -81,8 +81,8 @@ function ListView() {
     if (nat) f.nature = nat as TxFilter['nature']
     return f
   }, [params, limit])
-  const q = useApi('tx.list', [filter], { placeholderData: (p) => p })
-  const setStatus = useApiMutation('tx.setStatus', { success: (n) => `${n} movimiento(s) actualizados`, onSuccess: () => setSelected(new Set()) })
+  const q = useApi('finanzas:tx.list', [filter], { placeholderData: (p) => p })
+  const setStatus = useApiMutation('finanzas:tx.setStatus', { success: (n) => `${n} movimiento(s) actualizados`, onSuccess: () => setSelected(new Set()) })
   const set = (k: string, v: string | null) => {
     const p = new URLSearchParams(params)
     if (v) p.set(k, v)
@@ -338,11 +338,11 @@ function monthOptions(trackingStart?: string): string[] {
 }
 
 function ReviewView() {
-  const q = useApi('tx.reviewQueue', [])
+  const q = useApi('finanzas:tx.reviewQueue', [])
   const { openEdit } = useTxEditor()
   const { accountName } = useCatalog()
-  const setStatus = useApiMutation('tx.setStatus', { success: 'Movimiento actualizado' })
-  const dismiss = useApiMutation('tx.dismissDuplicate', { success: 'Marcado como no duplicado' })
+  const setStatus = useApiMutation('finanzas:tx.setStatus', { success: 'Movimiento actualizado' })
+  const dismiss = useApiMutation('finanzas:tx.dismissDuplicate', { success: 'Marcado como no duplicado' })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const d = q.data!
