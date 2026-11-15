@@ -29,7 +29,7 @@ import {
 } from '../components/ui'
 import { useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
-import type { ApiResult } from '../../../main/services/api'
+import type { ApiResult } from '../../../main/app'
 
 type Row = ApiResult<'goals.list'>[number]
 

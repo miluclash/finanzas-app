@@ -8,7 +8,8 @@ import { firstError, TransferInput, TxFilter, TxInput } from '@shared/modules/fi
 import type { Transaction, TxStatus } from '@shared/modules/finanzas/types'
 import { audit, setSettings } from './store'
 import { entityToRow, insertRow, nextId, nextSequence, selectById, updateRow } from './tables'
-import { UserError, type AppState } from './state'
+import { UserError } from '../../core/errors'
+import type { AppState } from './state'
 
 export interface TxRow extends Transaction {
   errors: string[]

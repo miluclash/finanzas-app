@@ -35,7 +35,8 @@ import type {
 import { TX_TYPES } from '@shared/modules/finanzas/types'
 import { audit, DEFAULT_SETTINGS, getSettings, setSettings } from './store'
 import { entityToRow, insertRow, TABLE_ORDER, type TableName } from './tables'
-import { UserError, type AppState } from './state'
+import { UserError } from '../../core/errors'
+import type { AppState } from './state'
 
 type Cell = string | number | boolean | Date | null
 

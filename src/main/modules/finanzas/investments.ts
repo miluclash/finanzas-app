@@ -6,7 +6,8 @@ import type { Account, AllocationBlock, Instrument, InvestmentOp, Price, Transac
 import { audit } from './store'
 import { entityToRow, insertRow, nextId, rowToEntity, selectById, updateRow } from './tables'
 import { deleteEntity, friendlySqlError, parseInput, saveEntity } from './crud'
-import { UserError, type AppState } from './state'
+import { UserError } from '../../core/errors'
+import type { AppState } from './state'
 
 export function investmentsOverview(s: AppState) {
   const ctx = s.ctx()

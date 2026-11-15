@@ -1,43 +1,59 @@
-// Estado del proceso principal: base de datos abierta + snapshot y contexto cacheados.
+// Estado de finanzas en el proceso principal: snapshot y contexto cacheados sobre la base del núcleo.
 import { buildCtx, type Ctx } from '@shared/modules/finanzas/ctx'
-import { todayISO } from '@shared/dates'
 import type { DataSnapshot } from '@shared/modules/finanzas/types'
+import { createAppRegistry } from '../../app'
+import { createCoreContext, initCore, type CoreContext, type CorePaths } from '../../core/context'
 import type { Db } from '../../core/db'
-import { migrate } from '../../db/migrations'
-import { loadSnapshot, seedIfEmpty } from './store'
+import { loadSnapshot } from './store'
 
-export class UserError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'UserError'
-  }
-}
+/** Un único `AppState` por contexto del núcleo (lo comparten los handlers y quien lo cree). */
+const states = new WeakMap<CoreContext, AppState>()
 
 export class AppState {
   private snapshot: DataSnapshot | null = null
   private ctxCache: { today: string; ctx: Ctx } | null = null
-  /** Permite fijar la fecha de hoy en tests. */
-  todayOverride: string | null = null
 
-  constructor(
-    public db: Db,
-    public readonly paths: { dbPath: string | null; backupsDir: string | null }
-  ) {
-    db.onChange = () => this.invalidate()
+  private constructor(readonly core: CoreContext) {
+    core.onChange(() => this.invalidate())
   }
 
-  static init(db: Db, paths: { dbPath: string | null; backupsDir: string | null }): AppState {
-    migrate(db)
-    seedIfEmpty(db)
-    return new AppState(db, paths)
+  /** Estado de finanzas de un contexto (lo crea la primera vez). */
+  static for(core: CoreContext): AppState {
+    let s = states.get(core)
+    if (!s) {
+      s = new AppState(core)
+      states.set(core, s)
+    }
+    return s
+  }
+
+  /** Crea el contexto del núcleo con los módulos de la app, migra, siembra y devuelve el estado. */
+  static init(db: Db, paths: CorePaths): AppState {
+    const core = createCoreContext(db, paths, createAppRegistry())
+    initCore(core)
+    return AppState.for(core)
+  }
+
+  get db(): Db {
+    return this.core.db
+  }
+
+  get paths(): CorePaths {
+    return this.core.paths
+  }
+
+  /** Permite fijar la fecha de hoy en tests. */
+  get todayOverride(): string | null {
+    return this.core.todayOverride
+  }
+
+  set todayOverride(v: string | null) {
+    this.core.todayOverride = v
   }
 
   /** Sustituye la base de datos (restaurar copia). */
   replaceDb(db: Db): void {
-    this.db.onChange = null
-    this.db = db
-    db.onChange = () => this.invalidate()
-    this.invalidate()
+    this.core.replaceDb(db)
   }
 
   invalidate(): void {
@@ -46,7 +62,7 @@ export class AppState {
   }
 
   today(): string {
-    return this.todayOverride ?? todayISO()
+    return this.core.today()
   }
 
   snap(): DataSnapshot {

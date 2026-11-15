@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-// Contrato de la API que la interfaz llama por IPC. Todos los métodos se validan aquí o en sus servicios.
+// Handlers IPC de finanzas. Todos los métodos se validan aquí o en sus servicios.
+// Los del núcleo (app.info, audit.list, backup.*, data.openFolder) están en core/handlers.ts.
 import { dashboardData, computeAlerts } from '@shared/modules/finanzas/dashboard'
 import { monthSummaries, netWorthSeries, trackedMonths } from '@shared/modules/finanzas/ledger'
 import { addMonthsToMonth, monthOf } from '@shared/dates'
@@ -24,36 +25,25 @@ import type {
 } from '@shared/modules/finanzas/schemas'
 import type { MonthKey, Settings, TxStatus } from '@shared/modules/finanzas/types'
 import type { TxDraft } from '@shared/modules/finanzas/validation'
-import { schemaVersion } from '../db/migrations'
-import { autoBackup, createBackup, exportCsv, exportJson, exportXlsx, listBackups, restoreBackup } from './backup'
-import * as catalog from '../modules/finanzas/catalog'
-import { applyImport, previewImport } from '../modules/finanzas/importExcel'
-import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from '../modules/finanzas/importTradeRepublic'
-import * as inv from '../modules/finanzas/investments'
+import { createBackup } from '../../core/backup'
+import type { DialogProvider } from '../../core/handlers'
+import { exportCsv, exportJson, exportXlsx } from './exports'
+import * as catalog from './catalog'
+import { applyImport, previewImport } from './importExcel'
+import { applyTradeRepublic, previewTradeRepublic, type TrApplyOptions } from './importTradeRepublic'
+import * as inv from './investments'
 import { planReport } from '@shared/modules/finanzas/investmentPlan'
-import * as planning from '../modules/finanzas/planning'
-import { UserError, type AppState } from '../modules/finanzas/state'
-import * as tx from '../modules/finanzas/transactions'
+import * as planning from './planning'
+import type { AppState } from './state'
+import * as tx from './transactions'
 
-export interface DialogProvider {
-  openFile(title: string, filters: Array<{ name: string; extensions: string[] }>): Promise<string | null>
-  saveFile(title: string, defaultName: string, filters: Array<{ name: string; extensions: string[] }>): Promise<string | null>
-  openDir(title: string): Promise<string | null>
-  showItem(p: string): void
-  openPath(p: string): void
+/** Finanzas no tiene datos del usuario (ni cuentas ni movimientos). */
+export function isEmpty(s: AppState): boolean {
+  return s.snap().accounts.length === 0 && s.snap().transactions.length === 0
 }
 
-export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion = '0.0.0') {
+export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
   const h = {
-    'app.info': () => ({
-      version: appVersion,
-      dbPath: s.paths.dbPath,
-      backupsDir: s.paths.backupsDir,
-      schemaVersion: schemaVersion(s.db),
-      today: s.today(),
-      isEmpty: s.snap().accounts.length === 0 && s.snap().transactions.length === 0
-    }),
-
     // Catálogo y ajustes
     'catalog.get': () => catalog.getCatalog(s),
     'settings.update': (patch: Partial<Settings>) => catalog.updateSettings(s, patch),
@@ -138,30 +128,14 @@ export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion 
     'inv.ops': () => s.snap().ops,
     'inv.prices': () => s.snap().prices,
 
-    // Auditoría
-    'audit.list': (limit = 300, entity?: string) =>
-      s.db.all<{
-        id: number
-        ts: string
-        entity: string
-        entity_id: string
-        action: string
-        summary: string | null
-        before_json: string | null
-        after_json: string | null
-      }>(
-        `SELECT * FROM audit_log ${entity ? 'WHERE entity = ?' : ''} ORDER BY id DESC LIMIT ${Math.min(Math.max(1, limit), 5000)}`,
-        entity ? [entity] : undefined
-      ),
-
-    // Importar / exportar / copias
+    // Importar / exportar
     'import.pick': async () => {
       const f = await dialogs.openFile('Elige tu FINANCIAL_MASTER.xlsx', [{ name: 'Excel', extensions: ['xlsx'] }])
       if (!f) return null
       return previewImport(s, f)
     },
     'import.apply': (token: string, replaceExisting: boolean) => {
-      const hasData = !h['app.info']().isEmpty
+      const hasData = !isEmpty(s)
       let backup: string | null = null
       if (hasData && replaceExisting && s.paths.backupsDir) backup = createBackup(s, 'antes-de-importar').path
       const res = applyImport(s, token, { replaceExisting })
@@ -196,31 +170,9 @@ export function createHandlers(s: AppState, dialogs: DialogProvider, appVersion 
       const files = exportCsv(s, d)
       dialogs.openPath(d)
       return files
-    },
-    'backup.list': () => listBackups(s),
-    'backup.create': () => createBackup(s, 'manual'),
-    'backup.auto': () => autoBackup(s),
-    'backup.restore': async (file?: string) => {
-      const f =
-        file ??
-        (await dialogs.openFile('Elige una copia para restaurar', [{ name: 'Copia de Finanzas', extensions: ['sqlite', 'json'] }]))
-      if (!f) return null
-      return restoreBackup(s, f)
-    },
-    'backup.openFolder': () => {
-      if (!s.paths.backupsDir) throw new UserError('No hay carpeta de copias.')
-      dialogs.openPath(s.paths.backupsDir)
-      return true
-    },
-    'data.openFolder': () => {
-      if (s.paths.dbPath) dialogs.showItem(s.paths.dbPath)
-      return true
     }
   }
   return h
 }
 
-export type Handlers = ReturnType<typeof createHandlers>
-export type ApiMethod = keyof Handlers
-export type ApiResult<K extends ApiMethod> = Awaited<ReturnType<Handlers[K]>>
-export type ApiArgs<K extends ApiMethod> = Parameters<Handlers[K]>
+export type FinanzasHandlers = ReturnType<typeof createFinanzasHandlers>

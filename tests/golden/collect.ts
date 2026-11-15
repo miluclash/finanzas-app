@@ -18,9 +18,10 @@ import { allBalances, effectiveNature, liquidityAt, positionAt, trackedMonths } 
 import { matchOccurrences, pendingOccurrences, ruleStatus, suggestRule } from '../../src/shared/modules/finanzas/recurring'
 import { allDuplicatePairs } from '../../src/shared/modules/finanzas/validation'
 import { addDays, addMonthsToMonth, monthEnd, monthOf } from '../../src/shared/dates'
-import { exportJsonObject } from '../../src/main/services/backup'
+import { exportJsonObject } from '../../src/main/modules/finanzas/exports'
 import type { TxDraft } from '../../src/shared/modules/finanzas/validation'
-import { createHandlers, type DialogProvider } from '../../src/main/services/api'
+import { createAppHandlers, type Handlers } from '../../src/main/app'
+import type { DialogProvider } from '../../src/main/core/handlers'
 import type { AppState } from '../../src/main/modules/finanzas/state'
 
 /** Diálogos falsos: las lecturas que se recogen nunca los usan. */
@@ -78,7 +79,7 @@ type Out = Record<string, unknown>
 
 export function collectGolden(s: AppState, todays: string[]): Record<string, unknown> {
   const out: Out = {}
-  const h = createHandlers(s, noDialogs, '0.0.0')
+  const h = createAppHandlers(s.core, noDialogs, '0.0.0')
   const saved = s.todayOverride
   try {
     todays.forEach((today, i) => {
@@ -97,7 +98,7 @@ export function collectGolden(s: AppState, todays: string[]): Record<string, unk
 /** Error del propio colector (no del dominio): se propaga, nunca se congela. */
 class CollectorError extends Error {}
 
-function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: string, out: Out, isFirst: boolean): void {
+function collectOne(s: AppState, h: Handlers, today: string, out: Out, isFirst: boolean): void {
   const put = (key: string, fn: () => unknown): void => {
     const k = `${today}|${key}`
     try {

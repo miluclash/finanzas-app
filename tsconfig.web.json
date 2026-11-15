@@ -30,8 +30,7 @@
   "include": [
     "src/renderer/src/**/*",
     "src/shared/**/*",
-    "src/main/services/**/*",
-    "src/main/db/**/*",
+    "src/main/app.ts",
     "src/main/modules/**/*",
     "src/main/core/**/*"
   ]

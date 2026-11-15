@@ -2,10 +2,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { createAppHandlers, createAppRegistry, type Handlers } from './app'
+import { createBackup } from './core/backup'
+import { createCoreContext, initCore, type CoreContext } from './core/context'
 import { Db } from './core/db'
-import { createHandlers, type DialogProvider, type Handlers } from './services/api'
-import { AppState, UserError } from './modules/finanzas/state'
-import { createBackup } from './services/backup'
+import { UserError } from './core/errors'
+import type { DialogProvider } from './core/handlers'
 import { initUpdater } from './core/updater'
 
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
@@ -13,14 +15,15 @@ const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 // Formato español en controles nativos (fechas DD/MM/AAAA, separadores)
 app.commandLine.appendSwitch('lang', 'es-ES')
 
-// Carpeta de datos: %APPDATA%\Finanzas (o FINANZAS_DATA_DIR para pruebas)
+// Carpeta de datos: %APPDATA%\Finanzas (o FINANZAS_DATA_DIR para pruebas). Se decide solo aquí:
+// el núcleo recibe las rutas como parámetro.
 function dataDir(): string {
   if (process.env.FINANZAS_DATA_DIR) return process.env.FINANZAS_DATA_DIR
   return path.join(app.getPath('appData'), 'Finanzas')
 }
 
 let mainWindow: BrowserWindow | null = null
-let state: AppState | null = null
+let core: CoreContext | null = null
 let handlers: Handlers | null = null
 
 function createWindow(): void {
@@ -82,8 +85,9 @@ async function initData(): Promise<void> {
   fs.mkdirSync(dir, { recursive: true })
   const dbPath = path.join(dir, 'finanzas.sqlite')
   const db = await Db.open(dbPath)
-  state = AppState.init(db, { dbPath, backupsDir: path.join(dir, 'backups') })
-  handlers = createHandlers(state, dialogs, app.getVersion())
+  core = createCoreContext(db, { dbPath, backupsDir: path.join(dir, 'backups') }, createAppRegistry())
+  initCore(core)
+  handlers = createAppHandlers(core, dialogs, app.getVersion())
   try {
     handlers['backup.auto']()
   } catch (e) {
@@ -131,7 +135,7 @@ else {
     }
     createWindow()
     initUpdater(() => {
-      if (state) createBackup(state, 'antes-de-actualizar')
+      if (core) createBackup(core, 'antes-de-actualizar')
     })
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

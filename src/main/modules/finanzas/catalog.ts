@@ -13,7 +13,8 @@ import type { Account, Category, CategoryGroup, Reconciliation, Settings, Subcat
 import { audit, getSettings, setSettings } from './store'
 import { insertRow, nextId } from './tables'
 import { deleteEntity, friendlySqlError, parseInput, saveEntity } from './crud'
-import { UserError, type AppState } from './state'
+import { UserError } from '../../core/errors'
+import type { AppState } from './state'
 
 export function getCatalog(s: AppState) {
   const snap = s.snap()

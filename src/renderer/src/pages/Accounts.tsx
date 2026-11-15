@@ -26,7 +26,7 @@ import {
   TextInput
 } from '../components/ui'
 import { useApi, useApiMutation, type ApiError } from '../lib/api'
-import type { ApiResult } from '../../../main/services/api'
+import type { ApiResult } from '../../../main/app'
 
 type Row = ApiResult<'accounts.list'>[number]
 

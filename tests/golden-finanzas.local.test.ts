@@ -10,7 +10,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Db } from '../src/main/core/db'
 import { DEFAULT_SETTINGS } from '../src/main/modules/finanzas/store'
-import { schemaVersion } from '../src/main/db/migrations'
+import { schemaVersion } from '../src/main/core/migrations'
 import { AppState } from '../src/main/modules/finanzas/state'
 import { collectGolden, diffGolden } from './golden/collect'
 

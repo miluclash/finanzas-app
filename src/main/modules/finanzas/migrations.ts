@@ -1,11 +1,6 @@
-// Migraciones del esquema. Cada una se aplica una sola vez, en orden, dentro de una transacción.
-import type { Db } from '../core/db'
-
-export interface Migration {
-  version: number
-  name: string
-  up: string
-}
+// Migraciones del esquema de finanzas (versiones 1–999). Cada una se aplica una sola vez, en orden,
+// dentro de una transacción (ver `core/migrations.ts`). Nunca se edita una migración publicada.
+import type { Migration } from '../../core/migrations'
 
 const DATE_CHECK = (col: string) => `CHECK (${col} GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]')`
 const NULLABLE_DATE_CHECK = (col: string) => `CHECK (${col} IS NULL OR ${col} GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]')`
@@ -262,31 +257,3 @@ CREATE INDEX idx_audit_entity ON audit_log(entity, entity_id);
 `
   }
 ]
-
-export function migrate(db: Db): number {
-  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    applied_at TEXT NOT NULL
-  );`)
-  const done = new Set(db.all<{ version: number }>('SELECT version FROM schema_migrations').map((r) => r.version))
-  let applied = 0
-  for (const m of MIGRATIONS) {
-    if (done.has(m.version)) continue
-    db.tx(() => {
-      db.exec(m.up)
-      db.run('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)', [
-        m.version,
-        m.name,
-        new Date().toISOString()
-      ])
-    })
-    applied++
-  }
-  return applied
-}
-
-export function schemaVersion(db: Db): number {
-  const r = db.get<{ v: number | null }>('SELECT MAX(version) AS v FROM schema_migrations')
-  return r?.v ?? 0
-}

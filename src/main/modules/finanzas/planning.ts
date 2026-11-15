@@ -9,7 +9,8 @@ import type { Goal, GoalAllocation, MonthKey, RecurringRule, Scenario } from '@s
 import { audit } from './store'
 import { insertRow, nextId } from './tables'
 import { deleteEntity, parseInput, saveEntity } from './crud'
-import { UserError, type AppState } from './state'
+import { UserError } from '../../core/errors'
+import type { AppState } from './state'
 
 // ---------- Recurrentes ----------
 

@@ -1,6 +1,6 @@
 // Cliente tipado de la API del proceso principal + hooks de React Query.
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query'
-import type { ApiArgs, ApiMethod, ApiResult } from '../../../main/services/api'
+import type { ApiArgs, ApiMethod, ApiResult } from '../../../main/app'
 import { toast } from './toast'
 
 export class ApiError extends Error {

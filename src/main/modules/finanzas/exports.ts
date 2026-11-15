@@ -1,104 +1,15 @@
-// Copias de seguridad (archivo SQLite completo) y exportaciones (JSON, Excel, CSV).
+// Exportaciones de finanzas (JSON, Excel, CSV) y restauración desde una exportación JSON.
+// Las copias de seguridad (.sqlite) son del núcleo: core/backup.ts.
 import ExcelJS from 'exceljs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { monthSummaries, trackedMonths } from '@shared/modules/finanzas/ledger'
-import { Db } from '../core/db'
-import { migrate, schemaVersion } from '../db/migrations'
-import { audit } from '../modules/finanzas/store'
-import { insertRow, TABLE_ORDER, TABLES, type TableName } from '../modules/finanzas/tables'
-import { wipeData } from '../modules/finanzas/importExcel'
-import { UserError, type AppState } from '../modules/finanzas/state'
-
-function stamp(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
-}
-
-export interface BackupInfo {
-  name: string
-  path: string
-  size: number
-  createdAt: string
-  auto: boolean
-}
-
-export function listBackups(s: AppState): BackupInfo[] {
-  const dir = s.paths.backupsDir
-  if (!dir || !fs.existsSync(dir)) return []
-  return fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith('.sqlite'))
-    .map((f) => {
-      const st = fs.statSync(path.join(dir, f))
-      return { name: f, path: path.join(dir, f), size: st.size, createdAt: st.mtime.toISOString(), auto: f.includes('-auto') }
-    })
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-}
-
-export function createBackup(s: AppState, kind: 'auto' | 'manual' | 'antes-de-restaurar' | 'antes-de-importar' | 'antes-de-actualizar' = 'manual'): BackupInfo {
-  const dir = s.paths.backupsDir
-  if (!dir) throw new UserError('No hay carpeta de copias configurada.')
-  fs.mkdirSync(dir, { recursive: true })
-  const file = path.join(dir, `finanzas-${stamp()}-${kind}.sqlite`)
-  fs.writeFileSync(file, Buffer.from(s.db.exportBytes()))
-  const st = fs.statSync(file)
-  return { name: path.basename(file), path: file, size: st.size, createdAt: st.mtime.toISOString(), auto: kind === 'auto' }
-}
-
-/** Una copia automática al día como máximo; se conservan las 30 más recientes. */
-export function autoBackup(s: AppState, keep = 30): BackupInfo | null {
-  const dir = s.paths.backupsDir
-  if (!dir) return null
-  const today = stamp().slice(0, 8)
-  const existing = listBackups(s).filter((b) => b.auto)
-  let created: BackupInfo | null = null
-  if (!existing.some((b) => b.name.includes(`finanzas-${today}`))) created = createBackup(s, 'auto')
-  const autos = listBackups(s).filter((b) => b.auto)
-  for (const old of autos.slice(keep)) fs.rmSync(old.path, { force: true })
-  return created
-}
-
-async function validateSqlite(buf: Uint8Array): Promise<void> {
-  let db: Db | null = null
-  try {
-    db = await Db.openReadOnlyBuffer(buf)
-    const tables = new Set(db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").map((r) => r.name))
-    for (const t of ['schema_migrations', 'accounts', 'transactions', 'categories'])
-      if (!tables.has(t)) throw new UserError('El archivo no es una copia de seguridad de esta app.')
-  } catch (e) {
-    if (e instanceof UserError) throw e
-    throw new UserError('El archivo no es una base de datos válida.')
-  } finally {
-    db?.close()
-  }
-}
-
-/** Restaura una copia (.sqlite o .json exportado). Antes guarda una copia del estado actual. */
-export async function restoreBackup(s: AppState, file: string): Promise<{ safetyBackup: string | null }> {
-  if (!fs.existsSync(file)) throw new UserError('El archivo no existe.')
-  const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
-  if (file.toLowerCase().endsWith('.json')) {
-    restoreFromJson(s, JSON.parse(fs.readFileSync(file, 'utf8')))
-    return { safetyBackup: safety }
-  }
-  const buf = new Uint8Array(fs.readFileSync(file))
-  await validateSqlite(buf)
-  if (!s.paths.dbPath) {
-    const db = await Db.openReadOnlyBuffer(buf)
-    migrate(db)
-    s.replaceDb(db)
-    return { safetyBackup: safety }
-  }
-  fs.writeFileSync(s.paths.dbPath + '.restore', Buffer.from(buf))
-  s.db.close()
-  fs.renameSync(s.paths.dbPath + '.restore', s.paths.dbPath)
-  const db = await Db.open(s.paths.dbPath)
-  migrate(db)
-  s.replaceDb(db)
-  audit(s.db, 'backup', path.basename(file), 'restore', `Restaurada copia ${path.basename(file)}`, null, null)
-  return { safetyBackup: safety }
-}
+import { UserError } from '../../core/errors'
+import { MIGRATION_RANGES, schemaVersion } from '../../core/migrations'
+import { audit } from './store'
+import { insertRow, TABLE_ORDER, TABLES, type TableName } from './tables'
+import { wipeData } from './importExcel'
+import type { AppState } from './state'
 
 // ---------- Exportación ----------
 
@@ -112,7 +23,7 @@ export function exportJsonObject(s: AppState) {
   return {
     app: 'finanzas-app',
     format: 1,
-    schemaVersion: schemaVersion(s.db),
+    schemaVersion: schemaVersion(s.db, MIGRATION_RANGES.finanzas),
     exportedAt: new Date().toISOString(),
     settings: s.db.all('SELECT key, value FROM settings ORDER BY key'),
     duplicateDismissals: s.db.all('SELECT tx_a, tx_b, created_at FROM duplicate_dismissals'),
