@@ -183,7 +183,14 @@ export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBacku
 
     // Copia del estado actual solo cuando ya se sabe que la copia elegida sirve (turno exclusivo:
     // nada ha cambiado desde que empezó). Así un intento fallido no deja copias sueltas.
-    const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
+    let safety: string | null
+    try {
+      safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
+    } catch (e) {
+      // Sin copia del estado actual no se sigue (p. ej. disco lleno); la copia en memoria, fuera.
+      copia.close()
+      throw e
+    }
 
     // 3. Sustituir el archivo por la copia migrada. Hasta `replaceDb(final)` la activa es la vieja.
     let final = copia

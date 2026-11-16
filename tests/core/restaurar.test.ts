@@ -103,6 +103,40 @@ describe('restaurar un .sqlite a medias', () => {
     s.db.close()
   })
 
+  it('(f) si no se puede hacer la copia antes-de-restaurar, no se sigue: archivo intacto, base actual usable y copia en memoria cerrada', async () => {
+    const dir = tmpDir()
+    const file = path.join(dir, 'finanzas.sqlite')
+    const s = AppState.init(await Db.open(file), { dbPath: file, backupsDir: path.join(dir, 'backups') })
+    s.todayOverride = '2026-10-11'
+    account(s, { name: 'De la copia' })
+    const copia = createBackup(s, 'manual')
+    account(s, { name: 'Actual' })
+    const vieja = s.db
+    const antes = sha(file)
+
+    const real = fs.writeFileSync
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((p, ...rest) => {
+      if (String(p).includes('-antes-de-restaurar.sqlite')) throw Object.assign(new Error('ENOSPC: no queda espacio en el disco'), { code: 'ENOSPC' })
+      return real(p, ...(rest as [Parameters<typeof real>[1]]))
+    })
+    const cerrar = vi.spyOn(Db.prototype, 'close')
+
+    await expect(restoreBackup(s, copia.path)).rejects.toThrow('ENOSPC')
+    vi.mocked(fs.writeFileSync).mockRestore()
+
+    // Se han cerrado la base de la validación y la copia migrada en memoria; la actual no.
+    expect(cerrar).toHaveBeenCalledTimes(2)
+    expect(cerrar.mock.contexts).not.toContain(vieja)
+    expect(s.db).toBe(vieja)
+    expect(s.core.queue.busy).toBe(false)
+    expect(sha(file)).toBe(antes)
+    expect(fs.readdirSync(dir).filter((f) => f.endsWith('.restore'))).toEqual([])
+    expect(listBackups(s).filter((b) => b.name.includes('-antes-de-restaurar'))).toEqual([])
+    account(s, { name: 'Después' })
+    expect(nombres(s)).toEqual(['Actual', 'De la copia', 'Después'])
+    s.db.close()
+  })
+
   it('(b) si la migración de la copia falla: no se toca nada, la base vieja sigue activa y usable y la app arranca', async () => {
     const dir = tmpDir()
     // La copia: una base de finanzas que ya tiene una tabla trn_a sin la migración apuntada, así que
