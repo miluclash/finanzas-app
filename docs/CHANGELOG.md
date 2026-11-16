@@ -10,7 +10,7 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 - **Cola de escritura.** Todas las escrituras en la base pasan por una cola única, una detrás de otra, cada una en su transacción y con un guardado en disco por operación (temporal + renombrado, como antes). Escribir fuera de la cola da error.
   - Abrir la app sin cambios ya no reescribe `finanzas.sqlite`.
   - Si hay migraciones pendientes sobre una base con datos, antes se hace una copia `antes-de-migrar`.
-  - Restaurar una copia abre la base nueva antes de sustituir el archivo; si algo falla, la base actual sigue intacta o se explica qué ha pasado.
+  - Restaurar una copia la pone al día en memoria antes de tocar el archivo: si no sirve para esta versión, no cambia nada y lo dice; la copia `antes-de-restaurar` solo se hace cuando la copia elegida es válida.
   - Al cerrar o actualizar se espera a que la cola termine. Si el último guardado falla, se hace una copia `sin-guardar` y se avisa; si tampoco se puede, se pregunta antes de cerrar y no se instala la actualización.
   - Si un guardado falla durante el uso, el aviso dice que el cambio está hecho y se reintentará, y la pantalla lo muestra.
 - **Registro de módulos.** Cada sección se registra con sus migraciones (rango de versiones propio), sus métodos IPC y su semilla. Los métodos se llaman `<módulo>:<acción>` (`finanzas:tx.save`, `core:backup.create`).

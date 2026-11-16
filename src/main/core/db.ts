@@ -23,6 +23,24 @@ function sleepSync(ms: number): void {
 }
 
 /**
+ * Renombra `from` sobre `to` reintentando unas cuantas veces: en Windows el antivirus o el
+ * indexador pueden bloquear el archivo un momento. Si no lo consigue, lanza el último error.
+ */
+export function renameWithRetry(from: string, to: string): void {
+  let lastErr: unknown = null
+  for (let i = 0; i < 8; i++) {
+    try {
+      fs.renameSync(from, to)
+      return
+    } catch (e) {
+      lastErr = e
+      sleepSync(50 * (i + 1))
+    }
+  }
+  throw lastErr
+}
+
+/**
  * Error al guardar en disco al cerrar una operación de la cola. Los cambios ya están
  * confirmados en memoria; el siguiente guardado (o `flush()`) vuelve a intentarlo.
  */
@@ -304,18 +322,8 @@ export class Db {
       }
       throw e
     }
-    let lastErr: unknown = null
-    for (let i = 0; i < 8; i++) {
-      try {
-        fs.renameSync(tmp, this.filePath)
-        this.pendingPersist = false
-        return
-      } catch (e) {
-        lastErr = e
-        sleepSync(50 * (i + 1))
-      }
-    }
-    throw lastErr
+    renameWithRetry(tmp, this.filePath)
+    this.pendingPersist = false
   }
 
   exportBytes(): Uint8Array {

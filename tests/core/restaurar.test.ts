@@ -147,12 +147,17 @@ describe('restaurar un .sqlite a medias', () => {
     expect(nombres(s)).toEqual(['Actual', 'Después'])
     ctx.db.close()
 
+    // Un intento fallido no deja copias sueltas: la copia antes-de-restaurar solo se hace si la copia
+    // elegida sirve.
+    const listar = (): string[] => (fs.existsSync(backups) ? fs.readdirSync(backups) : [])
+    expect(listar().filter((f) => f.includes('-antes-de-restaurar'))).toEqual([])
+
     // Al volver a abrir, la app arranca sobre ese archivo sin migrar nada (ni copia antes-de-migrar).
-    const copiasAntes = fs.readdirSync(backups).length
+    const copiasAntes = listar().length
     const ctx2 = createCoreContext(await Db.open(file), { dbPath: file, backupsDir: backups }, registroConTrnA())
     expect(() => initCore(ctx2)).not.toThrow()
     expect(AppState.for(ctx2).snap().accounts.map((a) => a.name).sort()).toEqual(['Actual', 'Después'])
-    expect(fs.readdirSync(backups).length).toBe(copiasAntes)
+    expect(listar().length).toBe(copiasAntes)
     ctx2.db.close()
   })
 

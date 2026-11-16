@@ -9,7 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { audit } from './audit'
 import { coreOf, type CorePaths, type CoreRef } from './context'
-import { Db } from './db'
+import { Db, renameWithRetry } from './db'
 import { UserError } from './errors'
 import { migrate } from './migrations'
 
@@ -70,7 +70,7 @@ export function createBackup(s: BackupSource, kind: BackupKind = 'manual'): Back
   const tmp = `${file}.tmp`
   try {
     fs.writeFileSync(tmp, Buffer.from(s.db.exportBytes()))
-    fs.renameSync(tmp, file)
+    renameWithRetry(tmp, file)
   } catch (e) {
     try {
       fs.rmSync(tmp, { force: true })
@@ -157,8 +157,8 @@ export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBacku
   const s = coreOf(ref)
   return s.queue.enqueueTask(RESTORE_LABEL, async ({ runOp }) => {
     if (!fs.existsSync(file)) throw new UserError('El archivo no existe.')
-    const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
     if (file.toLowerCase().endsWith('.json')) {
+      const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
       const obj: unknown = JSON.parse(fs.readFileSync(file, 'utf8'))
       runOp(RESTORE_LABEL, () => restoreJson(s, obj))
       return { safetyBackup: safety }
@@ -181,6 +181,10 @@ export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBacku
     }
     s.replaceDb(old)
 
+    // Copia del estado actual solo cuando ya se sabe que la copia elegida sirve (turno exclusivo:
+    // nada ha cambiado desde que empezó). Así un intento fallido no deja copias sueltas.
+    const safety = s.paths.backupsDir ? createBackup(s, 'antes-de-restaurar').path : null
+
     // 3. Sustituir el archivo por la copia migrada. Hasta `replaceDb(final)` la activa es la vieja.
     let final = copia
     const dbPath = s.paths.dbPath
@@ -191,7 +195,7 @@ export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBacku
         const bytes = copia.exportBytes()
         nueva = await Db.fromBuffer(bytes, dbPath)
         fs.writeFileSync(tmp, Buffer.from(bytes))
-        fs.renameSync(tmp, dbPath)
+        renameWithRetry(tmp, dbPath)
       } catch (e) {
         nueva?.close()
         copia.close()

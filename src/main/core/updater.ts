@@ -51,6 +51,10 @@ export function initUpdater(hooks: UpdaterHooks): UpdaterControl {
   autoUpdater.autoInstallOnAppQuit = true
   // Una sola copia por actualización descargada; quien llega después espera a la misma.
   let backup: Promise<void> | null = null
+  let backupVersion: string | null = null
+  // Una sola instalación en curso (ver `update.install`). Se suelta si el actualizador da error o
+  // descarga otra versión, para que "Reiniciar y actualizar" vuelva a funcionar.
+  let installing: Promise<InstallResult> | null = null
   const ensureBackup = (): Promise<void> => {
     if (!backup)
       backup = Promise.resolve()
@@ -67,10 +71,19 @@ export function initUpdater(hooks: UpdaterHooks): UpdaterControl {
     if (status.state === 'downloading') status = { ...status, percent: Math.round(p.percent) }
   })
   autoUpdater.on('update-downloaded', (i) => {
+    // Cada versión descargada tiene su propia copia antes de actualizar.
+    if (backupVersion !== i.version) {
+      backup = null
+      backupVersion = i.version
+    }
+    installing = null
     void ensureBackup()
     status = { state: 'ready', version: i.version }
   })
-  autoUpdater.on('error', (e) => (status = { state: 'error', message: e?.message ?? String(e) }))
+  autoUpdater.on('error', (e) => {
+    installing = null
+    status = { state: 'error', message: e?.message ?? String(e) }
+  })
   const check = () => autoUpdater.checkForUpdates().catch((e) => (status = { state: 'error', message: String(e?.message ?? e) }))
   ipcMain.handle('update.check', () => check())
   const install = async (): Promise<InstallResult> => {
@@ -92,7 +105,6 @@ export function initUpdater(hooks: UpdaterHooks): UpdaterControl {
   }
   // Una sola instalación en curso: un segundo clic recibe la misma promesa y no vuelve a llamar a
   // `quitAndInstall`. Si no se ha podido instalar, se puede volver a intentar.
-  let installing: Promise<InstallResult> | null = null
   ipcMain.handle('update.install', () => {
     if (!installing) {
       const p = install()

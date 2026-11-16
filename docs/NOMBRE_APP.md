@@ -59,7 +59,7 @@ Después hay que separar a mano lo que es nombre de la app de lo que es el módu
 
 | Archivo | Qué |
 |---|---|
-| `src/main/core/backup.ts` | Nombre de las copias `finanzas-<fecha>-<tipo>.sqlite` (66), que incluye los tipos nuevos `antes-de-migrar` y `sin-guardar`; filtro de copias automáticas `finanzas-<fecha>` (79) |
+| `src/main/core/backup.ts` | Nombre de las copias `finanzas-<fecha>-<tipo>.sqlite` (67), que incluye los tipos nuevos `antes-de-migrar` y `sin-guardar`; filtro de copias automáticas `finanzas-<fecha>` (93) |
 | `src/main/modules/finanzas/exports.ts` | Identificador `app: 'finanzas-app'` en las exportaciones JSON (línea 24; se valida al importar, línea 41: cambiarlo impide restaurar exportaciones antiguas); `wb.creator = 'Finanzas'` en Excel (línea 90) |
 | `src/main/modules/finanzas/handlers.ts` | Nombres de archivo por defecto de la exportación `finanzas-<fecha>.json` y `.xlsx` (líneas 176 y 183); nombre `finanzas` del servidor MCP que se escribe en la configuración (línea 125) |
 | `src/main/core/handlers.ts` | Filtro «Copia de Finanzas» del diálogo de restauración (línea 54, visible) |
