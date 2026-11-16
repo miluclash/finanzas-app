@@ -39,7 +39,13 @@ export function useApi<K extends ApiMethod>(
  */
 export function useApiMutation<K extends ApiMethod>(
   method: K,
-  opts: { success?: string | ((r: ApiResult<K>) => string | null); onSuccess?: (r: ApiResult<K>) => void; silentError?: boolean } = {}
+  opts: {
+    success?: string | ((r: ApiResult<K>) => string | null)
+    onSuccess?: (r: ApiResult<K>) => void
+    silentError?: boolean
+    /** Refrescar todas las consultas también si falla (p. ej. restaurar una copia). */
+    invalidateOnError?: boolean
+  } = {}
 ) {
   const qc = useQueryClient()
   return useMutation<ApiResult<K>, ApiError, ApiArgs<K>>({
@@ -53,7 +59,7 @@ export function useApiMutation<K extends ApiMethod>(
     onError: async (e) => {
       if (!opts.silentError) toast.error(e.message)
       // El cambio está hecho aunque no se haya guardado en disco: que la pantalla lo muestre.
-      if (e.saved) await qc.invalidateQueries()
+      if (e.saved || opts.invalidateOnError) await qc.invalidateQueries()
     }
   })
 }

@@ -136,6 +136,54 @@ describe('cola de escritura', () => {
     reabierta.close()
   })
 
+  it('committedCount cuenta cada operación confirmada, también si falla el guardado, y no las deshechas', async () => {
+    const file = tmpFile()
+    const { db, q } = await setup(file)
+    expect(q.committedCount).toBe(1) // la de montar
+    await q.enqueue('prueba:a', () => db.run('INSERT INTO prueba (n) VALUES (1)'))
+    expect(q.committedCount).toBe(2)
+    // Una que falla y se deshace no cuenta.
+    await expect(q.enqueue('prueba:mal', () => db.run('INSERT INTO prueba (n) VALUES (1)'))).rejects.toThrow()
+    expect(q.committedCount).toBe(2)
+    // Una confirmada cuyo guardado falla sí cuenta: el cambio está hecho en memoria.
+    const persist = vi.spyOn(db, 'persist').mockImplementationOnce(() => {
+      throw new Error('disco lleno')
+    })
+    await expect(q.enqueue('prueba:b', () => db.run('INSERT INTO prueba (n) VALUES (2)'))).rejects.toBeInstanceOf(SaveError)
+    expect(q.committedCount).toBe(3)
+    expect(q.hasPendingSave).toBe(true)
+    persist.mockRestore()
+    // Reintentar el guardado (flush) no es una operación: no cuenta.
+    await q.enqueueTask('prueba:flush', async () => q.flush())
+    expect(q.committedCount).toBe(3)
+    expect(q.hasPendingSave).toBe(false)
+    // Las operaciones de una tarea y las de runNow también cuentan.
+    await q.enqueueTask('prueba:tarea', async ({ runOp }) => runOp('prueba:c', () => db.run('INSERT INTO prueba (n) VALUES (3)')))
+    q.runNow('prueba:d', () => db.run('INSERT INTO prueba (n) VALUES (4)'))
+    expect(q.committedCount).toBe(5)
+    db.close()
+  })
+
+  it('si no se puede escribir el temporal al guardar, no queda ningún .tmp a medias', async () => {
+    const file = tmpFile()
+    const { db, q } = await setup(file)
+    const antes = fs.readFileSync(file)
+    const real = fs.writeFileSync
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((p, ...rest) => {
+      if (String(p).endsWith('.tmp')) {
+        real(p, 'a medias')
+        throw Object.assign(new Error('ENOSPC: no queda espacio en el disco'), { code: 'ENOSPC' })
+      }
+      return real(p, ...(rest as [Parameters<typeof real>[1]]))
+    })
+    await expect(q.enqueue('prueba:a', () => db.run('INSERT INTO prueba (n) VALUES (1)'))).rejects.toBeInstanceOf(SaveError)
+    vi.restoreAllMocks()
+    expect(fs.readdirSync(path.dirname(file)).filter((f) => f.endsWith('.tmp'))).toEqual([])
+    expect(fs.readFileSync(file).equals(antes)).toBe(true)
+    expect(q.hasPendingSave).toBe(true)
+    db.close()
+  })
+
   it('onChange se llama al cerrar una tx de servicio, tras un run suelto, al confirmar y en rollbackOp', async () => {
     const { db } = await setup()
     const onChange = vi.fn()

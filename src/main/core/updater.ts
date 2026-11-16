@@ -29,13 +29,22 @@ export interface UpdaterHooks {
   settle(): Promise<SettleResult>
 }
 
-export function initUpdater(hooks: UpdaterHooks): void {
+/** Resultado de `update.install` para la interfaz: `null` si no hay nada que instalar. */
+export type InstallResult = true | null | { ok: false; error: string; user: true }
+
+/** Lo que la app puede pedir al actualizador después de arrancarlo. */
+export interface UpdaterControl {
+  /** Que la actualización descargada no se instale al cerrar esta vez (p. ej. "Cerrar sin guardar"). */
+  skipInstallOnQuit(): void
+}
+
+export function initUpdater(hooks: UpdaterHooks): UpdaterControl {
   ipcMain.handle('update.status', () => ({ current: app.getVersion(), ...status }))
   if (!app.isPackaged || process.env.FINANZAS_DATA_DIR) {
     status = { state: 'disabled' }
     ipcMain.handle('update.check', () => null)
     ipcMain.handle('update.install', () => null)
-    return
+    return { skipInstallOnQuit: () => undefined }
   }
   const { autoUpdater } = electronUpdater
   autoUpdater.autoDownload = true
@@ -64,7 +73,7 @@ export function initUpdater(hooks: UpdaterHooks): void {
   autoUpdater.on('error', (e) => (status = { state: 'error', message: e?.message ?? String(e) }))
   const check = () => autoUpdater.checkForUpdates().catch((e) => (status = { state: 'error', message: String(e?.message ?? e) }))
   ipcMain.handle('update.check', () => check())
-  ipcMain.handle('update.install', async () => {
+  const install = async (): Promise<InstallResult> => {
     if (status.state !== 'ready') return null
     await ensureBackup()
     // Nada a medias: se espera a que la cola termine y el guardado esté al día antes de instalar.
@@ -80,7 +89,30 @@ export function initUpdater(hooks: UpdaterHooks): void {
     if (!r.ok) return { ok: false, error: r.error, user: true }
     setImmediate(() => autoUpdater.quitAndInstall(false, true))
     return true
+  }
+  // Una sola instalación en curso: un segundo clic recibe la misma promesa y no vuelve a llamar a
+  // `quitAndInstall`. Si no se ha podido instalar, se puede volver a intentar.
+  let installing: Promise<InstallResult> | null = null
+  ipcMain.handle('update.install', () => {
+    if (!installing) {
+      const p = install()
+      installing = p
+      p.then(
+        (r) => {
+          if (r !== true && installing === p) installing = null
+        },
+        () => {
+          if (installing === p) installing = null
+        }
+      )
+    }
+    return installing
   })
   setTimeout(check, 5000)
   setInterval(check, 6 * 60 * 60 * 1000)
+  return {
+    skipInstallOnQuit: () => {
+      autoUpdater.autoInstallOnAppQuit = false
+    }
+  }
 }

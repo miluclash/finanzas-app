@@ -37,6 +37,7 @@ export function listBackups(s: BackupSource): BackupInfo[] {
   if (!dir || !fs.existsSync(dir)) return []
   return fs
     .readdirSync(dir)
+    // Solo copias terminadas: los `.sqlite.tmp` de una copia en curso (o que falló) no cuentan.
     .filter((f) => f.endsWith('.sqlite'))
     .map((f) => {
       const st = fs.statSync(path.join(dir, f))
@@ -64,7 +65,20 @@ export function createBackup(s: BackupSource, kind: BackupKind = 'manual'): Back
   if (!dir) throw new UserError('No hay carpeta de copias configurada.')
   fs.mkdirSync(dir, { recursive: true })
   const file = path.join(dir, `finanzas-${stamp()}-${kind}.sqlite`)
-  fs.writeFileSync(file, Buffer.from(s.db.exportBytes()))
+  // Temporal + renombrado: con el disco lleno no queda una copia truncada en la lista (que solo
+  // muestra los `.sqlite`).
+  const tmp = `${file}.tmp`
+  try {
+    fs.writeFileSync(tmp, Buffer.from(s.db.exportBytes()))
+    fs.renameSync(tmp, file)
+  } catch (e) {
+    try {
+      fs.rmSync(tmp, { force: true })
+    } catch {
+      // Se conserva el error original (p. ej. disco lleno).
+    }
+    throw e
+  }
   const st = fs.statSync(file)
   return { name: path.basename(file), path: file, size: st.size, createdAt: st.mtime.toISOString(), auto: kind === 'auto' }
 }
@@ -107,16 +121,37 @@ function restoreJson(ref: CoreRef, obj: unknown): void {
 /** Etiqueta de la cola para restaurar una copia. */
 const RESTORE_LABEL = 'core:backup.restore'
 
+
+/** No se ha podido poner al día la copia: el mensaje deja claro que no se ha tocado nada. */
+function copiaNoUsable(e: unknown): UserError {
+  const nada = 'No se ha cambiado nada: sigues con los datos que tenías.'
+  // Un error de usuario ya explica qué pasa; uno inesperado (SQL de una migración) se resume y
+  // lleva el detalle técnico, por si hay que mirarlo.
+  if (e instanceof UserError) return new UserError(`No se ha podido poner al día la copia: ${e.message} ${nada}`)
+  const detalle = e instanceof Error ? e.message : String(e)
+  return new UserError(
+    `Esta copia no se puede usar con esta versión de la app: no se ha podido poner al día. ${nada} (Detalle: ${detalle})`
+  )
+}
+
 /**
  * Restaura una copia (.sqlite o .json exportado). Antes guarda una copia del estado actual.
  *
  * Se encola a sí misma en un turno exclusivo de la cola (`enqueueTask`): quien la llama no tiene
  * que envolverla en otra tarea (eso bloquearía la cola, ver writeQueue.ts).
  *
- * Con una copia `.sqlite`, la base nueva sustituye a la actual (`replaceDb`) antes de migrarla, y
- * la vieja se cierra al final. Si algo falla antes de `replaceDb`, la base actual sigue intacta (y
- * no queda ningún `.restore` a medias). Si falla la migración de la copia ya restaurada, la base
- * nueva se queda activa y se lanza un `UserError` que dice dónde está el estado anterior.
+ * Con una copia `.sqlite` se migra ANTES de tocar el archivo:
+ * 1. Se valida la copia y se abre en memoria, sin archivo. Para migrarla tiene que ser la base
+ *    activa (la cola escribe en la activa); la migración es síncrona, así que ninguna lectura la ve
+ *    a medias, y al terminar vuelve a estar activa la vieja.
+ * 2. Si la migración falla, la base vieja sigue activa, el archivo no se ha tocado y se lanza un
+ *    `UserError` que lo dice.
+ * 3. Si va bien, la copia ya migrada se escribe en `<db>.restore` y se renombra sobre el archivo
+ *    (si falla, se borra el `.restore` y la vieja sigue activa). Después la base nueva pasa a ser la
+ *    activa, se apunta la restauración y se cierran la copia en memoria y la vieja.
+ * Sin `dbPath` (memoria) es igual, pero sin archivo: la copia migrada pasa a ser la activa.
+ *
+ * En ningún paso hay una lectura que vea una base cerrada, y si algo falla la base activa es usable.
  */
 export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBackup: string | null }> {
   const s = coreOf(ref)
@@ -130,64 +165,52 @@ export function restoreBackup(ref: CoreRef, file: string): Promise<{ safetyBacku
     }
     const buf = new Uint8Array(fs.readFileSync(file))
     await validateSqlite(buf, s.registry.requiredTables)
-    if (!s.paths.dbPath) {
-      const db = await Db.openReadOnlyBuffer(buf)
-      const old = s.db
-      s.replaceDb(db)
-      try {
-        migrate(db, s.registry.migrations, runOp)
-      } finally {
-        old.close()
-      }
-      return { safetyBackup: safety }
-    }
-    // La base nueva se abre desde los bytes ya validados ANTES de tocar el archivo: si no se puede
-    // abrir, el archivo y la base actual siguen intactos. sql.js no mantiene el archivo abierto,
-    // así que se puede sustituir con la base vieja aún en memoria.
-    const db = await Db.fromBuffer(buf, s.paths.dbPath)
-    const tmp = s.paths.dbPath + '.restore'
-    try {
-      fs.writeFileSync(tmp, Buffer.from(buf))
-      fs.renameSync(tmp, s.paths.dbPath)
-    } catch (e) {
-      db.close()
-      try {
-        fs.rmSync(tmp, { force: true })
-      } catch {
-        // Se conserva el error original (p. ej. disco lleno).
-      }
-      throw e
-    }
-    // Desde aquí el archivo ya es la copia: la base nueva se queda activa pase lo que pase.
+
+    // 1-2. Migrar la copia en memoria. Entre `replaceDb(copia)` y `replaceDb(old)` no hay ningún
+    // `await`: nada más se ejecuta mientras la copia es la activa.
+    const copia = await Db.openReadOnlyBuffer(buf)
     const old = s.db
-    s.replaceDb(db)
+    s.replaceDb(copia)
+    try {
+      migrate(copia, s.registry.migrations, runOp)
+    } catch (e) {
+      s.replaceDb(old)
+      copia.close()
+      console.error('No se pudo poner al día la copia que se iba a restaurar', e)
+      throw copiaNoUsable(e)
+    }
+    s.replaceDb(old)
+
+    // 3. Sustituir el archivo por la copia migrada. Hasta `replaceDb(final)` la activa es la vieja.
+    let final = copia
+    const dbPath = s.paths.dbPath
+    if (dbPath) {
+      const tmp = dbPath + '.restore'
+      let nueva: Db | null = null
+      try {
+        const bytes = copia.exportBytes()
+        nueva = await Db.fromBuffer(bytes, dbPath)
+        fs.writeFileSync(tmp, Buffer.from(bytes))
+        fs.renameSync(tmp, dbPath)
+      } catch (e) {
+        nueva?.close()
+        copia.close()
+        try {
+          fs.rmSync(tmp, { force: true })
+        } catch {
+          // Se conserva el error original (p. ej. disco lleno).
+        }
+        // La vieja ya es la activa: no hace falta `replaceDb`.
+        throw e
+      }
+      final = nueva
+    }
+    s.replaceDb(final)
     const name = path.basename(file)
     try {
-      let migrateError: unknown = null
-      try {
-        migrate(db, s.registry.migrations, runOp)
-      } catch (e) {
-        migrateError = e
-      }
-      // La restauración se apunta aunque la migración haya fallado; si esto falla tampoco tapa
-      // el error de la migración.
-      try {
-        runOp(RESTORE_LABEL, () => audit(db, 'backup', name, 'restore', `Restaurada copia ${name}`, null, null))
-      } catch (e) {
-        if (!migrateError) throw e
-        console.error('No se pudo apuntar la restauración en el registro de cambios', e)
-      }
-      if (migrateError) {
-        console.error('No se pudo migrar la copia restaurada', migrateError)
-        const previo = safety
-          ? `Lo que tenías antes está guardado en la copia ${path.basename(safety)}.`
-          : 'No había carpeta de copias, así que no se ha guardado una copia de lo que tenías antes.'
-        throw new UserError(
-          `La copia se ha restaurado, pero no se ha podido poner al día con esta versión de la app. ${previo} ` +
-            'Se volverá a intentar la próxima vez que abras la app.'
-        )
-      }
+      runOp(RESTORE_LABEL, () => audit(final, 'backup', name, 'restore', `Restaurada copia ${name}`, null, null))
     } finally {
+      if (final !== copia) copia.close()
       old.close()
     }
     return { safetyBackup: safety }

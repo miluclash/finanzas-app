@@ -454,7 +454,8 @@ function DataSettings() {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [picking, setPicking] = useState(false)
   const create = useApiMutation('core:backup.create', { success: (b) => `Copia creada: ${b.name}` })
-  const restore = useApiMutation('core:backup.restore', { success: (r) => (r ? 'Copia restaurada' : null) })
+  // Tras restaurar, con éxito o con error, se refresca todo: la base activa puede haber cambiado.
+  const restore = useApiMutation('core:backup.restore', { success: (r) => (r ? 'Copia restaurada' : null), invalidateOnError: true })
   const exportJson = useApiMutation('finanzas:export.json', { success: (f) => (f ? 'Exportado a JSON' : null) })
   const exportXlsx = useApiMutation('finanzas:export.xlsx', { success: (f) => (f ? 'Exportado a Excel' : null) })
   const exportCsv = useApiMutation('finanzas:export.csv', { success: (f) => (f ? `${f.length} archivos CSV exportados` : null) })

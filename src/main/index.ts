@@ -1,5 +1,5 @@
 // Proceso principal de Electron: ventana, base de datos e IPC.
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell, type MessageBoxSyncOptions } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createAppHandlers, createAppRegistry, type Handlers } from './app'
@@ -8,7 +8,7 @@ import { createCoreContext, initCore, type CoreContext } from './core/context'
 import { Db, SaveError } from './core/db'
 import { UserError } from './core/errors'
 import type { DialogProvider } from './core/handlers'
-import { initUpdater } from './core/updater'
+import { initUpdater, type UpdaterControl } from './core/updater'
 
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 
@@ -25,6 +25,7 @@ function dataDir(): string {
 let mainWindow: BrowserWindow | null = null
 let core: CoreContext | null = null
 let handlers: Handlers | null = null
+let updater: UpdaterControl | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -107,6 +108,19 @@ async function settleWrites(c: CoreContext): Promise<void> {
 type GuardadoFinal = { kind: 'guardado' } | { kind: 'copia'; path: string } | { kind: 'fallo' }
 
 /**
+ * `queue.committedCount` del último momento en que se aceptó salir sin guardar en el archivo: al
+ * hacer una copia `sin-guardar` (que lo tiene todo hasta ahí) o al elegir "Cerrar sin guardar".
+ * Cualquier escritura posterior cambia el contador y obliga a repetir el proceso al cerrar.
+ */
+let salidaSinGuardarEn: number | null = null
+
+/** Se puede salir ya: la cola está libre y todo está guardado (o no ha cambiado nada desde la copia). */
+function puedeSalir(c: CoreContext): boolean {
+  if (c.queue.busy) return false
+  return !c.queue.hasPendingSave || c.queue.committedCount === salidaSinGuardarEn
+}
+
+/**
  * Antes de cerrar o de instalar una actualización: intenta dejar todo guardado y, si el archivo
  * no se puede guardar, vuelca la base en memoria a una copia `sin-guardar` (en un turno de la cola).
  */
@@ -119,7 +133,12 @@ async function guardarOCopiar(c: CoreContext): Promise<GuardadoFinal> {
   }
   if (!c.paths.backupsDir) return { kind: 'fallo' }
   try {
-    const copia = await c.queue.enqueueTask('core:backup.sin-guardar', async () => createBackup(c, 'sin-guardar'))
+    const copia = await c.queue.enqueueTask('core:backup.sin-guardar', async () => {
+      const b = createBackup(c, 'sin-guardar')
+      // En el turno de la copia no entra ninguna escritura: el contador es exactamente el de la copia.
+      salidaSinGuardarEn = c.queue.committedCount
+      return b
+    })
     return { kind: 'copia', path: copia.path }
   } catch (e) {
     console.error('Tampoco se pudo hacer la copia sin-guardar', e)
@@ -127,9 +146,15 @@ async function guardarOCopiar(c: CoreContext): Promise<GuardadoFinal> {
   }
 }
 
+/** Diálogo bloqueante, con la ventana principal como padre si sigue abierta. */
+function mostrarDialogo(opts: MessageBoxSyncOptions): number {
+  const w = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
+  return w ? dialog.showMessageBoxSync(w, opts) : dialog.showMessageBoxSync(opts)
+}
+
 /** Aviso (bloqueante) de que los cambios no se guardaron en el archivo pero sí en una copia. */
 function avisarCopiaSinGuardar(copia: string): void {
-  dialog.showMessageBoxSync({
+  mostrarDialogo({
     type: 'warning',
     title: 'Finanzas',
     message: 'No se han podido guardar tus últimos cambios en el archivo de datos',
@@ -143,7 +168,7 @@ function avisarCopiaSinGuardar(copia: string): void {
 
 /** Pregunta si reintentar el guardado (true) o cerrar sin guardar (false). */
 function preguntarReintentar(): boolean {
-  const r = dialog.showMessageBoxSync({
+  const r = mostrarDialogo({
     type: 'error',
     title: 'Finanzas',
     message: 'No se han podido guardar tus últimos cambios',
@@ -158,7 +183,10 @@ function preguntarReintentar(): boolean {
   return r === 0
 }
 
-/** Al cerrar: guarda, o hace la copia `sin-guardar` y avisa, o pregunta hasta que se guarde o Michael decida cerrar. */
+/**
+ * Al cerrar: guarda, o hace la copia `sin-guardar` y avisa, o pregunta hasta que se guarde o Michael
+ * decida cerrar sin guardar (entonces tampoco se instala la actualización pendiente en este cierre).
+ */
 async function cerrarSinPerder(c: CoreContext): Promise<void> {
   const r = await guardarOCopiar(c)
   if (r.kind === 'guardado') return
@@ -174,11 +202,10 @@ async function cerrarSinPerder(c: CoreContext): Promise<void> {
       console.error('El reintento de guardado ha vuelto a fallar', e)
     }
   }
+  // "Cerrar sin guardar": el diálogo es síncrono, así que no ha entrado nada desde que se eligió.
+  salidaSinGuardarEn = c.queue.committedCount
+  updater?.skipInstallOnQuit()
 }
-
-// Una vez decidido el cierre (todo guardado, copia `sin-guardar` hecha o "Cerrar sin guardar"),
-// `before-quit` deja salir sin volver a intentarlo: así no hay bucles ni diálogos repetidos.
-let readyToQuit = false
 
 ipcMain.handle('api', async (_e, method: string, args: unknown[]) => {
   if (!handlers) return { ok: false, error: 'La base de datos aún no está lista.' }
@@ -225,7 +252,7 @@ else {
       return
     }
     createWindow()
-    initUpdater({
+    updater = initUpdater({
       beforeInstall: async () => {
         const c = core
         if (!c) return
@@ -244,11 +271,9 @@ else {
             error:
               'No se han podido guardar tus últimos cambios (ni hacer una copia con ellos), así que la actualización no se ha instalado. Comprueba que queda espacio en el disco y vuelve a intentarlo.'
           }
-        if (r.kind === 'copia') {
-          avisarCopiaSinGuardar(r.path)
-          // El guardado pendiente sigue fallando: que el cierre de la instalación no lo repita.
-          readyToQuit = true
-        }
+        // Con la copia hecha, el cierre de la instalación sale sin repetirla si no entra nada más
+        // (`salidaSinGuardarEn`); si entra alguna escritura, `before-quit` vuelve a empezar.
+        if (r.kind === 'copia') avisarCopiaSinGuardar(r.path)
         return { ok: true }
       }
     })
@@ -261,19 +286,24 @@ else {
   })
   // Al cerrar no se puede perder nada: si la cola está trabajando o hay un guardado pendiente, se
   // espera y se reintenta el guardado; si falla, copia `sin-guardar` o diálogo (`cerrarSinPerder`).
-  // Después se vuelve a pedir el cierre, una sola vez (`readyToQuit`).
+  // Después se vuelve a pedir el cierre una sola vez; mientras tanto, `settling` evita empezar otro.
+  // Se sale sin repetir nada si la cola está libre y no ha entrado ninguna escritura desde la copia
+  // (o desde "Cerrar sin guardar"); si ha entrado alguna, se repite el proceso.
   let settling = false
   app.on('before-quit', (e) => {
     const c = core
-    if (readyToQuit || !c) return
-    if (!c.queue.busy && !c.queue.hasPendingSave) return
+    if (!c || puedeSalir(c)) return
     e.preventDefault()
     if (settling) return
     settling = true
     void cerrarSinPerder(c)
-      .catch((err) => console.error('No se pudieron guardar los últimos cambios al cerrar', err))
+      .catch((err) => {
+        // No debería pasar (`cerrarSinPerder` captura sus errores). Se sale igual, sin bucles.
+        console.error('No se pudieron guardar los últimos cambios al cerrar', err)
+        salidaSinGuardarEn = c.queue.committedCount
+      })
       .finally(() => {
-        readyToQuit = true
+        settling = false
         app.quit()
       })
   })

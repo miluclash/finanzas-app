@@ -4,6 +4,7 @@ import { toast } from '../lib/toast'
 /** Pie de la barra lateral: versión y estado de la actualización automática. */
 export function UpdateFooter() {
   const [st, setSt] = useState<UpdateStatus | null>(null)
+  const [installing, setInstalling] = useState(false)
   useEffect(() => {
     let alive = true
     const poll = () =>
@@ -25,11 +26,20 @@ export function UpdateFooter() {
         <div className="font-medium text-ink">Versión {st.version} lista</div>
         <div className="text-muted">Se instala al cerrar la app. Tus datos no cambian.</div>
         <button
-          className="mt-2 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110"
+          className="mt-2 rounded-md bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-ink hover:brightness-110 disabled:cursor-default disabled:opacity-60 disabled:hover:brightness-100"
+          disabled={installing}
           onClick={async () => {
-            // Si no se ha podido guardar antes de instalar, no se instala y llega el motivo.
-            const r = (await window.finanzas.installUpdate()) as { ok?: boolean; error?: string } | null
-            if (r && r.ok === false && r.error) toast.error(r.error)
+            if (installing) return
+            setInstalling(true)
+            try {
+              // Si no se ha podido guardar antes de instalar, no se instala y llega el motivo.
+              const r = await window.finanzas.installUpdate()
+              if (r && r !== true) toast.error(r.error)
+            } catch (e) {
+              toast.error(`No se ha podido instalar la actualización: ${e instanceof Error ? e.message : String(e)}`)
+            } finally {
+              setInstalling(false)
+            }
           }}
         >
           Reiniciar y actualizar

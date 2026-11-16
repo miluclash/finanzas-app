@@ -11,7 +11,7 @@
 // encolada con `enqueue`/`enqueueTask`: la nueva espera a que termine la actual y la actual
 // espera a la nueva, así que ninguna acaba nunca.
 import { audit } from './audit'
-import type { Db } from './db'
+import { SaveError, type Db } from './db'
 
 export interface AuditEntry {
   entity: string
@@ -50,6 +50,8 @@ export class WriteQueue {
   /** Hay un `runNow` en curso. */
   private syncRunning = false
   private idleWaiters: Array<() => void> = []
+  /** Ver `committedCount`. */
+  private committed = 0
 
   /** `getDb` y no la `Db` directamente: restaurar una copia sustituye la base. */
   constructor(private readonly getDb: () => Db) {}
@@ -57,6 +59,15 @@ export class WriteQueue {
   /** Hay algo en curso o pendiente. */
   get busy(): boolean {
     return this.pending > 0 || this.syncRunning
+  }
+
+  /**
+   * Operaciones confirmadas desde que se creó la cola (también las que no se pudieron guardar en
+   * disco: el cambio sí está hecho en memoria). Sirve para saber si ha entrado alguna escritura
+   * desde un momento dado (p. ej. desde la última copia `sin-guardar`).
+   */
+  get committedCount(): number {
+    return this.committed
   }
 
   /** Hay cambios confirmados en memoria que falta guardar en disco (falló un guardado). */
@@ -178,8 +189,15 @@ export class WriteQueue {
       }
       throw e
     }
-    // Si el guardado en disco falla, `commitOp` deja los cambios confirmados y lanza SaveError.
-    db.commitOp()
+    // Si el guardado en disco falla, `commitOp` deja los cambios confirmados y lanza SaveError:
+    // también cuenta como operación confirmada.
+    try {
+      db.commitOp()
+    } catch (e) {
+      if (e instanceof SaveError) this.committed++
+      throw e
+    }
+    this.committed++
     return result
   }
 }

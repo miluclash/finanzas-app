@@ -293,7 +293,17 @@ export class Db {
     this.applyPragmas()
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true })
     const tmp = `${this.filePath}.tmp`
-    fs.writeFileSync(tmp, Buffer.from(data))
+    try {
+      fs.writeFileSync(tmp, Buffer.from(data))
+    } catch (e) {
+      // Con el disco lleno puede quedar un temporal a medias: fuera.
+      try {
+        fs.rmSync(tmp, { force: true })
+      } catch {
+        // Se conserva el error original.
+      }
+      throw e
+    }
     let lastErr: unknown = null
     for (let i = 0; i < 8; i++) {
       try {
