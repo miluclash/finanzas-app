@@ -3,7 +3,7 @@ import { useApi } from './api'
 
 /** Catálogo (cuentas, categorías…) con búsquedas por id. */
 export function useCatalog() {
-  const q = useApi('catalog.get', [], { staleTime: 30_000 })
+  const q = useApi('finanzas:catalog.get', [], { staleTime: 30_000 })
   const maps = useMemo(() => {
     const d = q.data
     return {

@@ -2,9 +2,9 @@ import { CheckCircle2, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate, todayISO } from '@shared/dates'
-import { ACCOUNT_TYPE_LABEL } from '@shared/labels'
+import { ACCOUNT_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
-import { ACCOUNT_TYPES, type Account, type AccountType } from '@shared/types'
+import { ACCOUNT_TYPES, type Account, type AccountType } from '@shared/modules/finanzas/types'
 import { DataTable, type Column } from '../components/DataTable'
 import { useTxEditor } from '../components/TxEditor'
 import {
@@ -26,12 +26,12 @@ import {
   TextInput
 } from '../components/ui'
 import { useApi, useApiMutation, type ApiError } from '../lib/api'
-import type { ApiResult } from '../../../main/services/api'
+import type { ApiResult } from '../../../main/app'
 
-type Row = ApiResult<'accounts.list'>[number]
+type Row = ApiResult<'finanzas:accounts.list'>[number]
 
 export function AccountsPage() {
-  const q = useApi('accounts.list', [])
+  const q = useApi('finanzas:accounts.list', [])
   const [editing, setEditing] = useState<Account | 'new' | null>(null)
   const [reconciling, setReconciling] = useState<Row | null>(null)
   const [showInactive, setShowInactive] = useState(false)
@@ -184,8 +184,8 @@ export function AccountForm({ account, onClose }: { account: Account | null; onC
   const [liq, setLiq] = useState(account?.includeLiquidity ?? (type === 'CHECKING' || type === 'CASH'))
   const [contrib, setContrib] = useState<number | null>(account?.initialContributionsCents ?? 0)
   const [notes, setNotes] = useState(account?.notes ?? '')
-  const save = useApiMutation('accounts.save', { success: (a) => `Cuenta guardada: ${a.name}`, onSuccess: onClose })
-  const del = useApiMutation('accounts.delete', { success: 'Cuenta borrada', onSuccess: onClose })
+  const save = useApiMutation('finanzas:accounts.save', { success: (a) => `Cuenta guardada: ${a.name}`, onSuccess: onClose })
+  const del = useApiMutation('finanzas:accounts.delete', { success: 'Cuenta borrada', onSuccess: onClose })
   return (
     <Modal
       open
@@ -289,12 +289,12 @@ function ReconcileModal({ row, onClose }: { row: Row; onClose: () => void }) {
   const [bank, setBank] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [result, setResult] = useState<{ differenceCents: number } | null>(null)
-  const history = useApi('accounts.reconciliations', [row.account.id])
-  const save = useApiMutation('accounts.reconcile', {
+  const history = useApi('finanzas:accounts.reconciliations', [row.account.id])
+  const save = useApiMutation('finanzas:accounts.reconcile', {
     onSuccess: (r) => setResult(r),
     success: (r) => (r.differenceCents === 0 ? 'Saldo verificado: cuadra con el banco' : 'Saldo registrado: hay diferencia')
   })
-  const delRec = useApiMutation('accounts.deleteReconciliation', { success: 'Verificación borrada' })
+  const delRec = useApiMutation('finanzas:accounts.deleteReconciliation', { success: 'Verificación borrada' })
   return (
     <Modal open onClose={onClose} title={`Verificar saldo · ${row.account.name}`} width={600} footer={<Button onClick={onClose}>Cerrar</Button>}>
       <div className="flex flex-col gap-4">

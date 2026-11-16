@@ -16,7 +16,7 @@ import { TransactionsPage } from './pages/Transactions'
 import { WelcomePage } from './pages/Welcome'
 
 export function App() {
-  const info = useApi('app.info', [])
+  const info = useApi('core:app.info', [])
   if (info.isLoading) return <Loading text="Abriendo tus datos…" />
   if (info.error) return <div className="p-8"><ErrorBox error={info.error} /></div>
   return (

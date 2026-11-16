@@ -1,10 +1,11 @@
 /// <reference types="vite/client" />
 
 interface FinanzasBridge {
-  call: (method: string, args: unknown[]) => Promise<{ ok: boolean; data?: unknown; error?: string; user?: boolean }>
+  call: (method: string, args: unknown[]) => Promise<{ ok: boolean; data?: unknown; error?: string; user?: boolean; saved?: boolean }>
   updateStatus: () => Promise<UpdateStatus>
   checkUpdate: () => Promise<unknown>
-  installUpdate: () => Promise<unknown>
+  /** `null` si no hay nada que instalar; si no se ha podido guardar antes, el motivo. */
+  installUpdate: () => Promise<true | null | { ok: false; error: string; user: true }>
   setTheme: (theme: 'system' | 'light' | 'dark') => Promise<boolean>
 }
 

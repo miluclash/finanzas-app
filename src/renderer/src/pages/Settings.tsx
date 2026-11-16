@@ -1,9 +1,9 @@
 import { FolderOpen, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { formatDate } from '@shared/dates'
-import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/labels'
+import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
-import { COST_METHODS, NATURES, type Category, type CategoryGroup, type CostMethod, type GroupKind, type Nature, type Settings } from '@shared/types'
+import { COST_METHODS, NATURES, type Category, type CategoryGroup, type CostMethod, type GroupKind, type Nature, type Settings } from '@shared/modules/finanzas/types'
 import {
   Badge,
   Button,
@@ -28,7 +28,7 @@ import {
 import { api, useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 import { toast } from '../lib/toast'
-import type { ImportPreview } from '../../../main/services/importExcel'
+import type { ImportPreview } from '../../../main/modules/finanzas/importExcel'
 
 type Tab = 'general' | 'categorias' | 'datos' | 'auditoria'
 
@@ -61,7 +61,7 @@ function GeneralSettings() {
   useEffect(() => {
     if (cat && !s) setS(cat.settings)
   }, [cat, s])
-  const save = useApiMutation('settings.update', { success: 'Ajustes guardados' })
+  const save = useApiMutation('finanzas:settings.update', { success: 'Ajustes guardados' })
   if (!s || !cat) return <Loading />
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...s, [k]: v })
   const incomeCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'INCOME')
@@ -238,14 +238,14 @@ function CategoriesSettings() {
 
 function CategoryDetail({ category: c, onEdit, onDeleted }: { category: Category; onEdit: () => void; onDeleted: () => void }) {
   const { cat } = useCatalog()
-  const usage = useApi('categories.usage', [c.id])
+  const usage = useApi('finanzas:categories.usage', [c.id])
   const [reassign, setReassign] = useState('')
   const [newSub, setNewSub] = useState('')
-  const del = useApiMutation('categories.delete', { success: 'Categoría borrada', onSuccess: onDeleted })
-  const addSub = useApiMutation('subcategories.save', { success: 'Subcategoría añadida', onSuccess: () => setNewSub('') })
-  const delSub = useApiMutation('subcategories.delete', { success: 'Subcategoría borrada' })
-  const merge = useApiMutation('subcategories.merge', { success: (n) => `Fusionadas (${n} movimientos movidos)` })
-  const renameSub = useApiMutation('subcategories.save', { success: 'Subcategoría renombrada' })
+  const del = useApiMutation('finanzas:categories.delete', { success: 'Categoría borrada', onSuccess: onDeleted })
+  const addSub = useApiMutation('finanzas:subcategories.save', { success: 'Subcategoría añadida', onSuccess: () => setNewSub('') })
+  const delSub = useApiMutation('finanzas:subcategories.delete', { success: 'Subcategoría borrada' })
+  const merge = useApiMutation('finanzas:subcategories.merge', { success: (n) => `Fusionadas (${n} movimientos movidos)` })
+  const renameSub = useApiMutation('finanzas:subcategories.save', { success: 'Subcategoría renombrada' })
   const subs = (cat?.subcategories ?? []).filter((s) => s.categoryId === c.id)
   const group = cat?.groups.find((g) => g.id === c.groupId)
   const sameKind = (cat?.categories ?? []).filter((x) => x.id !== c.id && cat?.groups.find((g) => g.id === x.groupId)?.kind === group?.kind)
@@ -350,8 +350,8 @@ function CategoryDetail({ category: c, onEdit, onDeleted }: { category: Category
 function GroupForm({ group, onClose }: { group: CategoryGroup | null; onClose: () => void }) {
   const [name, setName] = useState(group?.name ?? '')
   const [kind, setKind] = useState<GroupKind>(group?.kind ?? 'EXPENSE')
-  const save = useApiMutation('groups.save', { success: 'Grupo guardado', onSuccess: onClose })
-  const del = useApiMutation('groups.delete', { success: 'Grupo borrado', onSuccess: onClose })
+  const save = useApiMutation('finanzas:groups.save', { success: 'Grupo guardado', onSuccess: onClose })
+  const del = useApiMutation('finanzas:groups.delete', { success: 'Grupo borrado', onSuccess: onClose })
   return (
     <Modal
       open
@@ -398,7 +398,7 @@ function CategoryForm({ category, groupId, onClose }: { category: Category | nul
   const [nature, setNature] = useState<Nature>(category?.defaultNature ?? 'VARIABLE')
   const [active, setActive] = useState(category?.active ?? true)
   const [notes, setNotes] = useState(category?.notes ?? '')
-  const save = useApiMutation('categories.save', { success: 'Categoría guardada', onSuccess: onClose })
+  const save = useApiMutation('finanzas:categories.save', { success: 'Categoría guardada', onSuccess: onClose })
   return (
     <Modal
       open
@@ -449,15 +449,16 @@ function CategoryForm({ category, groupId, onClose }: { category: Category | nul
 }
 
 function DataSettings() {
-  const info = useApi('app.info', [])
-  const backups = useApi('backup.list', [])
+  const info = useApi('core:app.info', [])
+  const backups = useApi('core:backup.list', [])
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [picking, setPicking] = useState(false)
-  const create = useApiMutation('backup.create', { success: (b) => `Copia creada: ${b.name}` })
-  const restore = useApiMutation('backup.restore', { success: (r) => (r ? 'Copia restaurada' : null) })
-  const exportJson = useApiMutation('export.json', { success: (f) => (f ? 'Exportado a JSON' : null) })
-  const exportXlsx = useApiMutation('export.xlsx', { success: (f) => (f ? 'Exportado a Excel' : null) })
-  const exportCsv = useApiMutation('export.csv', { success: (f) => (f ? `${f.length} archivos CSV exportados` : null) })
+  const create = useApiMutation('core:backup.create', { success: (b) => `Copia creada: ${b.name}` })
+  // Tras restaurar, con éxito o con error, se refresca todo: la base activa puede haber cambiado.
+  const restore = useApiMutation('core:backup.restore', { success: (r) => (r ? 'Copia restaurada' : null), invalidateOnError: true })
+  const exportJson = useApiMutation('finanzas:export.json', { success: (f) => (f ? 'Exportado a JSON' : null) })
+  const exportXlsx = useApiMutation('finanzas:export.xlsx', { success: (f) => (f ? 'Exportado a Excel' : null) })
+  const exportCsv = useApiMutation('finanzas:export.csv', { success: (f) => (f ? `${f.length} archivos CSV exportados` : null) })
   return (
     <div className="flex max-w-[900px] flex-col gap-6">
       <Section title="Importar el Excel FINANCIAL_MASTER" description="Verás una vista previa con recuentos, avisos y duplicados antes de importar nada." boxed>
@@ -466,7 +467,7 @@ function DataSettings() {
           onClick={async () => {
             setPicking(true)
             try {
-              const p = await api('import.pick')
+              const p = await api('finanzas:import.pick')
               if (p) setPreview(p)
             } catch (e) {
               toast.error(e instanceof Error ? e.message : String(e))
@@ -497,7 +498,7 @@ function DataSettings() {
         boxed
         actions={
           <>
-            <Button size="sm" icon={<FolderOpen className="size-3.5" />} onClick={() => api('backup.openFolder')}>
+            <Button size="sm" icon={<FolderOpen className="size-3.5" />} onClick={() => api('core:backup.openFolder')}>
               Abrir carpeta
             </Button>
             <Button size="sm" onClick={() => create.mutate([])} loading={create.isPending}>
@@ -548,7 +549,7 @@ function DataSettings() {
           <p className="mt-1 text-[12px] text-muted">
             Versión {info.data.version} · esquema v{info.data.schemaVersion}. Un único archivo SQLite que solo existe en este PC.
           </p>
-          <Button size="sm" className="mt-2" icon={<FolderOpen className="size-3.5" />} onClick={() => api('data.openFolder')}>
+          <Button size="sm" className="mt-2" icon={<FolderOpen className="size-3.5" />} onClick={() => api('core:data.openFolder')}>
             Mostrar en el Explorador
           </Button>
         </Section>
@@ -560,7 +561,7 @@ function DataSettings() {
 }
 
 function ClaudeMcp() {
-  const q = useApi('mcp.config', [])
+  const q = useApi('finanzas:mcp.config', [])
   const json = q.data ? JSON.stringify(q.data, null, 2) : ''
   return (
     <Section
@@ -591,7 +592,7 @@ function ClaudeMcp() {
 export function ImportPreviewModal({ preview: p, onClose }: { preview: ImportPreview; onClose: () => void }) {
   const hasData = p.existing.accounts > 0 || p.existing.transactions > 0
   const [confirmReplace, setConfirmReplace] = useState(false)
-  const apply = useApiMutation('import.apply', {
+  const apply = useApiMutation('finanzas:import.apply', {
     success: (r) => `Importados ${r.counts.transactions} movimientos y ${r.counts.accounts} cuentas${r.backup ? ' (copia previa guardada)' : ''}`,
     onSuccess: onClose
   })
@@ -692,7 +693,7 @@ export function ImportPreviewModal({ preview: p, onClose }: { preview: ImportPre
 
 function AuditLog() {
   const [entity, setEntity] = useState('')
-  const q = useApi('audit.list', [300, entity || undefined])
+  const q = useApi('core:audit.list', [300, entity || undefined])
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const label: Record<string, string> = {

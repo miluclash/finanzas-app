@@ -44,15 +44,17 @@ Para usar una carpeta de datos distinta (pruebas, datos de demostración separad
 ### Estructura
 
 ```
-src/shared/      Tipos, dinero, fechas y toda la lógica financiera (funciones puras)
-src/main/        Proceso principal: SQLite, migraciones, servicios, importación/exportación, IPC
+src/shared/      Dinero, fechas y, en modules/finanzas/, tipos y toda la lógica financiera (funciones puras)
+src/main/core/   Núcleo: SQLite, cola de escritura, migraciones, registro de módulos, copias, IPC común
+src/main/modules/finanzas/   Servicios, importación/exportación e IPC de finanzas
+src/main/app.ts  Une el núcleo con los módulos (y define los tipos de la API para la interfaz)
 src/preload/     Puente seguro hacia la interfaz (contextIsolation, sin Node en la interfaz)
 src/renderer/    Interfaz React
 tests/           Tests (los *.local.test.ts solo se ejecutan con tu Excel real en local)
 scripts/         Capturas y prueba de extremo a extremo con Electron
 ```
 
-Esquema y migraciones: `src/main/db/migrations.ts`. Variables de entorno: no hay secretos; la única opcional es `FINANZAS_DATA_DIR`.
+Esquema y migraciones de finanzas: `src/main/modules/finanzas/migrations.ts` (el motor está en `src/main/core/migrations.ts`). Todas las escrituras en la base pasan por la cola de `src/main/core/writeQueue.ts`. Variables de entorno: no hay secretos; la única opcional es `FINANZAS_DATA_DIR`.
 
 ## Atajos
 

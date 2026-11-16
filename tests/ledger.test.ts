@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { availableCash } from '../src/shared/domain/available'
-import { accountBalance, monthSummary, positionAt } from '../src/shared/domain/ledger'
-import { saveTransaction, setStatus } from '../src/main/services/transactions'
-import { account, cat, memoryApp, transfer, tx } from './helpers'
+import { availableCash } from '../src/shared/modules/finanzas/available'
+import { accountBalance, monthSummary, positionAt } from '../src/shared/modules/finanzas/ledger'
+import { saveTransaction, setStatus } from '../src/main/modules/finanzas/transactions'
+import { account, cat, escribir, memoryApp, transfer, tx } from './helpers'
 
 describe('saldos y métricas', () => {
   it('saldo = inicial + movimientos válidos desde la apertura (los anulados y anteriores no cuentan)', async () => {
@@ -11,7 +11,7 @@ describe('saldos y métricas', () => {
     tx(s, { accountId: a.id, amountCents: -2500, date: '2026-07-01' })
     const old = tx(s, { accountId: a.id, amountCents: -1000, date: '2026-05-15' }) // antes de la apertura
     const c = tx(s, { accountId: a.id, amountCents: -700, date: '2026-07-02' })
-    setStatus(s, [c.id], 'CANCELLED')
+    escribir(s, () => setStatus(s, [c.id], 'CANCELLED'))
     expect(old.id).toBeTruthy()
     expect(accountBalance(s.ctx(), a.id)).toBe(7500)
   })
@@ -38,7 +38,7 @@ describe('saldos y métricas', () => {
     const a = account(s, { name: 'Corriente', openingBalanceCents: 10000 })
     const ocio = cat(s, 'Salir fuera')
     const g = tx(s, { accountId: a.id, amountCents: -1350, categoryId: ocio })
-    saveTransaction(s, { accountId: a.id, date: '2026-10-02', description: 'Bizum amigo', amountCents: 500, type: 'REFUND', categoryId: ocio, linkedTxId: g.id })
+    escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-02', description: 'Bizum amigo', amountCents: 500, type: 'REFUND', categoryId: ocio, linkedTxId: g.id }))
     const m = monthSummary(s.ctx(), '2026-10')
     expect(m.incomeCents).toBe(0)
     expect(m.expensesByCategory[ocio]).toBe(-850)
@@ -48,7 +48,7 @@ describe('saldos y métricas', () => {
   it('los ajustes cambian el saldo pero no son ingreso ni gasto', async () => {
     const s = await memoryApp()
     const a = account(s, { name: 'Savings & Investment', type: 'SAVINGS', includeLiquidity: false, openingBalanceCents: 3810 })
-    saveTransaction(s, { accountId: a.id, date: '2026-09-30', description: 'Revalorización', amountCents: -71, type: 'ADJUSTMENT' })
+    escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-09-30', description: 'Revalorización', amountCents: -71, type: 'ADJUSTMENT' }))
     expect(accountBalance(s.ctx(), a.id)).toBe(3739)
     const m = monthSummary(s.ctx(), '2026-09')
     expect(m.incomeCents).toBe(0)
@@ -60,15 +60,17 @@ describe('saldos y métricas', () => {
     const a = account(s, { name: 'Corriente', openingBalanceCents: 0 })
     tx(s, { accountId: a.id, amountCents: 100000, date: '2026-09-04' })
     tx(s, { accountId: a.id, amountCents: -20000, date: '2026-09-05' })
-    saveTransaction(s, {
-      accountId: a.id,
-      date: '2026-09-14',
-      description: 'Portátil',
-      amountCents: -50000,
-      type: 'EXPENSE',
-      categoryId: cat(s, 'Otros gastos'),
-      nature: 'EXTRAORDINARY'
-    })
+    escribir(s, () =>
+      saveTransaction(s, {
+        accountId: a.id,
+        date: '2026-09-14',
+        description: 'Portátil',
+        amountCents: -50000,
+        type: 'EXPENSE',
+        categoryId: cat(s, 'Otros gastos'),
+        nature: 'EXTRAORDINARY'
+      })
+    )
     const m = monthSummary(s.ctx(), '2026-09')
     expect(m.savingsRate).toBeCloseTo(0.3)
     expect(m.savingsRateOrdinary).toBeCloseTo(0.8)

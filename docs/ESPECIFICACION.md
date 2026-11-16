@@ -19,8 +19,9 @@ App de escritorio para Windows, de un solo usuario, que sustituye a FINANCIAL_MA
 ### Capas
 
 ```
-src/shared/      Tipos, dinero, fechas y TODA la lógica financiera (funciones puras, testeadas)
-src/main/        Proceso principal: base de datos, migraciones, servicios, importación/exportación, IPC
+src/shared/      Dinero, fechas y, en modules/finanzas/, tipos y TODA la lógica financiera (funciones puras, testeadas)
+src/main/core/   Núcleo: base de datos, cola de escritura, migraciones, registro de módulos, copias, IPC común
+src/main/modules/finanzas/   Servicios, importación/exportación e IPC de finanzas
 src/preload/     Puente seguro (contextIsolation) que expone window.api
 src/renderer/    Interfaz React
 tests/           Tests unitarios y de integración
@@ -54,7 +55,7 @@ La interfaz nunca toca la base de datos: pide datos al proceso principal por IPC
 
 `settings`, `category_groups`, `categories`, `subcategories`, `accounts`, `reconciliations`, `transactions`, `recurring_rules`, `goals`, `goal_allocations`, `budgets`, `scenarios`, `allocation_blocks`, `instruments`, `investment_ops`, `prices`, `duplicate_dismissals`, `audit_log`, `sequences`, `schema_migrations`.
 
-El esquema completo con restricciones está en `src/main/db/migrations.ts`.
+El esquema completo con restricciones está en `src/main/modules/finanzas/migrations.ts`.
 
 ## Inversiones
 

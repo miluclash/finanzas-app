@@ -1,12 +1,14 @@
 // Cliente tipado de la API del proceso principal + hooks de React Query.
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query'
-import type { ApiArgs, ApiMethod, ApiResult } from '../../../main/services/api'
+import type { ApiArgs, ApiMethod, ApiResult } from '../../../main/app'
 import { toast } from './toast'
 
 export class ApiError extends Error {
   constructor(
     message: string,
-    public user: boolean
+    public user: boolean,
+    /** Los cambios sí están hechos (en memoria), aunque no se hayan podido guardar en disco. */
+    public saved = false
   ) {
     super(message)
   }
@@ -14,7 +16,7 @@ export class ApiError extends Error {
 
 export async function api<K extends ApiMethod>(method: K, ...args: ApiArgs<K>): Promise<ApiResult<K>> {
   const res = await window.finanzas.call(method, args as unknown[])
-  if (!res.ok) throw new ApiError(res.error ?? 'Error desconocido', !!res.user)
+  if (!res.ok) throw new ApiError(res.error ?? 'Error desconocido', !!res.user, !!res.saved)
   return res.data as ApiResult<K>
 }
 
@@ -37,7 +39,13 @@ export function useApi<K extends ApiMethod>(
  */
 export function useApiMutation<K extends ApiMethod>(
   method: K,
-  opts: { success?: string | ((r: ApiResult<K>) => string | null); onSuccess?: (r: ApiResult<K>) => void; silentError?: boolean } = {}
+  opts: {
+    success?: string | ((r: ApiResult<K>) => string | null)
+    onSuccess?: (r: ApiResult<K>) => void
+    silentError?: boolean
+    /** Refrescar todas las consultas también si falla (p. ej. restaurar una copia). */
+    invalidateOnError?: boolean
+  } = {}
 ) {
   const qc = useQueryClient()
   return useMutation<ApiResult<K>, ApiError, ApiArgs<K>>({
@@ -48,8 +56,10 @@ export function useApiMutation<K extends ApiMethod>(
       if (msg) toast.success(msg)
       opts.onSuccess?.(r)
     },
-    onError: (e) => {
+    onError: async (e) => {
       if (!opts.silentError) toast.error(e.message)
+      // El cambio está hecho aunque no se haya guardado en disco: que la pantalla lo muestre.
+      if (e.saved || opts.invalidateOnError) await qc.invalidateQueries()
     }
   })
 }

@@ -2,13 +2,13 @@
 // Solo se ejecuta con FINANCIAL_MASTER_PATH y METRICS_OUT definidos.
 import fs from 'node:fs'
 import { describe, it } from 'vitest'
-import { dashboardData } from '../src/shared/domain/dashboard'
-import { forecast } from '../src/shared/domain/forecast'
-import { monthSummaries, netWorthSeries, trackedMonths } from '../src/shared/domain/ledger'
-import { ruleStatus } from '../src/shared/domain/recurring'
-import { goalProgress } from '../src/shared/domain/goals'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
-import { memoryApp } from './helpers'
+import { dashboardData } from '../src/shared/modules/finanzas/dashboard'
+import { forecast } from '../src/shared/modules/finanzas/forecast'
+import { monthSummaries, netWorthSeries, trackedMonths } from '../src/shared/modules/finanzas/ledger'
+import { ruleStatus } from '../src/shared/modules/finanzas/recurring'
+import { goalProgress } from '../src/shared/modules/finanzas/goals'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
+import { escribir, memoryApp } from './helpers'
 
 const file = process.env.FINANCIAL_MASTER_PATH
 const out = process.env.METRICS_OUT
@@ -18,7 +18,7 @@ run('métricas sobre el Excel real', () => {
   it('vuelca métricas', async () => {
     const s = await memoryApp(process.env.TODAY ?? '2026-10-11')
     const p = await previewImport(s, file!)
-    applyImport(s, p.token, { replaceExisting: false })
+    escribir(s, () => applyImport(s, p.token, { replaceExisting: false }))
     const ctx = s.ctx()
     const months = trackedMonths(ctx)
     const sums = [...monthSummaries(ctx, months).values()]

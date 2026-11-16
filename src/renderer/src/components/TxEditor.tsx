@@ -3,10 +3,10 @@ import { ChevronDown, ChevronRight, Link2 } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addDays, formatDate, todayISO } from '@shared/dates'
-import { applySign } from '@shared/domain/validation'
-import { NATURE_LABEL, TX_TYPE_LABEL } from '@shared/labels'
+import { applySign } from '@shared/modules/finanzas/validation'
+import { NATURE_LABEL, TX_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
-import type { Nature, Transaction, TxStatus, TxType } from '@shared/types'
+import type { Nature, Transaction, TxStatus, TxType } from '@shared/modules/finanzas/types'
 import { api, useApi, useApiMutation } from '../lib/api'
 import { useCatalog } from '../lib/catalog'
 import { Button, confirmDialog, DateInput, Field, Modal, MoneyInput, Notice, Segmented, Select, TextArea, TextInput } from './ui'
@@ -41,7 +41,7 @@ export function TxEditorProvider({ children }: { children: ReactNode }) {
   }, [])
   const openEdit = useCallback(async (id: string) => {
     try {
-      const d = await api('tx.get', id)
+      const d = await api('finanzas:tx.get', id)
       setKey((k) => k + 1)
       if (d.tx.type === 'TRANSFER') setState({ kind: 'transfer', transferId: d.tx.transferId ?? undefined })
       else setState({ kind: 'tx', id })
@@ -102,7 +102,7 @@ function TxModal({
 }) {
   const { cat, maps, categoryKind } = useCatalog()
   const navigate = useNavigate()
-  const existingQ = useApi('tx.get', [id ?? ''], { enabled: !!id })
+  const existingQ = useApi('finanzas:tx.get', [id ?? ''], { enabled: !!id })
   const existing = id ? existingQ.data?.tx : undefined
   const settings = cat?.settings
   const accounts = (cat?.accounts ?? []).filter((a) => a.active || a.id === existing?.accountId)
@@ -193,28 +193,28 @@ function TxModal({
     const t = setTimeout(() => setDebounced(JSON.parse(draftKey)), 250)
     return () => clearTimeout(t)
   }, [draftKey])
-  const check = useApi('tx.validate', [debounced], { enabled: loaded && !!debounced.accountId && !!amount, placeholderData: (p) => p })
+  const check = useApi('finanzas:tx.validate', [debounced], { enabled: loaded && !!debounced.accountId && !!amount, placeholderData: (p) => p })
 
   // Autocompletado desde el historial
   const [focusDesc, setFocusDesc] = useState(false)
-  const sugg = useApi('tx.suggest', [description], { enabled: focusDesc && !id && description.trim().length >= 2 })
+  const sugg = useApi('finanzas:tx.suggest', [description], { enabled: focusDesc && !id && description.trim().length >= 2 })
 
   // Gastos candidatos para enlazar un reembolso
   const refundCandidates = useApi(
-    'tx.list',
+    'finanzas:tx.list',
     [{ type: 'EXPENSE', from: addDays(date || todayISO(), -180), to: date || todayISO(), categoryId: categoryId || undefined, limit: 60 }],
     { enabled: type === 'REFUND' }
   )
 
-  const save = useApiMutation('tx.save', {
+  const save = useApiMutation('finanzas:tx.save', {
     success: (r) => `${id ? 'Movimiento actualizado' : 'Movimiento guardado'}: ${r.description}`,
     onSuccess: () => {
       if (keepOpen) onNew()
       else onClose()
     }
   })
-  const setStatusM = useApiMutation('tx.setStatus', { success: 'Estado actualizado', onSuccess: onClose })
-  const del = useApiMutation('tx.delete', { success: 'Movimiento eliminado', onSuccess: onClose })
+  const setStatusM = useApiMutation('finanzas:tx.setStatus', { success: 'Estado actualizado', onSuccess: onClose })
+  const del = useApiMutation('finanzas:tx.delete', { success: 'Movimiento eliminado', onSuccess: onClose })
 
   const submit = (another: boolean) => {
     setKeepOpen(another)
@@ -598,7 +598,7 @@ function TransferModal({
   onMovement: () => void
 }) {
   const { cat, maps } = useCatalog()
-  const legsQ = useApi('tx.list', [{ transferId: transferId ?? '__none__', includeCancelled: true }], { enabled: !!transferId })
+  const legsQ = useApi('finanzas:tx.list', [{ transferId: transferId ?? '__none__', includeCancelled: true }], { enabled: !!transferId })
   const legs = (legsQ.data?.rows ?? []).filter((t) => t.transferId === transferId)
   const accounts = (cat?.accounts ?? []).filter((a) => a.active || legs.some((l) => l.accountId === a.id))
   const [date, setDate] = useState(todayISO())
@@ -631,12 +631,12 @@ function TransferModal({
   useEffect(() => {
     if (!touchedDesc && toId) setDescription(`Traspaso a ${maps.account.get(toId)?.name ?? ''}`)
   }, [toId, touchedDesc, maps.account])
-  const save = useApiMutation('tx.saveTransfer', {
+  const save = useApiMutation('finanzas:tx.saveTransfer', {
     success: transferId ? 'Transferencia actualizada' : 'Transferencia guardada',
     onSuccess: onClose
   })
-  const setStatusM = useApiMutation('tx.setStatus', { success: 'Estado actualizado', onSuccess: onClose })
-  const del = useApiMutation('tx.delete', { success: 'Transferencia eliminada', onSuccess: onClose })
+  const setStatusM = useApiMutation('finanzas:tx.setStatus', { success: 'Estado actualizado', onSuccess: onClose })
+  const del = useApiMutation('finanzas:tx.delete', { success: 'Transferencia eliminada', onSuccess: onClose })
   const sameAccount = fromId && toId && fromId === toId
   const transferRules = (cat?.recurring ?? []).filter((r) => r.kind === 'TRANSFER' && (r.active || r.id === recurringId))
   return (

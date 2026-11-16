@@ -2,8 +2,8 @@
 // (el archivo nunca se guarda en el repositorio).
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
-import { memoryApp } from './helpers'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
+import { escribir, memoryApp } from './helpers'
 
 const file = process.env.FINANCIAL_MASTER_PATH
 const run = file && fs.existsSync(file) ? describe : describe.skip
@@ -15,7 +15,7 @@ run('importación del FINANCIAL_MASTER real', () => {
     if (process.env.VERBOSE) fs.writeFileSync(process.env.VERBOSE, JSON.stringify({ ...p, token: undefined }, null, 2))
     expect(p.errors).toEqual([])
     expect(p.balanceCheck.every((b) => b.ok)).toBe(true)
-    applyImport(s, p.token, { replaceExisting: false })
+    escribir(s, () => applyImport(s, p.token, { replaceExisting: false }))
     const ctx = s.ctx()
     expect(ctx.transactions.length).toBe(p.counts.Movimientos)
   })

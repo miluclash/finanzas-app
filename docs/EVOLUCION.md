@@ -65,6 +65,18 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
 - Prefijos nuevos: `trn_` (entreno) y `core_` (compartido: gráficos, paneles, IA, ajustes por módulo).
 - Copia automática antes de aplicar cualquier migración.
 
+### 3.4 Cómo quedó tras F1 (decisiones de implementación)
+
+- **Dónde está cada cosa**: núcleo en `src/main/core/` (`db`, `writeQueue`, `migrations`, `registry`, `context`, `backup`, `handlers`, `updater`, `audit`, `errors`); finanzas en `src/main/modules/finanzas/` (con `index.ts`, que define el módulo); la raíz de composición `src/main/app.ts` es el único sitio que junta núcleo y módulos. El núcleo no importa módulos y un módulo no importa otro ni la raíz (lo comprueba `tests/core/reglas.test.ts`).
+- **Cola**: `enqueue(etiqueta, fn, { before, audit })` con `fn` **síncrona** dentro de una transacción; `enqueueTask` para turnos exclusivos asíncronos (copias y restaurar); `runNow` solo para el arranque y los tests. Etiquetas `<módulo>:<acción>`. Las copias de seguridad van en `before` (fuera de la transacción).
+- **Los servicios de finanzas no saben de la cola**: la cola se pone en la frontera (handlers de escritura, restauración, arranque, cierre). Las lecturas son síncronas y no pasan por la cola.
+- **Fuera de una operación de la cola no se puede escribir** (`Db` lanza "Escritura fuera de la cola"). Un guardado en disco por operación y ninguno si no cambia nada: abrir una base al día no toca el archivo.
+- **Auditoría**: los servicios de finanzas ya apuntan cada cambio en `audit_log`, así que sus handlers no usan la entrada `audit` de la cola (evita filas duplicadas). Los módulos nuevos pueden usarla.
+- **Migraciones**: una sola tabla `schema_migrations` con rangos de versión por módulo (finanzas 1–999, núcleo 1000–1999, entreno 2000–2999; `MIGRATION_RANGES`). Cada migración pendiente es una operación de la cola. Copia `antes-de-migrar` solo si hay migraciones pendientes sobre una base con datos.
+- **Métodos IPC**: un único canal `api` con métodos `<módulo>:<acción>` (`finanzas:tx.save`, `core:backup.create`). Los canales `theme` y `update.*` siguen aparte.
+- **Cierre y actualización**: esperan a la cola; si el último guardado falla, copia `sin-guardar` y aviso; si tampoco se puede, se pregunta antes de cerrar y no se instala la actualización.
+- **Pendiente para F3**: las migraciones corren dentro de la transacción de la operación, así que una migración no puede hacer `PRAGMA foreign_keys = OFF` (necesario para reconstruir una tabla en SQLite). Si F3 lo necesita, hay que añadir a la cola un modo de migración fuera de transacción. Mover `ISODate`/`MonthKey` de `shared/modules/finanzas/types` a `src/shared/` antes de que entreno los use.
+
 ## 4. Modelo de datos de Entreno
 
 La exportación de Hevy tiene una fila por serie con estas columnas: `title`, `start_time`, `end_time`, `description`, `exercise_title`, `superset_id`, `exercise_notes`, `set_index`, `set_type`, `weight_kg`, `reps`, `distance_km`, `duration_seconds`, `rpe`.

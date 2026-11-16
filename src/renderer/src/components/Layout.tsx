@@ -50,7 +50,7 @@ export function useThemeSync() {
 
 export function Layout({ children }: { children: ReactNode }) {
   const { openNew, openTransfer } = useTxEditor()
-  const review = useApi('tx.reviewQueue', [])
+  const review = useApi('finanzas:tx.reviewQueue', [])
   const pending = (review.data?.pending.length ?? 0) + (review.data?.issues.length ?? 0) + (review.data?.duplicates.length ?? 0)
   useThemeSync()
   return (

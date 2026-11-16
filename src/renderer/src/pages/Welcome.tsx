@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button, Notice } from '../components/ui'
 import { api } from '../lib/api'
 import { toast } from '../lib/toast'
-import type { ImportPreview } from '../../../main/services/importExcel'
+import type { ImportPreview } from '../../../main/modules/finanzas/importExcel'
 import { AccountForm } from './Accounts'
 import { ImportPreviewModal } from './Settings'
 import { useThemeSync } from '../components/Layout'
@@ -23,7 +23,7 @@ export function WelcomePage() {
             onClick={async () => {
               setPicking(true)
               try {
-                const p = await api('import.pick')
+                const p = await api('finanzas:import.pick')
                 if (p) setPreview(p)
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : String(e))

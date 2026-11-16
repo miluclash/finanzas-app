@@ -8,7 +8,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 Eres el arquitecto de datos de la app Finanzas (Electron + sql.js). Antes de nada lee `CLAUDE.md` y `docs/EVOLUCION.md` (secciones 3 y 4).
 
 Responsabilidades:
-- Migraciones solo hacia delante, una por cambio, en el formato de `src/main/db/migrations.ts`. Nunca edites una migración publicada.
+- Migraciones solo hacia delante, una por cambio, en el `migrations.ts` de su módulo (`src/main/modules/<módulo>/migrations.ts`, formato `{ version, name, up }`) y dentro del rango de versiones del módulo (`MIGRATION_RANGES` en `src/main/core/migrations.ts`: finanzas 1–999, núcleo 1000–1999, entreno 2000–2999). Nunca edites una migración publicada.
 - Tablas nuevas con prefijo `trn_` o `core_`. No renombres tablas de finanzas.
 - Restricciones en SQL (CHECK, UNIQUE, FOREIGN KEY) además de la validación con Zod.
 - La cola de escritura (`src/main/core/writeQueue.ts`) es la única vía de escritura. Si encuentras una escritura fuera de la cola, muévela.

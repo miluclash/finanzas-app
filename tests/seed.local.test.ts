@@ -3,9 +3,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, it } from 'vitest'
-import { Db } from '../src/main/db/db'
-import { applyImport, previewImport } from '../src/main/services/importExcel'
-import { AppState } from '../src/main/services/state'
+import { Db } from '../src/main/core/db'
+import { applyImport, previewImport } from '../src/main/modules/finanzas/importExcel'
+import { AppState } from '../src/main/modules/finanzas/state'
+import { escribir } from './helpers'
 
 const file = process.env.FINANCIAL_MASTER_PATH
 const out = process.env.SEED_DB_PATH
@@ -18,6 +19,6 @@ run('semilla local', () => {
     const db = await Db.open(out!)
     const s = AppState.init(db, { dbPath: out!, backupsDir: null })
     const p = await previewImport(s, file!)
-    applyImport(s, p.token, { replaceExisting: false })
+    escribir(s, () => applyImport(s, p.token, { replaceExisting: false }))
   })
 })

@@ -1,9 +1,9 @@
 // Colector del test dorado de finanzas: recoge TODAS las cifras que la app enseña, en forma canónica,
 // para poder compararlas antes y después de cada refactorización. No modifica la base de datos.
 import Decimal from 'decimal.js'
-import { computeAlerts } from '../../src/shared/domain/dashboard'
-import { availableCash } from '../../src/shared/domain/available'
-import { goalProgress } from '../../src/shared/domain/goals'
+import { computeAlerts } from '../../src/shared/modules/finanzas/dashboard'
+import { availableCash } from '../../src/shared/modules/finanzas/available'
+import { goalProgress } from '../../src/shared/modules/finanzas/goals'
 import {
   cashEffects,
   computeHoldings,
@@ -12,16 +12,17 @@ import {
   investmentAccountIds,
   investmentSeries,
   portfolioSummary
-} from '../../src/shared/domain/investments'
-import { DEFAULT_PLAN, nextExecutionDate, splitContribution } from '../../src/shared/domain/investmentPlan'
-import { allBalances, effectiveNature, liquidityAt, positionAt, trackedMonths } from '../../src/shared/domain/ledger'
-import { matchOccurrences, pendingOccurrences, ruleStatus, suggestRule } from '../../src/shared/domain/recurring'
-import { allDuplicatePairs } from '../../src/shared/domain/validation'
+} from '../../src/shared/modules/finanzas/investments'
+import { DEFAULT_PLAN, nextExecutionDate, splitContribution } from '../../src/shared/modules/finanzas/investmentPlan'
+import { allBalances, effectiveNature, liquidityAt, positionAt, trackedMonths } from '../../src/shared/modules/finanzas/ledger'
+import { matchOccurrences, pendingOccurrences, ruleStatus, suggestRule } from '../../src/shared/modules/finanzas/recurring'
+import { allDuplicatePairs } from '../../src/shared/modules/finanzas/validation'
 import { addDays, addMonthsToMonth, monthEnd, monthOf } from '../../src/shared/dates'
-import { exportJsonObject } from '../../src/main/services/backup'
-import type { TxDraft } from '../../src/shared/domain/validation'
-import { createHandlers, type DialogProvider } from '../../src/main/services/api'
-import type { AppState } from '../../src/main/services/state'
+import { exportJsonObject } from '../../src/main/modules/finanzas/exports'
+import type { TxDraft } from '../../src/shared/modules/finanzas/validation'
+import { createAppHandlers, type Handlers } from '../../src/main/app'
+import type { DialogProvider } from '../../src/main/core/handlers'
+import type { AppState } from '../../src/main/modules/finanzas/state'
 
 /** Diálogos falsos: las lecturas que se recogen nunca los usan. */
 const noDialogs: DialogProvider = {
@@ -78,7 +79,7 @@ type Out = Record<string, unknown>
 
 export function collectGolden(s: AppState, todays: string[]): Record<string, unknown> {
   const out: Out = {}
-  const h = createHandlers(s, noDialogs, '0.0.0')
+  const h = createAppHandlers(s.core, noDialogs, '0.0.0')
   const saved = s.todayOverride
   try {
     todays.forEach((today, i) => {
@@ -97,7 +98,7 @@ export function collectGolden(s: AppState, todays: string[]): Record<string, unk
 /** Error del propio colector (no del dominio): se propaga, nunca se congela. */
 class CollectorError extends Error {}
 
-function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: string, out: Out, isFirst: boolean): void {
+function collectOne(s: AppState, h: Handlers, today: string, out: Out, isFirst: boolean): void {
   const put = (key: string, fn: () => unknown): void => {
     const k = `${today}|${key}`
     try {
@@ -123,22 +124,22 @@ function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: st
   }
 
   // ----- A través de los handlers (lo que ve la interfaz) -----
-  put('catalog.get', () => h['catalog.get']())
-  put('accounts.list', () => h['accounts.list']())
-  for (const a of ctx.accounts) put(`accounts.reconciliations@${a.id}`, () => h['accounts.reconciliations'](a.id))
-  for (const c of ctx.categories) put(`categories.usage@${c.id}`, () => h['categories.usage'](c.id))
-  put('tx.list', () => h['tx.list']({}))
+  put('catalog.get', () => h['finanzas:catalog.get']())
+  put('accounts.list', () => h['finanzas:accounts.list']())
+  for (const a of ctx.accounts) put(`accounts.reconciliations@${a.id}`, () => h['finanzas:accounts.reconciliations'](a.id))
+  for (const c of ctx.categories) put(`categories.usage@${c.id}`, () => h['finanzas:categories.usage'](c.id))
+  put('tx.list', () => h['finanzas:tx.list']({}))
   // variantes pequeñas: ejercitan filtros y ordenaciones sin duplicar todo el libro
-  put('tx.list@cancelled', () => h['tx.list']({ status: 'CANCELLED' }))
-  put('tx.list@refunds', () => h['tx.list']({ type: 'REFUND', sort: 'amount', dir: 'asc' }))
-  put('tx.list@extraordinary', () => h['tx.list']({ nature: 'EXTRAORDINARY' }))
-  put('tx.list@search', () => h['tx.list']({ search: 'cafe', includeCancelled: true }))
+  put('tx.list@cancelled', () => h['finanzas:tx.list']({ status: 'CANCELLED' }))
+  put('tx.list@refunds', () => h['finanzas:tx.list']({ type: 'REFUND', sort: 'amount', dir: 'asc' }))
+  put('tx.list@extraordinary', () => h['finanzas:tx.list']({ nature: 'EXTRAORDINARY' }))
+  put('tx.list@search', () => h['finanzas:tx.list']({ search: 'cafe', includeCancelled: true }))
   const lastMonth = months[months.length - 1]
-  put('tx.list@paginado', () => h['tx.list']({ month: lastMonth, onlyIssues: true, limit: 5, offset: 1 }))
+  put('tx.list@paginado', () => h['finanzas:tx.list']({ month: lastMonth, onlyIssues: true, limit: 5, offset: 1 }))
   // tx.get: los movimientos con pareja, enlace o devolución, más uno de cada 5 (regla determinista)
   const refunded = new Set(ctx.transactions.map((x) => x.linkedTxId).filter(Boolean))
   ctx.transactions.forEach((x, i) => {
-    if (x.transferId || x.linkedTxId || refunded.has(x.id) || i % 5 === 0) put(`tx.get@${x.id}`, () => h['tx.get'](x.id))
+    if (x.transferId || x.linkedTxId || refunded.has(x.id) || i % 5 === 0) put(`tx.get@${x.id}`, () => h['finanzas:tx.get'](x.id))
   })
   // tx.suggest: consultas derivadas de los datos; la clave lleva el índice, nunca el texto
   const seenDesc = new Set<string>()
@@ -147,7 +148,7 @@ function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: st
     const text = x.description.slice(0, 3).toLowerCase()
     if (text.length < 3 || seenDesc.has(text) || q >= 6) continue
     seenDesc.add(text)
-    put(`tx.suggest@${q++}`, () => h['tx.suggest'](text))
+    put(`tx.suggest@${q++}`, () => h['finanzas:tx.suggest'](text))
   }
   // tx.validate: borradores fijos sobre la primera cuenta y la primera categoría de gasto
   const acc0 = ctx.accounts[0]
@@ -161,11 +162,11 @@ function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: st
       { ...base, date: addDays(today, 30) },
       { ...base, amountCents: 1234 }
     ]
-    drafts.forEach((d, i) => put(`tx.validate@${i}`, () => h['tx.validate'](d)))
+    drafts.forEach((d, i) => put(`tx.validate@${i}`, () => h['finanzas:tx.validate'](d)))
   }
   if (months[0]) {
-    put(`monthly.summaries@6@${addMonthsToMonth(months[0], 2)}`, () => h['monthly.summaries'](6, addMonthsToMonth(months[0], 2)))
-    put(`monthly.summaries@6@${lastMonth}`, () => h['monthly.summaries'](6, lastMonth))
+    put(`monthly.summaries@6@${addMonthsToMonth(months[0], 2)}`, () => h['finanzas:monthly.summaries'](6, addMonthsToMonth(months[0], 2)))
+    put(`monthly.summaries@6@${lastMonth}`, () => h['finanzas:monthly.summaries'](6, lastMonth))
   }
   // exportación JSON en memoria (sin la fecha de exportación); nunca se escribe en disco
   if (isFirst)
@@ -174,21 +175,21 @@ function collectOne(s: AppState, h: ReturnType<typeof createHandlers>, today: st
       void _ignored
       return rest
     })
-  put('tx.reviewQueue', () => h['tx.reviewQueue']())
-  put('dashboard.get', () => h['dashboard.get']())
-  for (const m of months) put(`dashboard.get@${m}`, () => h['dashboard.get'](m))
-  put('alerts.get', () => h['alerts.get']())
-  put('monthly.summaries@120', () => h['monthly.summaries'](120))
-  put('networth.series', () => h['networth.series']())
-  for (const m of months) put(`budgets.report@${m}`, () => h['budgets.report'](m))
-  put('recurring.list', () => h['recurring.list']())
-  put('goals.list', () => h['goals.list']())
-  put('forecast.run@12', () => h['forecast.run'](12))
-  put('forecast.run@24', () => h['forecast.run'](24))
-  put('inv.overview', () => h['inv.overview']())
-  put('inv.plan', () => h['inv.plan']())
-  put('inv.ops', () => h['inv.ops']())
-  put('inv.prices', () => h['inv.prices']())
+  put('tx.reviewQueue', () => h['finanzas:tx.reviewQueue']())
+  put('dashboard.get', () => h['finanzas:dashboard.get']())
+  for (const m of months) put(`dashboard.get@${m}`, () => h['finanzas:dashboard.get'](m))
+  put('alerts.get', () => h['finanzas:alerts.get']())
+  put('monthly.summaries@120', () => h['finanzas:monthly.summaries'](120))
+  put('networth.series', () => h['finanzas:networth.series']())
+  for (const m of months) put(`budgets.report@${m}`, () => h['finanzas:budgets.report'](m))
+  put('recurring.list', () => h['finanzas:recurring.list']())
+  put('goals.list', () => h['finanzas:goals.list']())
+  put('forecast.run@12', () => h['finanzas:forecast.run'](12))
+  put('forecast.run@24', () => h['finanzas:forecast.run'](24))
+  put('inv.overview', () => h['finanzas:inv.overview']())
+  put('inv.plan', () => h['finanzas:inv.plan']())
+  put('inv.ops', () => h['finanzas:inv.ops']())
+  put('inv.prices', () => h['finanzas:inv.prices']())
 
   // ----- Dominio directo (fechas pasadas y piezas que los handlers no exponen sueltas) -----
   put('trackedMonths', () => months)

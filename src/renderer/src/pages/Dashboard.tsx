@@ -2,7 +2,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Info, XCircle } from 'lucide-
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { addMonthsToMonth, formatDate, formatMonth, monthOf, todayISO } from '@shared/dates'
-import { GOAL_HEALTH_LABEL } from '@shared/domain/goals'
+import { GOAL_HEALTH_LABEL } from '@shared/modules/finanzas/goals'
 import { formatEur, formatPct } from '@shared/money'
 import { BarList, IncomeExpenseChart, LinesChart } from '../components/charts'
 import { useTxEditor } from '../components/TxEditor'
@@ -27,8 +27,8 @@ export function MonthPicker({ month, onChange, max }: { month: string; onChange:
 export function DashboardPage() {
   const current = monthOf(todayISO())
   const [month, setMonth] = useState(current)
-  const q = useApi('dashboard.get', [month])
-  const nw = useApi('networth.series', [])
+  const q = useApi('finanzas:dashboard.get', [month])
+  const nw = useApi('finanzas:networth.series', [])
   const { cat, categoryName, accountName, maps } = useCatalog()
   const { openEdit, openNew } = useTxEditor()
   const navigate = useNavigate()

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { availableCash } from '../src/shared/domain/available'
-import { budgetReport } from '../src/shared/domain/budgets'
-import { forecast } from '../src/shared/domain/forecast'
-import { goalProgress } from '../src/shared/domain/goals'
-import { occurrences, ruleStatus } from '../src/shared/domain/recurring'
-import { copyBudgets, saveAllocation, saveGoal, saveRecurring, setBudget } from '../src/main/services/planning'
-import { saveTransaction } from '../src/main/services/transactions'
-import type { RecurringRule } from '../src/shared/types'
-import { account, cat, memoryApp, transfer, tx } from './helpers'
+import { availableCash } from '../src/shared/modules/finanzas/available'
+import { budgetReport } from '../src/shared/modules/finanzas/budgets'
+import { forecast } from '../src/shared/modules/finanzas/forecast'
+import { goalProgress } from '../src/shared/modules/finanzas/goals'
+import { occurrences, ruleStatus } from '../src/shared/modules/finanzas/recurring'
+import { copyBudgets, saveAllocation, saveGoal, saveRecurring, setBudget } from '../src/main/modules/finanzas/planning'
+import { saveTransaction } from '../src/main/modules/finanzas/transactions'
+import type { RecurringRule } from '../src/shared/modules/finanzas/types'
+import { account, cat, escribir, memoryApp, transfer, tx } from './helpers'
 
 const baseRule: RecurringRule = {
   id: 'R',
@@ -45,15 +45,17 @@ describe('recurrentes', () => {
     const s = await memoryApp('2026-10-11')
     const a = account(s, { name: 'Corriente', openingBalanceCents: 50000 })
     const gym = cat(s, 'Gimnasio')
-    const r = saveRecurring(s, {
-      concept: 'Gimnasio',
-      kind: 'EXPENSE',
-      amountCents: 3995,
-      frequency: 'MONTHLY',
-      startDate: '2026-10-03',
-      accountId: a.id,
-      categoryId: gym
-    })
+    const r = escribir(s, () =>
+      saveRecurring(s, {
+        concept: 'Gimnasio',
+        kind: 'EXPENSE',
+        amountCents: 3995,
+        frequency: 'MONTHLY',
+        startDate: '2026-10-03',
+        accountId: a.id,
+        categoryId: gym
+      })
+    )
     // sin registrar: el cargo del 03/10 aparece como pendiente de registrar
     expect(ruleStatus(s.ctx(), r).overdue).toEqual(['2026-10-03'])
     expect(availableCash(s.ctx()).pendingCents).toBe(3995)
@@ -69,7 +71,7 @@ describe('recurrentes', () => {
     const s = await memoryApp('2026-10-11')
     const a = account(s, { name: 'Corriente' })
     const prac = cat(s, 'Prácticas')
-    const r = saveRecurring(s, { concept: 'Parcial', kind: 'INCOME', amountCents: 17341, frequency: 'ONE_OFF', startDate: '2026-10-05', accountId: a.id, categoryId: prac })
+    const r = escribir(s, () => saveRecurring(s, { concept: 'Parcial', kind: 'INCOME', amountCents: 17341, frequency: 'ONE_OFF', startDate: '2026-10-05', accountId: a.id, categoryId: prac }))
     tx(s, { accountId: a.id, amountCents: 14872, categoryId: prac, date: '2026-10-09' })
     expect(ruleStatus(s.ctx(), r).finished).toBe(true)
   })
@@ -80,23 +82,23 @@ describe('objetivos', () => {
     const s = await memoryApp()
     const a = account(s, { name: 'Corriente', openingBalanceCents: 100000 })
     const h = account(s, { name: 'Hucha C1', type: 'SAVINGS', includeLiquidity: false })
-    const g = saveGoal(s, { name: 'C1', type: 'REQUIRED', priority: 'HIGH', targetCents: 25100, linkedAccountId: h.id })
+    const g = escribir(s, () => saveGoal(s, { name: 'C1', type: 'REQUIRED', priority: 'HIGH', targetCents: 25100, linkedAccountId: h.id }))
     transfer(s, a.id, h.id, 25000, '2026-09-10')
     const p = goalProgress(s.ctx(), g)
     expect(p.currentCents).toBe(25000)
     expect(p.remainingCents).toBe(100)
     expect(p.reservedFromAvailableCents).toBe(0)
-    expect(() => saveAllocation(s, { goalId: g.id, date: '2026-10-01', amountCents: 100, accountId: a.id })).toThrow(/hucha vinculada/)
+    expect(() => escribir(s, () => saveAllocation(s, { goalId: g.id, date: '2026-10-01', amountCents: 100, accountId: a.id }))).toThrow(/hucha vinculada/)
   })
 
   it('las reservas en la cuenta corriente restan del disponible y los gastos del objetivo las consumen', async () => {
     const s = await memoryApp('2026-10-11')
     const a = account(s, { name: 'Corriente', openingBalanceCents: 60000 })
-    const g = saveGoal(s, { name: 'HYROX', type: 'PLANNED', priority: 'MEDIUM', targetCents: 13900, deadline: '2027-03-20' })
-    saveAllocation(s, { goalId: g.id, date: '2026-10-05', amountCents: 5000, accountId: a.id })
+    const g = escribir(s, () => saveGoal(s, { name: 'HYROX', type: 'PLANNED', priority: 'MEDIUM', targetCents: 13900, deadline: '2027-03-20' }))
+    escribir(s, () => saveAllocation(s, { goalId: g.id, date: '2026-10-05', amountCents: 5000, accountId: a.id }))
     expect(availableCash(s.ctx()).availableCents).toBe(55000)
     expect(goalProgress(s.ctx(), g).currentCents).toBe(5000)
-    saveTransaction(s, { accountId: a.id, date: '2026-10-08', description: 'Inscripción', amountCents: -3000, type: 'EXPENSE', categoryId: cat(s, 'Aficiones'), goalId: g.id })
+    escribir(s, () => saveTransaction(s, { accountId: a.id, date: '2026-10-08', description: 'Inscripción', amountCents: -3000, type: 'EXPENSE', categoryId: cat(s, 'Aficiones'), goalId: g.id }))
     // la reserva baja a 20 € y el saldo a 570 €: disponible 550 €
     expect(availableCash(s.ctx()).reservationsCents).toBe(2000)
     expect(availableCash(s.ctx()).availableCents).toBe(55000)
@@ -109,10 +111,10 @@ describe('presupuestos', () => {
     const s = await memoryApp('2026-10-11')
     const food = cat(s, 'Alimentación')
     const fun = cat(s, 'Salir fuera')
-    setBudget(s, { month: '2026-09', categoryId: food, amountCents: 10000 })
-    setBudget(s, { month: '2026-09', categoryId: fun, amountCents: 5000 })
-    setBudget(s, { month: '2026-10', categoryId: fun, amountCents: 8000 })
-    expect(copyBudgets(s, '2026-09', '2026-10')).toBe(1)
+    escribir(s, () => setBudget(s, { month: '2026-09', categoryId: food, amountCents: 10000 }))
+    escribir(s, () => setBudget(s, { month: '2026-09', categoryId: fun, amountCents: 5000 }))
+    escribir(s, () => setBudget(s, { month: '2026-10', categoryId: fun, amountCents: 8000 }))
+    expect(escribir(s, () => copyBudgets(s, '2026-09', '2026-10'))).toBe(1)
     const oct = budgetReport(s.ctx(), '2026-10')
     expect(oct.totalBudgetCents).toBe(18000)
     const sep = budgetReport(s.ctx(), '2026-09')
@@ -123,7 +125,7 @@ describe('presupuestos', () => {
     const s = await memoryApp('2026-10-31')
     const a = account(s, { name: 'Corriente', openingBalanceCents: 50000 })
     const food = cat(s, 'Alimentación')
-    setBudget(s, { month: '2026-10', categoryId: food, amountCents: 1000 })
+    escribir(s, () => setBudget(s, { month: '2026-10', categoryId: food, amountCents: 1000 }))
     tx(s, { accountId: a.id, amountCents: -1500, categoryId: food, date: '2026-10-10' })
     const l = budgetReport(s.ctx(), '2026-10').lines.find((x) => x.categoryId === food)!
     expect(l.state).toBe('OVER')
@@ -136,9 +138,9 @@ describe('previsión', () => {
     const s = await memoryApp('2026-10-11')
     const a = account(s, { name: 'Corriente', openingBalanceCents: 60000 })
     const broker = account(s, { name: 'Bróker', type: 'INVESTMENT', includeLiquidity: false })
-    saveRecurring(s, { concept: 'Nómina', kind: 'INCOME', amountCents: 54500, frequency: 'MONTHLY', startDate: '2026-11-02', endDate: '2027-05-07', accountId: a.id, categoryId: cat(s, 'Prácticas') })
-    saveRecurring(s, { concept: 'Gimnasio', kind: 'EXPENSE', amountCents: 3995, frequency: 'MONTHLY', startDate: '2026-10-03', accountId: a.id, categoryId: cat(s, 'Gimnasio') })
-    saveRecurring(s, { concept: 'Plan inversión', kind: 'TRANSFER', amountCents: 20000, frequency: 'MONTHLY', startDate: '2026-10-16', accountId: a.id, toAccountId: broker.id })
+    escribir(s, () => saveRecurring(s, { concept: 'Nómina', kind: 'INCOME', amountCents: 54500, frequency: 'MONTHLY', startDate: '2026-11-02', endDate: '2027-05-07', accountId: a.id, categoryId: cat(s, 'Prácticas') }))
+    escribir(s, () => saveRecurring(s, { concept: 'Gimnasio', kind: 'EXPENSE', amountCents: 3995, frequency: 'MONTHLY', startDate: '2026-10-03', accountId: a.id, categoryId: cat(s, 'Gimnasio') }))
+    escribir(s, () => saveRecurring(s, { concept: 'Plan inversión', kind: 'TRANSFER', amountCents: 20000, frequency: 'MONTHLY', startDate: '2026-10-16', accountId: a.id, toAccountId: broker.id }))
     tx(s, { accountId: a.id, amountCents: -3995, categoryId: cat(s, 'Gimnasio'), date: '2026-10-02' })
     const sc = s.ctx().scenarios.find((x) => x.name === 'Base')!
     const f = forecast(s.ctx(), { ...sc, variableMonthlyCents: 0 })
