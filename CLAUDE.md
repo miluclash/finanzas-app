@@ -56,7 +56,7 @@ La interfaz nunca toca la base de datos: pide datos al proceso principal por IPC
 ## Cómo se trabaja
 
 - Una fase = una rama `evolucion/fN-<tema>` = un PR. Michael revisa, prueba en Windows y hace merge.
-- Orquestador en la sesión principal (Fable 5.2). Delega en los agentes de `.claude/agents/`. **Al lanzar un agente, pásale explícitamente el `effort` de la tabla de `docs/EVOLUCION.md`** (no te fíes solo del frontmatter).
+- Orquestador en la sesión principal (Opus 5.5). Delega en los agentes de `.claude/agents/`. **Al lanzar un agente, pásale explícitamente el `effort` de la tabla de `docs/EVOLUCION.md`** (no te fíes solo del frontmatter).
 - Búsquedas y tareas mecánicas → effort bajo. Código nuevo y revisión → effort alto.
 - Cada PR termina con: tests en verde, typecheck limpio, revisión del agente `revisor` y una nota en `docs/CHANGELOG.md`.
 - No publiques versiones (tags) sin que Michael lo pida: la app instalada se actualiza sola.

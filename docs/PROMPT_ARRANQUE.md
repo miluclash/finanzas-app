@@ -1,6 +1,6 @@
 # Prompt de arranque
 
-Pégalo en Claude Code, dentro de la carpeta del repo, con **Fable 5.2** seleccionado (`/model`). Úsalo al empezar cada fase cambiando solo la línea de "Fase".
+Pégalo en Claude Code, dentro de la carpeta del repo, con **Opus 5.5** seleccionado (`/model`). Úsalo al empezar cada fase cambiando solo la línea de "Fase".
 
 ---
 
