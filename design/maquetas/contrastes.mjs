@@ -47,44 +47,41 @@ const resolve = (theme, modulo) => {
 const T = 4.5 // texto normal
 const U = 3 // elemento de interfaz / marca
 const pares = [
-  ['ink', 'bg', T, 'texto principal / fondo'],
-  ['ink', 'surface-1', T, 'texto principal / tarjeta'],
-  ['ink', 'surface-3', T, 'texto principal / seleccionado'],
-  ['ink-2', 'bg', T, 'texto secundario / fondo'],
-  ['ink-2', 'surface-1', T, 'texto secundario / tarjeta'],
-  ['ink-2', 'surface-3', T, 'texto secundario / seleccionado'],
-  ['ink-3', 'bg', T, 'texto apagado / fondo'],
-  ['ink-3', 'surface-1', T, 'texto apagado / tarjeta'],
-  ['ink-3', 'surface-2', T, 'texto apagado / superficie 2'],
-  ['ink-3', 'surface-3', T, 'texto apagado / seleccionado'],
-  ['accent-text', 'bg', T, 'texto de acento / fondo'],
-  ['accent-text', 'surface-1', T, 'texto de acento / tarjeta'],
-  ['accent-text', 'surface-2', T, 'texto de acento / superficie 2'],
-  ['accent-text', 'accent-soft', T, 'texto de acento / acento suave'],
-  ['accent-mark', 'surface-1', U, 'marca de acento / tarjeta'],
+  // Texto en cuatro niveles sobre cada superficie
+  ...['canvas', 'sidebar', 'card', 'raised', 'interactive'].flatMap((s) => [
+    ['ink', s, T, `texto principal / ${s}`],
+    ['ink-2', s, T, `texto secundario / ${s}`],
+    ['ink-3', s, T, `texto terciario / ${s}`]
+  ]),
+  ['ink-disabled', 'card', 2.5, 'texto deshabilitado / card (solo informativo)'],
+  // Acento
+  ...['canvas', 'card', 'raised', 'interactive', 'accent-soft'].map((s) => ['accent-text', s, T, `texto de acento / ${s}`]),
+  ['accent-mark', 'card', U, 'marca de acento / card'],
+  ['accent-mark', 'raised', U, 'marca de acento / elevado'],
+  ['accent-mark', 'track', U, 'relleno de progreso / pista'],
   ['on-primary', 'primary', T, 'texto del botón primario'],
-  ['primary-edge', 'surface-1', U, 'borde del botón primario / tarjeta'],
-  ['primary-edge', 'bg', U, 'borde del botón primario / fondo'],
-  ['control', 'surface-1', U, 'borde de campo / tarjeta'],
-  ['control', 'surface-2', U, 'borde de campo / superficie 2'],
-  ['control', 'bg', U, 'borde de campo / fondo'],
-  ['focus', 'surface-1', U, 'anillo de foco / tarjeta'],
-  ['focus', 'bg', U, 'anillo de foco / fondo'],
-  ['pos', 'surface-1', T, 'positivo / tarjeta'],
-  ['pos', 'surface-2', T, 'positivo / superficie 2'],
-  ['pos', 'pos-soft', T, 'positivo / su fondo suave'],
-  ['neg', 'surface-1', T, 'negativo / tarjeta'],
-  ['neg', 'surface-2', T, 'negativo / superficie 2'],
-  ['neg', 'neg-soft', T, 'negativo / su fondo suave'],
-  ['warn', 'surface-1', T, 'aviso / tarjeta'],
-  ['warn', 'surface-2', T, 'aviso / superficie 2'],
-  ['warn', 'warn-soft', T, 'aviso / su fondo suave'],
-  ['series-1', 'surface-1', U, 'serie 1 / tarjeta'],
-  ['series-2', 'surface-1', U, 'serie 2 / tarjeta'],
-  ['series-3', 'surface-1', U, 'serie 3 / tarjeta'],
-  ['series-4', 'surface-1', U, 'serie 4 / tarjeta'],
-  ['muted-mark', 'surface-1', U, 'gris de contexto / tarjeta'],
-  ['track', 'surface-1', 1.1, 'pista de medidor (decorativa)'],
+  ['on-accent', 'accent', T, 'texto del botón de acento'],
+  ['primary-edge', 'card', U, 'borde del botón primario / card'],
+  ['primary-edge', 'canvas', U, 'borde del botón primario / lienzo'],
+  // Controles
+  ...['canvas', 'card', 'raised', 'interactive'].flatMap((s) => [
+    ['control', s, U, `borde de campo / ${s}`],
+    ['focus', s, U, `anillo de foco / ${s}`]
+  ]),
+  // Estados: texto 4,5 sobre cada superficie y sobre su fondo suave
+  ...['success', 'warning', 'error', 'info'].flatMap((e) => [
+    ...['canvas', 'card', 'raised', 'interactive'].map((s) => [e, s, T, `${e} / ${s}`]),
+    [e, `${e}-soft`, T, `${e} / su fondo suave`]
+  ]),
+  // Gráficos
+  ['series-1', 'card', U, 'serie 1 / card'],
+  ['series-2', 'card', U, 'serie 2 / card'],
+  ['series-3', 'card', U, 'serie 3 / card'],
+  ['series-4', 'card', U, 'serie 4 / card'],
+  ['muted-mark', 'card', U, 'histórico (gris) / card'],
+  ['ref', 'card', U, 'línea de referencia / card'],
+  ['axis', 'card', 1.1, 'eje (decorativo)'],
+  // Marcador de Entreno
   ['hero-ink', 'hero-bg', T, 'marcador: cifra / fondo'],
   ['hero-ink-2', 'hero-bg', T, 'marcador: texto secundario / fondo'],
   ['hero-accent', 'hero-bg', T, 'marcador: acento / fondo'],
@@ -123,10 +120,10 @@ for (const [tema, nombre, theme, modulo] of contextos) {
 
 // Contrastes que más importan, para el informe
 const destacados = [
-  ['oscuro Entreno', 'dark', 'entreno', [['accent-text', 'surface-1'], ['on-primary', 'primary'], ['ink-3', 'surface-1']]],
-  ['claro Entreno', 'light', 'entreno', [['accent-text', 'surface-1'], ['accent-mark', 'surface-1'], ['primary-edge', 'surface-1'], ['on-primary', 'primary'], ['hero-accent', 'hero-bg']]],
-  ['oscuro Finanzas', 'dark', 'finanzas', [['accent-text', 'surface-1'], ['pos', 'surface-1'], ['neg', 'surface-1']]],
-  ['claro Finanzas', 'light', 'finanzas', [['accent-text', 'surface-1'], ['pos', 'surface-1'], ['neg', 'surface-1']]]
+  ['oscuro Entreno', 'dark', 'entreno', [['accent-text', 'card'], ['on-primary', 'primary'], ['ink-3', 'card'], ['success', 'card']]],
+  ['claro Entreno', 'light', 'entreno', [['accent-text', 'card'], ['accent-mark', 'card'], ['primary-edge', 'card'], ['on-primary', 'primary'], ['hero-accent', 'hero-bg']]],
+  ['oscuro Finanzas', 'dark', 'finanzas', [['accent-text', 'card'], ['success', 'card'], ['error', 'card'], ['ink-3', 'card']]],
+  ['claro Finanzas', 'light', 'finanzas', [['accent-text', 'card'], ['success', 'card'], ['error', 'card'], ['ink-3', 'card']]]
 ]
 const det = []
 for (const [n, theme, modulo, ps] of destacados) {
@@ -146,7 +143,7 @@ if (validar) {
   for (const [tema, nombre, theme, modulo] of contextos.filter((c) => c[3])) {
     const v = resolve(theme, modulo)
     const pal = [1, 2, 3, 4].map((i) => v('series-' + i))
-    const r = validar(pal, { mode: theme, surface: v('surface-1') })
+    const r = validar(pal, { mode: theme, surface: v('card') })
     const partes = r.report.map(([n, estado, d]) => `${n}: ${typeof estado === 'boolean' ? (estado ? 'pasa' : 'FALLA') : estado}`)
     const cvd = r.report[2][2].replace(/^worst adjacent /, '')
     palLineas.push(`  ${tema} ${nombre} [${pal.join(' ')}] ${r.ok ? 'PASA' : 'FALLA'} · ${partes.join(' · ')}`)
@@ -161,7 +158,7 @@ const informe = [
   ...lineas,
   'Destacados:',
   ...det,
-  ...(palLineas.length ? ['Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):', ...palLineas] : [])
+  ...(palLineas.length ? ['Paletas de series (validador de la skill dataviz, adyacentes, sobre card):', ...palLineas] : [])
 ].join('\n')
 console.log(informe)
 

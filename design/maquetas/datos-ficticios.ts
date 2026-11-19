@@ -151,8 +151,11 @@ export const entreno = {
     { dia: 'X', tipo: 'gimnasio', estado: 'hecha', nombre: 'Tirón' },
     { dia: 'J', tipo: 'gimnasio', estado: 'hoy', nombre: 'Pierna' },
     { dia: 'V', tipo: 'natacion', estado: 'prevista', nombre: 'Natación' },
-    { dia: 'S', tipo: 'gimnasio', estado: 'prevista', nombre: 'Cuerpo completo' }
-  ] as { dia: string; tipo: 'gimnasio' | 'natacion'; estado: 'hecha' | 'hoy' | 'prevista'; nombre: string }[],
+    { dia: 'S', tipo: 'gimnasio', estado: 'prevista', nombre: 'Cuerpo completo' },
+    { dia: 'D', tipo: 'descanso', estado: 'descanso', nombre: 'Descanso' }
+  ] as { dia: string; tipo: 'gimnasio' | 'natacion' | 'descanso'; estado: 'hecha' | 'hoy' | 'prevista' | 'descanso'; nombre: string }[],
+  proximaSesion: { cuando: 'Hoy', hora: '19:00', nombre: 'Pierna', tipo: 'gimnasio', detalle: 'Gimnasio · 5 ejercicios previstos' },
+  constanciaInicio: '2026-09-01',
   records: [
     { ejercicio: 'Press banca', marca: '82,5 kg × 5', mejora: '+2,5 kg', fecha: '18 nov', tipo: 'e1RM 96,3 kg' },
     { ejercicio: 'Sentadilla', marca: '110 kg × 4', mejora: '+5 kg', fecha: '14 nov', tipo: 'e1RM 124,7 kg' },

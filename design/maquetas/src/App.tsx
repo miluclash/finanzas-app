@@ -7,6 +7,7 @@ import { Finanzas } from './pantallas/Finanzas'
 import { Inicio } from './pantallas/Inicio'
 import { Movimientos } from './pantallas/Movimientos'
 import { Pendiente } from './pantallas/Pendiente'
+import { ToastProvider } from './ui/feedback'
 import { Sistema } from './pantallas/Sistema'
 import { aplicarTema, leerTema, type PrefTema } from './tema'
 
@@ -42,12 +43,19 @@ export function App() {
     movimientos: <Movimientos />,
     entreno: <Entreno />,
     ajustes: <Ajustes pref={pref} onPref={setPref} />,
-    sistema: <Sistema />,
+    sistema: <Sistema seccion={ruta.seccion} />,
     pendiente: <Pendiente ruta={ruta} />
   }[ruta.pantalla]
 
   // La hoja del sistema se ve sin el shell
-  if (ruta.pantalla === 'sistema') return <div className="h-full overflow-y-auto bg-bg text-ink" id="contenido">{pantalla}</div>
+  if (ruta.pantalla === 'sistema')
+    return (
+      <ToastProvider>
+        <div className="h-full overflow-y-auto bg-canvas text-ink" id="contenido">
+          {pantalla}
+        </div>
+      </ToastProvider>
+    )
   return (
     <Shell ruta={ruta} onTema={alternar}>
       {pantalla}

@@ -68,7 +68,7 @@ export function leerRuta(hash: string): Ruta {
     case 'ajustes':
       return { pantalla: 'ajustes', modulo: 'ajustes', seccion: 'ajustes', titulo: 'Ajustes' }
     case 'sistema':
-      return { pantalla: 'sistema', modulo: 'sistema', seccion: 'sistema', titulo: 'Sistema de diseño' }
+      return { pantalla: 'sistema', modulo: 'sistema', seccion: b ?? 'fundamentos', titulo: 'Sistema de diseño' }
     default:
       return { pantalla: 'inicio', modulo: 'inicio', seccion: 'inicio', titulo: 'Inicio' }
   }

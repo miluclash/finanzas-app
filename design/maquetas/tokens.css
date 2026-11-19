@@ -1,17 +1,17 @@
-/* CONTRASTES (generado por design/maquetas/contrastes.mjs; 258 comprobaciones, 0 fallos)
+/* CONTRASTES (generado por design/maquetas/contrastes.mjs; 408 comprobaciones, 0 fallos)
 Mínimos: texto normal 4,5:1 · elementos de interfaz y marcas 3:1.
-  oscuro núcleo   OK   peor texto 5.03:1 (ink-3/surface-3)  peor interfaz 3.53:1 (control/surface-2)
-  oscuro Finanzas OK   peor texto 4.88:1 (ink-3/surface-3)  peor interfaz 3.42:1 (control/surface-2)
-  oscuro Entreno  OK   peor texto 5.38:1 (ink-3/surface-3)  peor interfaz 3.95:1 (hero-mark-dim/hero-bg)
-  claro  núcleo   OK   peor texto 4.60:1 (ink-3/surface-3)  peor interfaz 3.24:1 (control/bg)
-  claro  Finanzas OK   peor texto 4.81:1 (ink-3/surface-3)  peor interfaz 3.33:1 (control/bg)
-  claro  Entreno  OK   peor texto 4.68:1 (pos/pos-soft)  peor interfaz 3.15:1 (primary-edge/bg)
+  oscuro núcleo   OK   peor texto 6.08:1 (ink-3/interactive)  peor interfaz 3.38:1 (control/interactive)
+  oscuro Finanzas OK   peor texto 5.91:1 (on-accent/accent)  peor interfaz 3.38:1 (control/interactive)
+  oscuro Entreno  OK   peor texto 6.08:1 (ink-3/interactive)  peor interfaz 3.38:1 (control/interactive)
+  claro  núcleo   OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
+  claro  Finanzas OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
+  claro  Entreno  OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
 Destacados:
-  oscuro Entreno: accent-text/surface-1 14.36 · on-primary/primary 14.82 · ink-3/surface-1 6.78
-  claro Entreno: accent-text/surface-1 6.26 · accent-mark/surface-1 3.62 · primary-edge/surface-1 3.62 · on-primary/primary 14.82 · hero-accent/hero-bg 14.96
-  oscuro Finanzas: accent-text/surface-1 7.31 · pos/surface-1 8.32 · neg/surface-1 7.12
-  claro Finanzas: accent-text/surface-1 6.62 · pos/surface-1 6.22 · neg/surface-1 6.34
-Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
+  oscuro Entreno: accent-text/card 14.05 · on-primary/primary 14.82 · ink-3/card 7.56 · success/card 8.10
+  claro Entreno: accent-text/card 6.26 · accent-mark/card 3.95 · primary-edge/card 3.95 · on-primary/primary 14.82 · hero-accent/hero-bg 14.96
+  oscuro Finanzas: accent-text/card 7.85 · success/card 8.10 · error/card 7.58 · ink-3/card 7.56
+  claro Finanzas: accent-text/card 6.62 · success/card 5.97 · error/card 6.26 · ink-3/card 6.21
+Paletas de series (validador de la skill dataviz, adyacentes, sobre card):
   oscuro Finanzas [#5b93cd #b58a3a #23a39d #926abe] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
       #926abe↔#23a39d ΔE 9.5 (deutan) · tritan 15.5
   oscuro Entreno [#78a000 #139ec6 #e36927 #9d6fe3] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
@@ -24,260 +24,317 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
 /*@@FIN-CONTRASTES@@*/
 
 /* ==========================================================================
-   Tokens del sistema de diseño (F2). Se copian tal cual a la app.
+   Tokens del sistema de diseño (F2, revisión 1). Se copian tal cual a la app.
 
    Estructura
-   1. Tokens sin color (tipografía, espaciado, radios, movimiento) en :root.
-   2. Núcleo neutro: oscuro por defecto y claro con data-theme="light".
-   3. Módulos con data-module="finanzas" | "entreno". Cada bloque redefine
-      superficies, acento, estados, series de gráfico y densidad. Cualquier
-      elemento puede llevar data-module (por ejemplo, una tarjeta del Inicio).
-   4. Puente con Tailwind 4 (@theme inline).
+   1. Sin color: tipografía, espaciado, radios, alturas, movimiento, shell.
+   2. Densidades: data-density="compact | normal | comfortable". Por defecto,
+      Finanzas va cómoda, Entreno compacta y el resto normal.
+   3. Núcleo neutro: oscuro por defecto y claro con data-theme="light".
+      Superficies en cuatro capas (lienzo < tarjeta < elevado < interactivo),
+      texto en cuatro niveles y estados (éxito, aviso, error, información)
+      con tokens propios, distintos de la identidad.
+   4. Identidad por módulo con data-module="finanzas | entreno": solo cambian
+      acento, series de gráfico y densidad. Las superficies y los estados son
+      del sistema, no de cada módulo.
+   5. Puente con Tailwind 4 (@theme inline).
 
-   Regla de orden: los bloques oscuros van antes que los claros, porque
-   `:root [data-module]` y `[data-theme="light"] [data-module]` tienen la
-   misma especificidad y gana el último.
-   Todos los colores son hexadecimales opacos para poder medir su contraste
-   con contrastes.mjs (que lee este archivo).
+   Reglas
+   - Ninguna pantalla lleva colores ni medidas sueltas: si hace falta un valor,
+     es un token (lo comprueba design/maquetas/auditar.mjs).
+   - Los bloques oscuros van antes que los claros: `:root [data-module]` y
+     `[data-theme="light"] [data-module]` tienen la misma especificidad y gana
+     el último.
+   - Todos los colores son hexadecimales opacos para poder medir su contraste
+     con contrastes.mjs (que lee este archivo).
+
+   Botones principales (regla)
+   - Una sola acción principal por vista.
+   - Finanzas y núcleo: «primario» en tinta invertida (blanco en oscuro, negro
+     en claro) para la acción principal de la página (Nuevo movimiento).
+     «Primario azul» (--accent) para confirmar dentro de un diálogo o panel
+     (Guardar, Aplicar), donde el botón de tinta ya no es el protagonista.
+   - Entreno: el primario es lima (--accent) en la página y en los diálogos.
+   - Destructivo: contorno en error; relleno en error solo en la confirmación.
+   - Secundario y fantasma para el resto. Nunca dos primarios juntos.
    ========================================================================== */
 
 /* 1. Sin color ----------------------------------------------------------- */
 :root {
   --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
 
-  /* Escala tipográfica: contraste claro entre cifra héroe, títulos, cuerpo y etiquetas */
-  --fs-hero: 3.25rem; /* 52 px · cifra héroe, una por vista */
-  --fs-display: 2.5rem; /* 40 px · cifra grande de tarjeta */
-  --fs-title: 1.625rem; /* 26 px · título de página */
-  --fs-heading: 1.0625rem; /* 17 px · título de sección */
-  --fs-body: 0.875rem; /* 14 px · cuerpo */
-  --fs-small: 0.8125rem; /* 13 px · texto secundario */
-  --fs-label: 0.71875rem; /* 11.5 px · etiquetas apagadas */
-  --tracking-hero: -0.03em;
-  --tracking-display: -0.024em;
-  --tracking-title: -0.022em;
-  --tracking-label: 0.01em;
-  --weight-hero: 620;
-  --weight-title: 650;
-  --weight-strong: 560;
-  --weight-body: 420;
+  /* Escala tipográfica (rangos del pliego entre paréntesis) */
+  --fs-kpi-hero: 2.75rem; /* 44 px · KPI protagonista (40–44) */
+  --fs-kpi: 2rem; /* 32 px · KPI de tarjeta (30–36) */
+  --fs-page: 1.75rem; /* 28 px · título de página (26–28) */
+  --fs-section: 1.1875rem; /* 19 px · título de sección (18–20) */
+  --fs-card-title: 0.9375rem; /* 15 px · título de tarjeta (14–16) */
+  --fs-body: 0.875rem; /* 14 px · texto habitual */
+  --fs-label: 0.8125rem; /* 13 px · etiqueta secundaria (12–13) */
+  --fs-micro: 0.75rem; /* 12 px · microtexto, solo excepcional (11–12) */
+  --lh-tight: 1.1;
+  --lh-snug: 1.3;
+  --lh-body: 1.5;
+  --tracking-kpi-hero: -0.025em;
+  --tracking-kpi: -0.02em;
+  --tracking-page: -0.02em;
+  --tracking-section: -0.012em;
+  --tracking-caps: 0.05em;
+  --w-body: 420;
+  --w-medium: 520;
+  --w-strong: 600;
+  --w-kpi: 620;
+  --w-title: 650;
 
-  /* Espaciado en base 4 */
+  /* Espaciado en base 4 px: 4 / 8 / 12 / 16 / 24 / 32 / 40 / 48 */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Radios */
-  --radius-xs: 4px; /* extremos de barra */
-  --radius-sm: 8px; /* botones, campos, chips */
-  --radius-md: 12px; /* tarjetas pequeñas */
-  --radius-lg: 16px; /* tarjetas */
-  --radius-xl: 22px; /* diálogos, paleta de comandos */
+  /* Radios: tarjetas 12, modales 16, botones y campos 8, etiquetas 6, pastillas del todo */
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --radius-control: 8px;
+  --radius-tag: 6px;
+  --radius-mark: 4px; /* extremos de barra */
   --radius-full: 999px;
+
+  /* Alturas normalizadas de botones y campos */
+  --h-sm: 32px;
+  --h-md: 40px;
+  --h-lg: 48px;
 
   /* Movimiento: cortas y suaves. Se anulan con prefers-reduced-motion */
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 220ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  /* Anchos del shell */
+  /* Shell */
   --sidebar-w: 256px;
-  --sidebar-w-collapsed: 68px;
-  --ai-w: 340px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 56px;
+  --content-max: 1200px;
+  --ai-w-min: 320px;
+  --ai-w-default: 360px;
+  --ai-w-max: 560px;
+  --z-sticky: 30;
+  --z-overlay: 50;
+  --z-toast: 60;
 
-  /* Densidad: la fijan los módulos (valores del núcleo = media) */
-  --density-pad: 20px; /* relleno de tarjeta */
-  --density-gap: 16px; /* hueco entre tarjetas */
-  --density-row: 40px; /* alto de fila de lista */
-  --num-weight: 600; /* peso de las cifras grandes */
-  --label-transform: none;
-  --label-tracking: 0.01em;
-  --label-weight: 500;
+  /* Marcas de gráfico */
+  --mark-line: 2px;
+  --mark-dot: 4px;
+  --mark-bar: 3px; /* indicador de elemento activo y asa del interruptor */
+  --chart-h: 200px;
+  --chart-h-sm: 120px;
+  --chart-h-xs: 48px;
+
+  /* Reflow de cuadrículas: columnas mínimas antes de bajar de fila */
+  --min-kpi: 10rem;
+  --min-kpi-wide: 15rem;
+  --settings-nav-w: 12rem;
+
+  /* Columnas de filas con etiqueta, medidores y esquemas */
+  --col-label: 14rem;
+  --col-spec: 18rem;
+  --col-meter-name: 5rem;
+  --col-meter-name-wide: 10rem;
+  --col-meter-value: 4rem;
+  --col-meter-value-wide: 6rem;
+  --col-meter-status: 6rem;
+
+  /* Etiquetas en mayúsculas: solo Entreno, solo cortas */
+  --caps-transform: none;
+  --caps-tracking: 0;
+  --caps-weight: 600;
 }
 
-/* 2. Núcleo oscuro (por defecto) ---------------------------------------- */
+/* 2. Densidades --------------------------------------------------------- */
+:root,
+[data-density='normal'] {
+  --row-h: 44px; /* alto de fila de tabla o lista */
+  --card-pad: 24px;
+  --gap: 16px;
+}
+[data-density='compact'],
+[data-module='entreno']:not([data-density]) {
+  --row-h: 36px;
+  --card-pad: 16px;
+  --gap: 12px;
+}
+[data-density='comfortable'],
+[data-module='finanzas']:not([data-density]) {
+  --row-h: 52px;
+  --card-pad: 24px;
+  --gap: 24px;
+}
+[data-module='entreno'] {
+  --caps-transform: uppercase;
+  --caps-tracking: var(--tracking-caps);
+  --caps-weight: 650;
+}
+
+/* 3. Núcleo oscuro (por defecto) ---------------------------------------- */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* Materiales: capas de superficie, de la más honda a la más alta */
-  --bg: #0c0d0f;
-  --sidebar: #101113;
-  --surface-1: #141518;
-  --surface-2: #1b1c20;
-  --surface-3: #24252a;
-  --overlay: #1d1e23;
-  --line: #26282d; /* separadores decorativos */
-  --line-strong: #363840;
-  --control: #6e727b; /* borde de campos y botones (3:1) */
+  /* Superficies: la profundidad sale de la luminosidad, sin negro puro */
+  --canvas: #0b0c0f;
+  --sidebar: #0f1115;
+  --card: #14161a;
+  --raised: #1b1e23;
+  --interactive: #252932;
+  --overlay: #1b1e23; /* menús, popovers y modales */
+  --line: #23262c; /* separadores y borde de tarjeta */
+  --line-strong: #30343b; /* borde sutil de elementos elevados */
+  --control: #747a86; /* borde de campos y botones (3:1) */
 
-  /* Tinta */
-  --ink: #f4f5f7;
-  --ink-2: #bcbfc7;
-  --ink-3: #90949d;
+  /* Texto en cuatro niveles */
+  --ink: #f2f4f7;
+  --ink-2: #c5cad3;
+  --ink-3: #a0a8b5; /* metadatos que hay que poder leer */
+  --ink-disabled: #636b77; /* solo para lo deshabilitado */
   --focus: #8ab4ff;
-  --scrim: rgb(4 5 7 / 0.6);
+  --scrim: rgb(5 6 8 / 0.62);
 
-  /* Botón primario del núcleo: tinta invertida */
-  --primary: #f4f5f7;
-  --on-primary: #0c0d0f;
-  --primary-edge: #f4f5f7;
+  /* Botón primario del núcleo y de Finanzas: tinta invertida */
+  --primary: #f2f4f7;
+  --on-primary: #0b0c0f;
+  --primary-edge: #f2f4f7;
 
-  /* Acento del núcleo (azul neutro, solo para Inicio y la paleta) */
-  --accent: #8ab4ff;
-  --on-accent: #0b1220;
-  --accent-text: #8ab4ff;
-  --accent-mark: #8ab4ff;
-  --accent-soft: #172236;
-  --accent-line: #2f4a78;
+  /* Acento neutro del núcleo (Inicio, shell): gris azulado sin identidad */
+  --accent: #e4e8ee;
+  --on-accent: #0b0c0f;
+  --accent-text: #c5cad3;
+  --accent-mark: #a9b3c3;
+  --accent-soft: #1e232b;
+  --accent-line: #3a404b;
 
-  /* Estados */
-  --pos: #7bc79a;
-  --neg: #ee8f87;
-  --warn: #e0b061;
-  --pos-soft: #14251c;
-  --neg-soft: #2b1a19;
-  --warn-soft: #2a2213;
+  /* Estados: propios, distintos de la identidad (el lima y el azul no son estados) */
+  --success: #3fc38c;
+  --warning: #f0b24a;
+  --error: #f28b82;
+  --info: #9db0cc;
+  --success-soft: #12261e;
+  --warning-soft: #2b2314;
+  --error-soft: #2d1b1c;
+  --info-soft: #1b2330;
 
   /* Gráficos */
-  --grid: #222328;
-  --axis: #34363c;
-  --track: #25262b;
-  --muted-mark: #6c707a; /* gris de contexto / serie secundaria */
-  --series-1: #5b93cd;
+  --grid: #20232a;
+  --axis: #30343b;
+  --track: #252932;
+  --muted-mark: #747a86; /* histórico y contexto */
+  --ref: #a0a8b5; /* líneas de referencia */
+  --series-1: #a9b3c3;
   --series-2: #b58a3a;
   --series-3: #23a39d;
   --series-4: #926abe;
-  --seq-1: #1d2a3b;
-  --seq-2: #2a4466;
-  --seq-3: #3a6296;
-  --seq-4: #5b93cd;
-  --seq-5: #9cc3ef;
+  --seq-1: #1f242c;
+  --seq-2: #343c49;
+  --seq-3: #566073;
+  --seq-4: #8591a6;
+  --seq-5: #c5cdda;
 
-  /* Marcador (tarjeta héroe) */
-  --hero-bg: var(--surface-1);
+  /* Marcador (la única tarjeta intensa de Entreno) */
+  --hero-bg: var(--card);
   --hero-ink: var(--ink);
   --hero-ink-2: var(--ink-2);
   --hero-accent: var(--accent-text);
   --hero-mark: var(--accent-mark);
   --hero-mark-dim: var(--muted-mark);
 
-  /* Sombras */
-  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.05) inset, 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-2: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 8px 28px rgb(0 0 0 / 0.45);
-  --shadow-3: 0 0 0 1px rgb(255 255 255 / 0.08) inset, 0 24px 64px rgb(0 0 0 / 0.6);
+  /* Sombras: solo en lo elevado (modales, menús, tooltips) */
+  --shadow-raised: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.04);
 }
 
 /* Núcleo claro */
 [data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f3f3f5;
-  --sidebar: #ebebee;
-  --surface-1: #ffffff;
-  --surface-2: #f7f7f9;
-  --surface-3: #eeeef1;
+  --canvas: #f3f4f6;
+  --sidebar: #eceef2;
+  --card: #ffffff;
+  --raised: #f6f7f9;
+  --interactive: #e1e5ec;
   --overlay: #ffffff;
-  --line: #e3e4e8;
-  --line-strong: #d1d2d9;
-  --control: #84878f;
+  --line: #e3e6eb;
+  --line-strong: #d1d5dc;
+  --control: #77808e;
 
-  --ink: #141519;
-  --ink-2: #4a4d56;
-  --ink-3: #686b74;
+  --ink: #14161a;
+  --ink-2: #424752;
+  --ink-3: #5b616e;
+  --ink-disabled: #9aa0ab;
   --focus: #1f5fd1;
-  --scrim: rgb(20 22 28 / 0.35);
+  --scrim: rgb(20 22 28 / 0.4);
 
-  --primary: #141519;
+  --primary: #14161a;
   --on-primary: #ffffff;
-  --primary-edge: #141519;
+  --primary-edge: #14161a;
 
-  --accent: #2b62c8;
+  --accent: #2b3340;
   --on-accent: #ffffff;
-  --accent-text: #2455b3;
-  --accent-mark: #2b62c8;
-  --accent-soft: #e7eefb;
-  --accent-line: #b5c9ee;
+  --accent-text: #424752;
+  --accent-mark: #566074;
+  --accent-soft: #eceef2;
+  --accent-line: #c5cad6;
 
-  --pos: #23704a;
-  --neg: #b0332b;
-  --warn: #86590a;
-  --pos-soft: #e4f1e9;
-  --neg-soft: #f9e8e6;
-  --warn-soft: #f6ebd5;
+  --success: #187150;
+  --warning: #85580a;
+  --error: #b0332b;
+  --info: #43596f;
+  --success-soft: #e3f3eb;
+  --warning-soft: #f8edd4;
+  --error-soft: #fbe7e5;
+  --info-soft: #e6ecf4;
 
-  --grid: #ebebee;
-  --axis: #d3d4da;
-  --track: #e8e9ed;
-  --muted-mark: #8a8d96;
-  --series-1: #2666a2;
+  --grid: #ebedf1;
+  --axis: #d1d5dc;
+  --track: #e6e9ee;
+  --muted-mark: #8a909c;
+  --ref: #5b616e;
+  --series-1: #566074;
   --series-2: #a77612;
   --series-3: #008e89;
   --series-4: #6b46a0;
-  --seq-1: #e4edf8;
-  --seq-2: #b9d0ec;
-  --seq-3: #82aadc;
-  --seq-4: #4a82c2;
-  --seq-5: #245b98;
+  --seq-1: #eceef2;
+  --seq-2: #cfd5df;
+  --seq-3: #9aa5b7;
+  --seq-4: #6b778c;
+  --seq-5: #3f4859;
 
-  --hero-bg: var(--surface-1);
+  --hero-bg: var(--card);
   --hero-ink: var(--ink);
   --hero-ink-2: var(--ink-2);
   --hero-accent: var(--accent-text);
   --hero-mark: var(--accent-mark);
   --hero-mark-dim: var(--muted-mark);
 
-  --shadow-1: 0 0 0 1px rgb(20 22 28 / 0.05), 0 1px 2px rgb(20 22 28 / 0.06);
-  --shadow-2: 0 0 0 1px rgb(20 22 28 / 0.05), 0 8px 28px rgb(20 22 28 / 0.1);
-  --shadow-3: 0 0 0 1px rgb(20 22 28 / 0.06), 0 24px 64px rgb(20 22 28 / 0.2);
+  --shadow-raised: 0 8px 24px rgb(20 22 28 / 0.14), 0 0 0 1px rgb(20 22 28 / 0.06);
 }
 
-/* 3. Módulo Finanzas: casi negro, grises y UN acento apagado. Densidad baja */
+/* 4. Finanzas: azul apagado. Densidad cómoda */
 :root [data-module='finanzas'],
 [data-theme='dark'] [data-module='finanzas'] {
-  --bg: #09090a;
-  --surface-1: #121213;
-  --surface-2: #19191b;
-  --surface-3: #222225;
-  --overlay: #1a1a1c;
-  --line: #222225;
-  --line-strong: #323236;
-  --control: #6d6d73;
+  --primary: #f2f4f7;
+  --on-primary: #0b0c0f;
+  --primary-edge: #f2f4f7;
 
-  --ink: #f2f2f3;
-  --ink-2: #b8b8bd;
-  --ink-3: #8e8e95;
-
-  --primary: #f2f2f3;
-  --on-primary: #09090a;
-  --primary-edge: #f2f2f3;
-
-  --accent: #5b93cd;
+  --accent: #5b93cd; /* «primario azul» y relleno */
   --on-accent: #08101a;
-  --accent-text: #74a6d9;
+  --accent-text: #7fafdf;
   --accent-mark: #5b93cd;
-  --accent-soft: #131d29;
-  --accent-line: #2a4966;
+  --accent-soft: #14202d;
+  --accent-line: #2d4b69;
 
-  --pos: #7cba97;
-  --neg: #d98b85;
-  --warn: #cba760;
-  --pos-soft: #14211a;
-  --neg-soft: #261a19;
-  --warn-soft: #251f13;
-
-  --grid: #202023;
-  --axis: #323236;
-  --track: #232326;
-  --muted-mark: #6c6c72;
   --series-1: #5b93cd;
   --series-2: #b58a3a;
   --series-3: #23a39d;
@@ -287,40 +344,11 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --seq-3: #386088;
   --seq-4: #5b93cd;
   --seq-5: #9ac0eb;
-
-  --hero-bg: var(--surface-1);
-  --hero-ink: var(--ink);
-  --hero-ink-2: var(--ink-2);
-  --hero-accent: var(--accent-text);
-  --hero-mark: var(--accent-mark);
-  --hero-mark-dim: var(--muted-mark);
-
-  --density-pad: 24px;
-  --density-gap: 20px;
-  --density-row: 48px;
-  --num-weight: 600;
-  --label-transform: none;
-  --label-tracking: 0.01em;
-  --label-weight: 500;
 }
 
-/* 3. Módulo Entreno: acento volt, más contraste, cifras de marcador. Densidad alta */
+/* 4. Entreno: lima. Densidad compacta, títulos cortos en mayúsculas */
 :root [data-module='entreno'],
 [data-theme='dark'] [data-module='entreno'] {
-  --bg: #090a07;
-  --surface-1: #13140f;
-  --surface-2: #1b1d14;
-  --surface-3: #262a1b;
-  --overlay: #1c1e15;
-  --line: #2a2d1f;
-  --line-strong: #3d422b;
-  --control: #7a806a;
-
-  --ink: #f7f8f1;
-  --ink-2: #c3c7b3;
-  --ink-3: #9a9f89;
-
-  /* Relleno del botón primario y de las marcas */
   --accent: #c8f31d;
   --on-accent: #0d1105;
   --accent-text: #c8f31d;
@@ -331,17 +359,6 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --on-primary: #0d1105;
   --primary-edge: #c8f31d;
 
-  --pos: #62e08c;
-  --neg: #ff7a6e;
-  --warn: #ffb62e;
-  --pos-soft: #0f2a19;
-  --neg-soft: #35171a;
-  --warn-soft: #33240a;
-
-  --grid: #23261a;
-  --axis: #3a3e2b;
-  --track: #262a1b;
-  --muted-mark: #727a62;
   --series-1: #78a000;
   --series-2: #139ec6;
   --series-3: #e36927;
@@ -352,41 +369,20 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --seq-4: #98c41a;
   --seq-5: #d4f84b;
 
-  /* Marcador: en oscuro es una pastilla volt con tinta oscura */
+  /* Marcador: en oscuro, pastilla lima con tinta oscura */
   --hero-bg: #c8f31d;
   --hero-ink: #0d1105;
   --hero-ink-2: #36440a;
   --hero-accent: #0d1105;
   --hero-mark: #0d1105;
   --hero-mark-dim: #62761a;
-
-  --density-pad: 16px;
-  --density-gap: 12px;
-  --density-row: 34px;
-  --num-weight: 720;
-  --label-transform: uppercase;
-  --label-tracking: 0.06em;
-  --label-weight: 600;
 }
 
 /* Finanzas, claro */
 [data-theme='light'] [data-module='finanzas'] {
-  --bg: #f4f4f5;
-  --surface-1: #ffffff;
-  --surface-2: #f8f8f9;
-  --surface-3: #efeff1;
-  --overlay: #ffffff;
-  --line: #e5e5e8;
-  --line-strong: #d4d4d9;
-  --control: #85858c;
-
-  --ink: #151517;
-  --ink-2: #4b4b52;
-  --ink-3: #686870;
-
-  --primary: #151517;
+  --primary: #14161a;
   --on-primary: #ffffff;
-  --primary-edge: #151517;
+  --primary-edge: #14161a;
 
   --accent: #2666a2;
   --on-accent: #ffffff;
@@ -395,17 +391,6 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --accent-soft: #e8eff7;
   --accent-line: #b4cbe3;
 
-  --pos: #2a6d46;
-  --neg: #a1403a;
-  --warn: #7f5c10;
-  --pos-soft: #e5f1ea;
-  --neg-soft: #f7e9e7;
-  --warn-soft: #f5ecd9;
-
-  --grid: #ececef;
-  --axis: #d4d4d9;
-  --track: #e9e9ec;
-  --muted-mark: #8b8b93;
   --series-1: #2666a2;
   --series-2: #a77612;
   --series-3: #008e89;
@@ -415,52 +400,21 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --seq-3: #88acd2;
   --seq-4: #4d82b8;
   --seq-5: #245b8f;
-
-  --hero-bg: var(--surface-1);
-  --hero-ink: var(--ink);
-  --hero-ink-2: var(--ink-2);
-  --hero-accent: var(--accent-text);
-  --hero-mark: var(--accent-mark);
-  --hero-mark-dim: var(--muted-mark);
 }
 
-/* Entreno, claro. El lima no da contraste sobre blanco: se separan
-   relleno (botón, con borde oscurecido), texto (verde oliva) y marca. */
+/* Entreno, claro: el lima no da contraste sobre blanco, así que relleno,
+   texto y marca van separados y el botón lleva borde oscurecido. */
 [data-theme='light'] [data-module='entreno'] {
-  --bg: #eef0e6;
-  --surface-1: #ffffff;
-  --surface-2: #f6f7f0;
-  --surface-3: #eaeddc;
-  --overlay: #ffffff;
-  --line: #dde1cf;
-  --line-strong: #c6cbb3;
-  --control: #7b8068;
-
-  --ink: #0b0c08;
-  --ink-2: #42473a;
-  --ink-3: #5e6355;
-
   --accent: #c8f31d;
   --on-accent: #0d1105;
   --accent-text: #4a6a00;
-  --accent-mark: #6b9300;
+  --accent-mark: #668c00;
   --accent-soft: #eef8c8;
-  --accent-line: #6b9300;
+  --accent-line: #668c00;
   --primary: #c8f31d;
   --on-primary: #0d1105;
-  --primary-edge: #6b9300;
+  --primary-edge: #668c00;
 
-  --pos: #0f7a3b;
-  --neg: #c0271b;
-  --warn: #8f5300;
-  --pos-soft: #dff3e6;
-  --neg-soft: #fbe5e2;
-  --warn-soft: #f9ecd0;
-
-  --grid: #e7e9dc;
-  --axis: #c9cdb8;
-  --track: #e3e7d2;
-  --muted-mark: #868c72;
   --series-1: #6f9600;
   --series-2: #007fa6;
   --series-3: #cf5604;
@@ -471,7 +425,7 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --seq-4: #709600;
   --seq-5: #466000;
 
-  /* Marcador: en claro es una pastilla casi negra con cifras volt */
+  /* Marcador: en claro, pastilla casi negra con cifras lima */
   --hero-bg: #0d0f08;
   --hero-ink: #f7f8f1;
   --hero-ink-2: #c3c7b3;
@@ -497,16 +451,16 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   }
 }
 
-/* 4. Puente con Tailwind 4: utilidades bg-surface-1, text-ink-2, etc. -------
-   Con `inline` cada utilidad apunta a la variable, así que respeta el
-   data-module más cercano. */
+/* 5. Puente con Tailwind 4: utilidades bg-card, text-ink-2, etc. -----------
+   Con `inline`, cada utilidad apunta a la variable y respeta el data-module
+   más cercano. */
 @theme inline {
   --font-sans: var(--font-ui);
-  --color-bg: var(--bg);
+  --color-canvas: var(--canvas);
   --color-sidebar: var(--sidebar);
-  --color-surface-1: var(--surface-1);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-interactive: var(--interactive);
   --color-overlay: var(--overlay);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
@@ -514,6 +468,7 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
+  --color-ink-disabled: var(--ink-disabled);
   --color-focus: var(--focus);
   --color-primary: var(--primary);
   --color-on-primary: var(--on-primary);
@@ -523,12 +478,14 @@ Paletas de series (validador de la skill dataviz, adyacentes, sobre surface-1):
   --color-accent-mark: var(--accent-mark);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
-  --color-pos: var(--pos);
-  --color-neg: var(--neg);
-  --color-warn: var(--warn);
-  --color-pos-soft: var(--pos-soft);
-  --color-neg-soft: var(--neg-soft);
-  --color-warn-soft: var(--warn-soft);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-error-soft: var(--error-soft);
+  --color-info-soft: var(--info-soft);
   --color-track: var(--track);
   --color-grid: var(--grid);
   --color-hero-bg: var(--hero-bg);

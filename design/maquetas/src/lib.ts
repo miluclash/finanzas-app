@@ -26,3 +26,15 @@ export const fecha = (iso: string) => {
   return `${d} ${MES[m - 1]}`
 }
 export const cx = (...a: Array<string | false | null | undefined>) => a.filter(Boolean).join(' ')
+export const eurPlano = (cents: number) => eur(cents, { sinDecimales: true })
+
+/* Contraste WCAG 2 entre dos colores #rrggbb (se usa en la hoja del sistema para mostrar los contrastes reales) */
+const lin = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+const lum = (h: string) => {
+  const [r, g, b] = lin(h)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+export const contraste = (a: string, b: string) => {
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p)
+  return (x + 0.05) / (y + 0.05)
+}
