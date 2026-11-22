@@ -14,7 +14,7 @@ export default defineConfig({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite-maquetas', import.meta.url)),
   plugins: [react(), tailwindcss()],
   define: { __APP_VERSION__: JSON.stringify(version) },
-  server: { host: '127.0.0.1', port: 5199, strictPort: true },
+  server: { host: true, port: 5199, strictPort: true },
   preview: { host: '127.0.0.1', port: 5199, strictPort: true },
   build: { outDir: 'dist', emptyOutDir: true }
 })
