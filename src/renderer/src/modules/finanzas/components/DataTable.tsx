@@ -1,7 +1,8 @@
-// Tabla ordenable y legible, con selección opcional.
-import { ArrowDown, ArrowUp } from 'lucide-react'
+// Tabla ordenable con el estilo del sistema de diseño (clase table): cifras a la derecha, hover y foco visibles,
+// selección opcional, fila navegable con teclado (Intro o Espacio) y densidad normal o compacta.
+import { ArrowDown, ArrowUp } from '@phosphor-icons/react'
 import { useMemo, useState, type ReactNode } from 'react'
-import { cx } from '../../../components/ui'
+import { cx } from '../../../core/ui'
 
 export interface Column<T> {
   key: string
@@ -61,19 +62,13 @@ export function DataTable<T>({
   const allSelected = !!selected && rows.length > 0 && rows.every((r) => selected.has(rowKey(r)))
   if (rows.length === 0 && empty) return <>{empty}</>
   return (
-    <div className="overflow-x-auto r-card border border-line bg-card">
-      <table className="t-body w-full border-collapse">
+    <div className="card card-flush overflow-x-auto">
+      <table className="table" data-density={dense ? 'compact' : 'normal'}>
         <thead>
-          <tr className="border-b border-line bg-raised text-left">
+          <tr>
             {onSelect && (
-              <th className="w-8 px-3 py-2">
-                <input
-                  type="checkbox"
-                  aria-label="Seleccionar todo"
-                  className="checkbox size-5"
-                  checked={allSelected}
-                  onChange={(e) => onSelect(e.target.checked ? new Set(rows.map(rowKey)) : new Set())}
-                />
+              <th style={{ width: 'var(--space-10)' }}>
+                <input type="checkbox" aria-label="Seleccionar todo" className="checkbox" checked={allSelected} onChange={(e) => onSelect(e.target.checked ? new Set(rows.map(rowKey)) : new Set())} />
               </th>
             )}
             {columns.map((c) => {
@@ -81,24 +76,15 @@ export function DataTable<T>({
               return (
                 <th
                   key={c.key}
+                  scope="col"
                   style={{ width: c.width }}
-                  className={cx(
-                    't-label whitespace-nowrap px-3 py-2 font-semibold',
-                    c.align === 'right' && 'text-right',
-                    c.align === 'center' && 'text-center'
-                  )}
+                  className={cx('whitespace-nowrap', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center')}
                   aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   {c.sort ? (
-                    <button
-                      type="button"
-                      className={cx('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')}
-                      onClick={() =>
-                        setSort((s) => (s?.key === c.key ? { key: c.key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: c.key, dir: 'desc' }))
-                      }
-                    >
+                    <button type="button" className={cx('inline-flex items-center gap-1 hover:text-ink', active && 'text-ink')} onClick={() => setSort((s) => (s?.key === c.key ? { key: c.key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key: c.key, dir: 'desc' }))}>
                       {c.header}
-                      {active && (sort!.dir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)}
+                      {active && (sort!.dir === 'asc' ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />)}
                     </button>
                   ) : (
                     c.header
@@ -114,20 +100,26 @@ export function DataTable<T>({
             return (
               <tr
                 key={k}
-                onClick={onRowClick ? () => onRowClick(r) : undefined}
-                className={cx(
-                  'border-b border-line last:border-b-0',
-                  onRowClick && 'cursor-pointer hover:bg-raised',
-                  selected?.has(k) && 'bg-accent-soft',
-                  rowClassName?.(r)
-                )}
+                className={cx('row', onRowClick && 'cursor-pointer', selected?.has(k) && 'bg-accent-soft', rowClassName?.(r))}
+                tabIndex={onRowClick ? 0 : undefined}
+                onClick={onRowClick ? (e) => !(e.target as HTMLElement).closest('button, a, input, select, label') && onRowClick(r) : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          onRowClick(r)
+                        }
+                      }
+                    : undefined
+                }
               >
                 {onSelect && (
-                  <td className="px-3" onClick={(e) => e.stopPropagation()}>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       aria-label="Seleccionar fila"
-                      className="checkbox size-5"
+                      className="checkbox"
                       checked={selected!.has(k)}
                       onChange={(e) => {
                         const n = new Set(selected)
@@ -139,16 +131,7 @@ export function DataTable<T>({
                   </td>
                 )}
                 {columns.map((c) => (
-                  <td
-                    key={c.key}
-                    className={cx(
-                      dense ? 'px-3 py-1.5' : 'px-3 py-2',
-                      'align-middle',
-                      c.align === 'right' && 'text-right',
-                      c.align === 'center' && 'text-center',
-                      c.className
-                    )}
-                  >
+                  <td key={c.key} className={cx(c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.className)}>
                     {c.cell(r)}
                   </td>
                 ))}
@@ -156,7 +139,7 @@ export function DataTable<T>({
             )
           })}
         </tbody>
-        {footer && <tfoot className="border-t border-line-strong bg-raised">{footer}</tfoot>}
+        {footer && <tfoot>{footer}</tfoot>}
       </table>
     </div>
   )

@@ -6,7 +6,8 @@
 //
 // Rutas: las del hash router (/, /finanzas, /finanzas/movimientos, /entreno, /ajustes…). Si no se indica ninguna,
 // se hacen las de Inicio, Finanzas, Entreno y Ajustes.
-// Variantes (se pueden unir con «+»): plegada, paleta, asistente, nuevo, completa.
+// Variantes (se pueden unir con «+»): plegada, paleta, asistente, nuevo, completa, desplegar (Más detalle del Panel),
+// fila (abre la primera fila de Movimientos), filtros (panel de filtros avanzados), transferencia (atajo T) y error (nuevo movimiento vacío, al guardar).
 //   /:plegada            barra lateral plegada
 //   /finanzas:paleta     buscador Ctrl+K abierto
 //   /:asistente          panel del asistente abierto
@@ -67,6 +68,28 @@ for (const { ruta, variantes } of specs) {
     if (variantes.includes('nuevo')) {
       await win.keyboard.press('n')
       await win.waitForTimeout(600)
+    }
+    if (variantes.includes('desplegar')) {
+      await win.getByRole('button', { name: 'Desplegar todo' }).click()
+      await win.waitForTimeout(500)
+    }
+    if (variantes.includes('fila')) {
+      await win.locator('table.table tbody tr.row button[aria-expanded]').first().click()
+      await win.waitForTimeout(400)
+    }
+    if (variantes.includes('filtros')) {
+      await win.getByRole('button', { name: /^Filtros/ }).click()
+      await win.waitForTimeout(400)
+    }
+    if (variantes.includes('transferencia')) {
+      await win.keyboard.press('t')
+      await win.waitForTimeout(600)
+    }
+    if (variantes.includes('error')) {
+      await win.keyboard.press('n')
+      await win.waitForTimeout(500)
+      await win.getByRole('button', { name: 'Guardar', exact: true }).click()
+      await win.waitForTimeout(500)
     }
     if (variantes.includes('completa')) {
       const h = await win.evaluate(() => (document.querySelector('main')?.scrollHeight ?? 900) + 56 + 8)

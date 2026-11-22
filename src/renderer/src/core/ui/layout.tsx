@@ -1,5 +1,5 @@
-import { CaretDown, CaretRight, FunnelSimple, X } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
+import { ArrowDown, ArrowUp, CaretDown, CaretRight, FunnelSimple, X } from '@phosphor-icons/react'
+import { useRef, type ReactNode } from 'react'
 import { formatEur } from '@shared/money'
 import { cx } from './cx'
 import { Button } from './controls'
@@ -37,7 +37,7 @@ export function PageHeader({ titulo, texto, acciones, className }: { titulo: str
     <header className={cx('mb-8 flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
         <h1 className="t-page">{titulo}</h1>
-        {texto && <p className="t-label mt-2">{texto}</p>}
+        {texto && <p className="t-label mt-2 max-w-3xl">{texto}</p>}
       </div>
       {acciones && <div className="flex shrink-0 flex-wrap items-center gap-2">{acciones}</div>}
     </header>
@@ -187,21 +187,75 @@ export function FilterBar({ principal, contador, abierto, onAlternar, avanzados,
 }
 
 /* ======================= DataTable ======================= */
-export type Columna<T> = { id: string; cabecera: ReactNode; ancho?: string; alinear?: 'right'; celda: (f: T) => ReactNode }
-/** DataTable: cifras a la derecha, conceptos a la izquierda; fila abierta integrada por tono; densidad compacta, normal o cómoda */
-export function DataTable<T>({ columnas, filas, id, abierta, onAlternar, detalle, densidad, nombreFila, titulo, forzarHover }: { columnas: Columna<T>[]; filas: T[]; id: (f: T) => string; abierta: string | null; onAlternar: (id: string) => void; detalle: (f: T) => ReactNode; densidad: 'compact' | 'normal' | 'comfortable'; nombreFila: (f: T) => string; titulo: string; forzarHover?: string }) {
+export type Columna<T> = { id: string; cabecera: ReactNode; ancho?: string; alinear?: 'right'; celda: (f: T) => ReactNode; ordenable?: boolean }
+export type OrdenTabla = { id: string; dir: 'asc' | 'desc' }
+const INTERACTIVO = 'button, a, input, select, textarea, label, [role="button"]'
+/** DataTable: cifras a la derecha, conceptos a la izquierda; fila abierta integrada por tono; densidad compacta, normal o cómoda.
+ *  Opcional: selección con casillas, columnas ordenables y mensaje de tabla vacía. La fila entera abre el detalle con el ratón;
+ *  con teclado se abre con el botón de la primera columna (Intro o Espacio). */
+export function DataTable<T>({
+  columnas,
+  filas,
+  id,
+  abierta,
+  onAlternar,
+  detalle,
+  densidad,
+  nombreFila,
+  titulo,
+  forzarHover,
+  seleccion,
+  onSeleccion,
+  orden,
+  onOrden,
+  vacio
+}: {
+  columnas: Columna<T>[]
+  filas: T[]
+  id: (f: T) => string
+  abierta: string | null
+  onAlternar: (id: string) => void
+  detalle: (f: T) => ReactNode
+  densidad: 'compact' | 'normal' | 'comfortable'
+  nombreFila: (f: T) => string
+  titulo: string
+  forzarHover?: string
+  seleccion?: Set<string>
+  onSeleccion?: (s: Set<string>) => void
+  orden?: OrdenTabla
+  onOrden?: (columna: string) => void
+  vacio?: ReactNode
+}) {
+  const sel = seleccion && onSeleccion ? { set: seleccion, cambiar: onSeleccion } : null
+  const todas = !!sel && filas.length > 0 && filas.every((f) => sel.set.has(id(f)))
+  if (filas.length === 0 && vacio) return <>{vacio}</>
   return (
     <table className="table" data-density={densidad} aria-label={titulo}>
       <thead>
         <tr>
+          {sel && (
+            <th style={{ width: 'var(--space-10)' }}>
+              <input type="checkbox" className="checkbox" aria-label="Seleccionar todos los de la lista" checked={todas} onChange={(e) => sel.cambiar(e.target.checked ? new Set(filas.map(id)) : new Set())} />
+            </th>
+          )}
           <th style={{ width: 'var(--space-12)' }}>
             <span className="sr-only">Abrir detalle</span>
           </th>
-          {columnas.map((c) => (
-            <th key={c.id} style={{ width: c.ancho, textAlign: c.alinear }} scope="col">
-              {c.cabecera}
-            </th>
-          ))}
+          {columnas.map((c) => {
+            const activa = orden?.id === c.id
+            return (
+              <th key={c.id} style={{ width: c.ancho, textAlign: c.alinear }} scope="col" aria-sort={activa ? (orden!.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                {c.ordenable && onOrden ? (
+                  <button type="button" className={cx('inline-flex items-center gap-1 hover:text-ink', activa && 'text-ink')} onClick={() => onOrden(c.id)}>
+                    {c.cabecera}
+                    {activa && (orden!.dir === 'asc' ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />)}
+                  </button>
+                ) : (
+                  c.cabecera
+                )}
+              </th>
+            )
+          })}
         </tr>
       </thead>
       <tbody>
@@ -209,7 +263,23 @@ export function DataTable<T>({ columnas, filas, id, abierta, onAlternar, detalle
           const k = id(f)
           const open = abierta === k
           return [
-            <tr key={k} className={cx('row', forzarHover === k && 'is-hover')} data-open={open}>
+            <tr key={k} className={cx('row cursor-pointer', forzarHover === k && 'is-hover')} data-open={open} onClick={(e) => !(e.target as HTMLElement).closest(INTERACTIVO) && onAlternar(k)}>
+              {sel && (
+                <td>
+                  <input
+                    type="checkbox"
+                    className="checkbox"
+                    aria-label={`Seleccionar: ${nombreFila(f)}`}
+                    checked={sel.set.has(k)}
+                    onChange={(e) => {
+                      const n = new Set(sel.set)
+                      if (e.target.checked) n.add(k)
+                      else n.delete(k)
+                      sel.cambiar(n)
+                    }}
+                  />
+                </td>
+              )}
               <td>
                 <button type="button" className="grid size-8 place-items-center r-control text-ink-2 hover:bg-interactive" aria-expanded={open} aria-controls={`det-${k}`} aria-label={`${open ? 'Cerrar' : 'Abrir'} detalle: ${nombreFila(f)}`} onClick={() => onAlternar(k)}>
                   {open ? <CaretDown size={16} aria-hidden /> : <CaretRight size={16} aria-hidden />}
@@ -223,7 +293,7 @@ export function DataTable<T>({ columnas, filas, id, abierta, onAlternar, detalle
             </tr>,
             open && (
               <tr key={`${k}-d`} className="row-detail">
-                <td />
+                <td colSpan={sel ? 2 : 1} />
                 <td colSpan={columnas.length} id={`det-${k}`} className="fade-in">
                   {detalle(f)}
                 </td>
@@ -233,5 +303,33 @@ export function DataTable<T>({ columnas, filas, id, abierta, onAlternar, detalle
         })}
       </tbody>
     </table>
+  )
+}
+
+/* ======================= Tabs ======================= */
+/** Pestañas de una página. Flechas para moverse entre ellas; la activa se marca por trazo y tinta, no solo por color */
+export function Tabs<T extends string>({ value, onChange, pestanas, label }: { value: T; onChange: (v: T) => void; pestanas: { id: T; texto: string; contador?: number }[]; label: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const mover = (e: React.KeyboardEvent, i: number) => {
+    const n = pestanas.length
+    const j = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : -1
+    if (j < 0) return
+    e.preventDefault()
+    onChange(pestanas[j].id)
+    ref.current?.querySelectorAll<HTMLElement>('[role="tab"]')[j]?.focus()
+  }
+  return (
+    <div ref={ref} className="tabs" role="tablist" aria-label={label}>
+      {pestanas.map((p, i) => (
+        <button key={p.id} type="button" role="tab" aria-selected={value === p.id} tabIndex={value === p.id ? 0 : -1} onClick={() => onChange(p.id)} onKeyDown={(e) => mover(e, i)}>
+          {p.texto}
+          {!!p.contador && (
+            <Count tono="warning" label={`${p.contador} por revisar`}>
+              {p.contador}
+            </Count>
+          )}
+        </button>
+      ))}
+    </div>
   )
 }

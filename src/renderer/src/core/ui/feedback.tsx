@@ -53,9 +53,9 @@ export function StatusBadge({ tono, children, className }: { tono: Tono; childre
 }
 
 /** Tag: un único estilo de etiqueta (recurrente, reembolso, pendiente, posible duplicado…) */
-export function Tag({ children, icono, tono, className }: { children: ReactNode; icono?: ReactNode; tono?: 'warning' | 'info' | 'accent'; className?: string }) {
+export function Tag({ children, icono, tono, className, title }: { children: ReactNode; icono?: ReactNode; tono?: 'warning' | 'info' | 'accent'; className?: string; title?: string }) {
   return (
-    <span className={cx('tag', tono && `tag-${tono}`, className)}>
+    <span title={title} className={cx('tag', tono && `tag-${tono}`, className)}>
       {icono}
       {children}
     </span>
@@ -187,7 +187,7 @@ export function Popover({ etiqueta, boton, children, alinear = 'left', abiertoIn
 }
 
 /* ======================= Modal ======================= */
-export function Modal({ titulo, descripcion, onCerrar, children, pie, ancho = 'md', inicial }: { titulo: string; descripcion?: string; onCerrar: () => void; children?: ReactNode; pie?: ReactNode; ancho?: 'sm' | 'md'; inicial?: React.RefObject<HTMLElement | null> }) {
+export function Modal({ titulo, descripcion, onCerrar, children, pie, ancho = 'md', inicial }: { titulo: string; descripcion?: string; onCerrar: () => void; children?: ReactNode; pie?: ReactNode; ancho?: 'sm' | 'md' | 'lg'; inicial?: React.RefObject<HTMLElement | null> }) {
   const ref = useRef<HTMLDivElement>(null)
   const tid = useId()
   const did = useId()
@@ -201,7 +201,7 @@ export function Modal({ titulo, descripcion, onCerrar, children, pie, ancho = 'm
         aria-modal="true"
         aria-labelledby={tid}
         aria-describedby={descripcion ? did : undefined}
-        className={cx('elevated pop-in r-modal relative flex max-h-full w-full flex-col overflow-y-auto p-6', ancho === 'sm' ? 'max-w-md' : 'max-w-lg')}
+        className={cx('elevated pop-in r-modal relative flex max-h-full w-full flex-col overflow-y-auto p-6', ancho === 'sm' ? 'max-w-md' : ancho === 'lg' ? 'max-w-xl' : 'max-w-lg')}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.stopPropagation()

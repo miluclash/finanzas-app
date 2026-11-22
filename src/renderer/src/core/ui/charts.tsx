@@ -19,7 +19,7 @@ export type Patron = 'solida' | 'discontinua' | 'punteada'
 const DASH: Record<Patron, string | undefined> = { solida: undefined, discontinua: '8 4', punteada: '2 4' }
 
 /* ======================= Tooltip del gráfico ======================= */
-function ChartTip({ active, payload, label, formato, titulo }: TipProps & { formato: (v: number, key: string) => string; titulo?: (l: string | number) => string }) {
+export function ChartTip({ active, payload, label, formato, titulo }: TipProps & { formato: (v: number, key: string) => string; titulo?: (l: string | number) => string }) {
   if (!active || !payload?.length) return null
   const filas = payload.filter((p) => p.value !== null && p.value !== undefined)
   if (!filas.length) return null
@@ -336,7 +336,11 @@ export function Lineas({
   etiquetaFinal = true,
   referencias,
   dominio,
-  ticks
+  ticks,
+  formatoX,
+  formatoFinal,
+  anchoEje = 48,
+  margenFinal = 56
 }: {
   datos: any[]
   claveX: string
@@ -349,14 +353,21 @@ export function Lineas({
   referencias?: Referencia[]
   dominio?: [number | 'auto', number | 'auto']
   ticks?: number[]
+  /** Texto de cada marca del eje X (por ejemplo, de «2026-11» a «nov 26») */
+  formatoX?: (v: string | number) => string
+  /** Texto de la etiqueta directa del final de la línea (por defecto, el mismo del tooltip) */
+  formatoFinal?: (v: number, key: string) => string
+  /** Ancho reservado al eje Y y al margen derecho de la etiqueta final, en px */
+  anchoEje?: number
+  margenFinal?: number
 }) {
   return (
     <div style={{ height: alto }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={datos} margin={{ top: 16, right: etiquetaFinal ? 56 : 8, bottom: 0, left: 0 }}>
+        <ComposedChart data={datos} margin={{ top: 16, right: etiquetaFinal ? margenFinal : 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} />
-          <XAxis dataKey={claveX} tickLine={false} axisLine={{ stroke: 'var(--axis)' }} tickMargin={8} minTickGap={16} />
-          <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={formatoEje ?? ((v) => String(v))} domain={dominio ?? ['auto', 'auto']} ticks={ticks} />
+          <XAxis dataKey={claveX} tickLine={false} axisLine={{ stroke: 'var(--axis)' }} tickMargin={8} minTickGap={16} tickFormatter={formatoX} />
+          <YAxis tickLine={false} axisLine={false} width={anchoEje} tickFormatter={formatoEje ?? ((v) => String(v))} domain={dominio ?? ['auto', 'auto']} ticks={ticks} />
           <RTooltip cursor={cursorLinea} isAnimationActive={false} content={(p: TipProps) => <ChartTip {...p} formato={formato} titulo={tituloTooltip} />} />
           {referencias?.map((r) => (
             <ReferenceLine key={r.texto} y={r.y} stroke="var(--ref)" strokeWidth={MARCA.linea - 0.5} strokeDasharray={DASH[r.patron ?? 'solida']} label={{ value: r.texto, position: r.posicion ?? 'insideTopLeft', fill: 'var(--ink-2)', style: { fontSize: 'var(--fs-label)' } }} />
@@ -383,7 +394,7 @@ export function Lineas({
                         <g key="e">
                           <circle cx={p.x} cy={p.y} r={MARCA.punto} fill={s.marcadorFinal === 'hueco' ? 'var(--card)' : s.color} stroke={s.marcadorFinal === 'hueco' ? s.color : 'var(--card)'} strokeWidth={MARCA.anillo} />
                           <text x={p.x + 10} y={p.y + 4} fontWeight={600} fill="var(--ink)" className="tnum" style={{ fontSize: 'var(--fs-label)' }}>
-                            {formato(p.value, s.key)}
+                            {(formatoFinal ?? formato)(p.value, s.key)}
                           </text>
                         </g>
                       ) : (

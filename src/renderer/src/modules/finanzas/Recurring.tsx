@@ -1,29 +1,12 @@
-import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowRight, Plus, Repeat } from '@phosphor-icons/react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
 import { FREQUENCY_LABEL, RECURRING_KIND_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import { FREQUENCIES, RECURRING_KINDS, type Frequency, type RecurringKind, type RecurringRule } from '@shared/modules/finanzas/types'
 import { DataTable, type Column } from './components/DataTable'
-import {
-  Amount,
-  Badge,
-  Button,
-  Checkbox,
-  confirmDialog,
-  DateInput,
-  ErrorBox,
-  Field,
-  Loading,
-  Modal,
-  MoneyInput,
-  PageHeader,
-  Section,
-  Select,
-  TextArea,
-  TextInput
-} from '../../components/ui'
+import { Button, Card, Checkbox, CifraEur, ConfirmDialog, EmptyState, ErrorState, Importe, LoadingState, Modal, MoneyField, PageHeader, Select, StatusBadge, Tag, TextArea, TextField } from '../../core/ui'
 import { useApi, useApiMutation } from '../../lib/api'
 import { useCatalog } from '../../lib/catalog'
 import type { ApiResult } from '../../../../main/app'
@@ -35,8 +18,33 @@ export function RecurringPage() {
   const { accountName, categoryName } = useCatalog()
   const [editing, setEditing] = useState<RecurringRule | 'new' | null>(null)
   const navigate = useNavigate()
-  if (q.isLoading) return <Loading />
-  if (q.error) return <ErrorBox error={q.error} />
+  const cabecera = (
+    <PageHeader
+      titulo="Recurrentes"
+      texto="Lo que esperas que se repita. Alimenta la previsión y el disponible, pero nunca crea movimientos reales: cuando llega el cargo, lo registras y queda enlazado."
+      acciones={
+        <Button variant="primary" icon={<Plus size={16} weight="bold" />} onClick={() => setEditing('new')}>
+          Nuevo recurrente
+        </Button>
+      }
+    />
+  )
+  if (q.isLoading)
+    return (
+      <div data-module="finanzas">
+        {cabecera}
+        <div className="card">
+          <LoadingState filas={3} etiqueta="Cargando los recurrentes" />
+        </div>
+      </div>
+    )
+  if (q.error || !q.data)
+    return (
+      <div data-module="finanzas">
+        {cabecera}
+        <ErrorState titulo="No se han podido cargar los recurrentes" texto={q.error?.message ?? 'Inténtalo de nuevo.'} accion={<Button size="sm" onClick={() => q.refetch()}>Reintentar</Button>} />
+      </div>
+    )
   const rows = q.data!
   const activeRows = rows.filter((r) => !r.status.finished)
   const finishedRows = rows.filter((r) => r.status.finished)
@@ -49,13 +57,13 @@ export function RecurringPage() {
       header: 'Concepto',
       sort: (r) => r.rule.concept,
       cell: (r) => (
-        <div>
+        <div className="min-w-56 py-1">
           <div className="font-medium">{r.rule.concept}</div>
-          <div className="text-[12px] text-muted">
+          <div className="t-meta">
             {RECURRING_KIND_LABEL[r.rule.kind]} · {r.rule.kind === 'TRANSFER' ? `${accountName(r.rule.accountId)} → ${accountName(r.rule.toAccountId)}` : `${categoryName(r.rule.categoryId)} · ${accountName(r.rule.accountId)}`}
             {r.rule.essential && ' · esencial'}
           </div>
-        </div>
+                  </div>
       )
     },
     {
@@ -65,9 +73,9 @@ export function RecurringPage() {
       sort: (r) => r.rule.amountCents,
       cell: (r) => (
         <div>
-          <Amount cents={r.rule.kind === 'INCOME' ? r.rule.amountCents : -r.rule.amountCents} />
+          <Importe cents={r.rule.kind === 'INCOME' ? r.rule.amountCents : -r.rule.amountCents} />
           {(r.rule.minCents !== null || r.rule.maxCents !== null) && (
-            <div className="text-[12px] text-muted">
+            <div className="t-meta tnum">
               {formatEur(r.rule.minCents)} – {formatEur(r.rule.maxCents)}
             </div>
           )}
@@ -81,11 +89,11 @@ export function RecurringPage() {
       sort: (r) => r.status.nextDate ?? 'z',
       cell: (r) =>
         r.status.nextDate ? (
-          <span className="num">{formatDate(r.status.nextDate)}</span>
+          <span className="tnum">{formatDate(r.status.nextDate)}</span>
         ) : r.rule.startDate ? (
-          <span className="text-muted">—</span>
+          <span className="text-ink-3">—</span>
         ) : (
-          <span className="text-[12px] text-muted">Sin fecha</span>
+          <span className="t-meta">Sin fecha</span>
         )
     },
     {
@@ -93,7 +101,7 @@ export function RecurringPage() {
       header: 'Equivalente mensual',
       align: 'right',
       sort: (r) => r.status.monthlyEquivalentCents,
-      cell: (r) => (r.rule.frequency === 'ONE_OFF' ? <span className="text-muted">—</span> : <Amount cents={r.status.monthlyEquivalentCents} />)
+      cell: (r) => (r.rule.frequency === 'ONE_OFF' ? <span className="text-ink-3">—</span> : <Importe cents={r.status.monthlyEquivalentCents} />)
     },
     {
       key: 'last',
@@ -101,7 +109,9 @@ export function RecurringPage() {
       cell: (r) =>
         r.status.lastMatchedDate ? (
           <button
-            className="num text-ink-2 hover:underline"
+            type="button"
+            className="tnum text-ink-2 hover:underline"
+            aria-label={`Ver los movimientos de ${r.rule.concept}`}
             onClick={(e) => {
               e.stopPropagation()
               navigate(`/finanzas/movimientos?recurrente=${r.rule.id}`)
@@ -110,55 +120,73 @@ export function RecurringPage() {
             {formatDate(r.status.lastMatchedDate)}
           </button>
         ) : (
-          <span className="text-muted">—</span>
+          <span className="text-ink-3">—</span>
         )
     },
     {
       key: 'state',
-      header: '',
+      header: <span className="sr-only">Estado</span>,
       cell: (r) => (
-        <span className="flex gap-1">
-          {!r.rule.active && <Badge>Pausado</Badge>}
-          {r.status.finished && r.rule.active && <Badge tone="pos">Terminado</Badge>}
+        <span className="flex flex-wrap gap-1">
+          {!r.rule.active && <Tag>Pausado</Tag>}
+          {r.status.finished && r.rule.active && <Tag>Terminado</Tag>}
           {r.status.overdue.length > 0 && (
-            <Badge tone="warn" title={`Previsto: ${r.status.overdue.map(formatDate).join(', ')}`}>
-              Sin registrar
-            </Badge>
+            <Tag tono="warning" icono={<Repeat size={12} aria-hidden />} title={`Previsto: ${r.status.overdue.map(formatDate).join(', ')}`}>
+              Sin registrar ({r.status.overdue.length})
+            </Tag>
           )}
         </span>
       )
     }
   ]
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Recurrentes"
-        description="Lo que esperas que se repita. Alimenta la previsión y el disponible, pero nunca crea movimientos reales: cuando llega el cargo, lo registras y queda enlazado."
-        actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEditing('new')}>
-            Nuevo recurrente
-          </Button>
-        }
+    <div data-module="finanzas">
+      {cabecera}
+      <Card titulo="Cada mes" subtitulo="Equivalente mensual de lo activo">
+        <dl className="auto-grid">
+          <div>
+            <dt className="t-label">Ingresos al mes</dt>
+            <dd className="t-kpi mt-1">
+              <CifraEur cents={income} />
+            </dd>
+          </div>
+          <div>
+            <dt className="t-label">Gastos fijos al mes</dt>
+            <dd className="t-kpi mt-1">
+              <CifraEur cents={expense} />
+            </dd>
+          </div>
+          <div>
+            <dt className="t-label">Transferencias al mes</dt>
+            <dd className="t-kpi mt-1">
+              <CifraEur cents={transfers} />
+            </dd>
+          </div>
+          <div>
+            <dt className="t-label">Saldo recurrente</dt>
+            <dd className="t-kpi mt-1">
+              <CifraEur cents={income + expense + transfers} />
+            </dd>
+          </div>
+        </dl>
+      </Card>
+      <h2 className="t-section mb-3 mt-10">Activos</h2>
+      <DataTable
+        rows={activeRows}
+        columns={columns}
+        rowKey={(r) => r.rule.id}
+        onRowClick={(r) => setEditing(r.rule)}
+        initialSort={{ key: 'next', dir: 'asc' }}
+        empty={<div className="card"><EmptyState icono={<Repeat size={24} aria-hidden />} titulo="Aún no hay recurrentes" texto="Añade nóminas, recibos o transferencias periódicas para que la previsión cuente con ellos." accion={<Button variant="primary" onClick={() => setEditing('new')}>Nuevo recurrente</Button>} /></div>}
       />
-      <div className="flex flex-wrap gap-8 text-[13px]">
-        <span className="text-muted">
-          Ingresos/mes <Amount cents={income} />
-        </span>
-        <span className="text-muted">
-          Gastos fijos/mes <Amount cents={expense} />
-        </span>
-        <span className="text-muted">
-          Transferencias/mes <Amount cents={transfers} />
-        </span>
-        <span className="text-muted">
-          Saldo recurrente <Amount cents={income + expense + transfers} strong />
-        </span>
-      </div>
-      <DataTable rows={activeRows} columns={columns} rowKey={(r) => r.rule.id} onRowClick={(r) => setEditing(r.rule)} initialSort={{ key: 'next', dir: 'asc' }} />
+      <p className="t-meta mt-2 flex items-center gap-1">
+        <ArrowRight size={14} aria-hidden /> Pulsa una fila (o Intro) para editarla.
+      </p>
       {finishedRows.length > 0 && (
-        <Section title="Terminados o pausados">
+        <>
+          <h2 className="t-section mb-3 mt-10">Terminados o pausados</h2>
           <DataTable rows={finishedRows} columns={columns} rowKey={(r) => r.rule.id} onRowClick={(r) => setEditing(r.rule)} dense />
-        </Section>
+        </>
       )}
       {editing && <RecurringForm rule={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
@@ -181,101 +209,92 @@ function RecurringForm({ rule, onClose }: { rule: RecurringRule | null; onClose:
   const [min, setMin] = useState<number | null>(rule?.minCents ?? null)
   const [max, setMax] = useState<number | null>(rule?.maxCents ?? null)
   const [notes, setNotes] = useState(rule?.notes ?? '')
+  const [borrar, setBorrar] = useState(false)
+  const conceptoRef = useRef<HTMLInputElement>(null)
   const save = useApiMutation('finanzas:recurring.save', { success: (r) => `Recurrente guardado: ${r.concept}`, onSuccess: onClose })
   const del = useApiMutation('finanzas:recurring.delete', { success: 'Recurrente borrado', onSuccess: onClose })
   const wantKind = kind === 'INCOME' ? 'INCOME' : 'EXPENSE'
   const accounts = (cat?.accounts ?? []).filter((a) => a.active || a.id === accountId || a.id === toAccountId)
   return (
-    <Modal
-      open
-      onClose={onClose}
-      width={640}
-      title={rule ? `Editar ${rule.concept}` : 'Nuevo recurrente'}
-      footer={
-        <>
-          {rule && (
-            <Button
-              variant="ghost"
-              className="mr-auto text-neg"
-              onClick={async () => {
-                if (await confirmDialog({ title: 'Borrar recurrente', text: 'Los movimientos ya registrados se conservan; solo pierden el enlace. Para dejar de usarlo sin borrar, pausa la regla.', confirm: 'Borrar', danger: true }))
-                  del.mutate([rule.id])
-              }}
-            >
-              Borrar
+    <div data-module="finanzas" className="contents">
+      <Modal
+        titulo={rule ? `Editar ${rule.concept}` : 'Nuevo recurrente'}
+        ancho="lg"
+        inicial={conceptoRef}
+        onCerrar={onClose}
+        pie={
+          <>
+            {rule && (
+              <Button variant="danger" className="mr-auto" onClick={() => setBorrar(true)}>
+                Borrar
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onClose}>
+              Cancelar
             </Button>
-          )}
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button
-            variant="primary"
-            loading={save.isPending}
-            onClick={() =>
-              save.mutate([
-                {
-                  id: rule?.id ?? null,
-                  concept,
-                  kind,
-                  amountCents: amount ?? 0,
-                  frequency,
-                  startDate: startDate || null,
-                  endDate: endDate || null,
-                  categoryId: kind === 'TRANSFER' ? null : categoryId || null,
-                  accountId,
-                  toAccountId: kind === 'TRANSFER' ? toAccountId || null : null,
-                  essential,
-                  active,
-                  minCents: min,
-                  maxCents: max,
-                  notes
-                }
-              ])
-            }
-          >
-            Guardar
-          </Button>
-        </>
-      }
-    >
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Concepto" required className="col-span-2">
-          <TextInput value={concept} onChange={(e) => setConcept(e.target.value)} autoFocus placeholder="Ej.: Gimnasio, Nómina, Plan de inversión" />
-        </Field>
-        <Field label="Tipo" required>
-          <Select value={kind} onChange={(e) => setKind(e.target.value as RecurringKind)}>
+            <Button
+              variant="accent"
+              cargando={save.isPending}
+              onClick={() =>
+                save.mutate([
+                  {
+                    id: rule?.id ?? null,
+                    concept,
+                    kind,
+                    amountCents: amount ?? 0,
+                    frequency,
+                    startDate: startDate || null,
+                    endDate: endDate || null,
+                    categoryId: kind === 'TRANSFER' ? null : categoryId || null,
+                    accountId,
+                    toAccountId: kind === 'TRANSFER' ? toAccountId || null : null,
+                    essential,
+                    active,
+                    minCents: min,
+                    maxCents: max,
+                    notes
+                  }
+                ])
+              }
+            >
+              Guardar
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField ref={conceptoRef} className="sm:col-span-2" label="Concepto" value={concept} onChange={(e) => setConcept(e.target.value)} placeholder="Ej.: Gimnasio, Nómina, Plan de inversión" />
+          <Select label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as RecurringKind)}>
             {RECURRING_KINDS.map((k) => (
               <option key={k} value={k}>
                 {RECURRING_KIND_LABEL[k]}
               </option>
             ))}
           </Select>
-        </Field>
-        <Field label="Importe" required>
-          <MoneyInput value={amount} onChange={setAmount} />
-        </Field>
-        <Field label="Frecuencia" required>
-          <Select value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}>
+          <MoneyField label="Importe" value={amount} onChange={setAmount} />
+          <Select label="Frecuencia" value={frequency} onChange={(e) => setFrequency(e.target.value as Frequency)}>
             {FREQUENCIES.map((f) => (
               <option key={f} value={f}>
                 {FREQUENCY_LABEL[f]}
               </option>
             ))}
           </Select>
-        </Field>
-        <Field label={frequency === 'ONE_OFF' ? 'Fecha' : 'Fecha de un cargo (ancla)'} hint={frequency === 'ONE_OFF' ? undefined : 'Una fecha en la que toca; las siguientes se calculan solas. Vacía = se reparte cada mes'}>
-          <DateInput value={startDate} onChange={setStartDate} />
-        </Field>
-        <Field label={kind === 'TRANSFER' ? 'Desde' : 'Cuenta'} required>
-          <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+          <TextField
+            type="date"
+            label={frequency === 'ONE_OFF' ? 'Fecha' : 'Fecha de un cargo (ancla)'}
+            ayuda={frequency === 'ONE_OFF' ? undefined : 'Una fecha en la que toca; las siguientes se calculan solas. Vacía = se reparte cada mes.'}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <Select label={kind === 'TRANSFER' ? 'Desde' : 'Cuenta'} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
           </Select>
-        </Field>
-        {kind === 'TRANSFER' ? (
-          <Field label="Hacia" required>
-            <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+          {kind === 'TRANSFER' ? (
+            <Select label="Hacia" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
               <option value="">Elige…</option>
               {accounts
                 .filter((a) => a.id !== accountId)
@@ -285,10 +304,8 @@ function RecurringForm({ rule, onClose }: { rule: RecurringRule | null; onClose:
                   </option>
                 ))}
             </Select>
-          </Field>
-        ) : (
-          <Field label="Categoría" required>
-            <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          ) : (
+            <Select label="Categoría" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">Elige…</option>
               {(cat?.categories ?? [])
                 .filter((c) => categoryKind(c.id) === wantKind)
@@ -298,29 +315,28 @@ function RecurringForm({ rule, onClose }: { rule: RecurringRule | null; onClose:
                   </option>
                 ))}
             </Select>
-          </Field>
-        )}
-        {frequency !== 'ONE_OFF' && (
-          <Field label="Fecha final" hint="Opcional: último cargo previsto">
-            <DateInput value={endDate} onChange={setEndDate} />
-          </Field>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Mínimo" hint="Rango esperado">
-            <MoneyInput value={min} onChange={setMin} placeholder="—" />
-          </Field>
-          <Field label="Máximo">
-            <MoneyInput value={max} onChange={setMax} placeholder="—" />
-          </Field>
+          )}
+          {frequency !== 'ONE_OFF' && <TextField type="date" label="Fecha final" ayuda="Opcional: último cargo previsto." value={endDate} onChange={(e) => setEndDate(e.target.value)} />}
+          <div className="grid grid-cols-2 gap-4">
+            <MoneyField label="Mínimo" ayuda="Rango esperado." value={min} onChange={setMin} placeholder="—" />
+            <MoneyField label="Máximo" value={max} onChange={setMax} placeholder="—" />
+          </div>
+          <div className="flex gap-6 sm:col-span-2">
+            <Checkbox checked={essential} onChange={setEssential} label="Esencial" />
+            <Checkbox checked={active} onChange={setActive} label="Activo" />
+          </div>
+          <TextArea className="sm:col-span-2" label="Notas" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
-        <div className="col-span-2 flex gap-6">
-          <Checkbox checked={essential} onChange={setEssential} label="Esencial" />
-          <Checkbox checked={active} onChange={setActive} label="Activo" />
-        </div>
-        <Field label="Notas" className="col-span-2">
-          <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
-      </div>
-    </Modal>
+      </Modal>
+      {borrar && rule && (
+        <ConfirmDialog
+          titulo="¿Borrar el recurrente?"
+          texto="Los movimientos ya registrados se conservan; solo pierden el enlace. Para dejar de usarlo sin borrar, pausa la regla."
+          confirmar="Borrar recurrente"
+          onCancelar={() => setBorrar(false)}
+          onConfirmar={() => (setBorrar(false), del.mutate([rule.id]))}
+        />
+      )}
+    </div>
   )
 }

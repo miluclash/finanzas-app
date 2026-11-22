@@ -18,7 +18,9 @@ const reglas = [
 ]
 const hallazgos = []
 const ficheros = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? ficheros(path.join(d, e.name)) : /\.(tsx|ts)$/.test(e.name) ? [path.join(d, e.name)] : []))
-for (const f of carpetas.flatMap(ficheros).filter((x) => !x.endsWith('Settings.tsx'))) {
+// Páginas de Finanzas ya reestilizadas (B1); el resto se suma al migrar (B2)
+const finanzas = ['Dashboard', 'Transactions', 'Accounts', 'Budgets', 'Recurring', 'components/TxEditor', 'components/charts', 'components/DataTable', 'components/MonthPicker'].map((n) => path.join(raiz, 'modules/finanzas', n + '.tsx'))
+for (const f of [...carpetas.flatMap(ficheros).filter((x) => !x.endsWith('Settings.tsx')), ...finanzas]) {
   fs.readFileSync(f, 'utf8').split('\n').forEach((l, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(l)) return
     for (const [re, msg] of reglas) if (re.test(l)) hallazgos.push(`${path.relative(raiz, f)}:${i + 1}  ${msg}\n    ${l.trim().slice(0, 140)}`)
@@ -29,4 +31,4 @@ if (hallazgos.length) {
   console.log(`\n${hallazgos.length} valores sueltos`)
   process.exit(1)
 }
-console.log('Sin valores sueltos en core/ y modules/entreno/')
+console.log('Sin valores sueltos en core/, modules/entreno/ y las páginas de Finanzas ya reestilizadas')

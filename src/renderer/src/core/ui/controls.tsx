@@ -106,14 +106,21 @@ export function Select({ label, ayuda, error, className, tamano, ocultarEtiqueta
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} className="switch" onClick={() => onChange(!checked)} />
 }
-export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Checkbox({ checked, onChange, label, disabled, ayuda }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; ayuda?: string }) {
   const id = useId()
   return (
-    <div className="flex items-center gap-3">
-      <input id={id} type="checkbox" className="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <label htmlFor={id} className="t-body">
-        {label}
-      </label>
+    <div className="flex items-start gap-3">
+      <input id={id} type="checkbox" className="checkbox" checked={checked} disabled={disabled} aria-describedby={ayuda ? `${id}-h` : undefined} onChange={(e) => onChange(e.target.checked)} />
+      <div>
+        <label htmlFor={id} className="t-body">
+          {label}
+        </label>
+        {ayuda && (
+          <p id={`${id}-h`} className="field-help mt-0">
+            {ayuda}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
