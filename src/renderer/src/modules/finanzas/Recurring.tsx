@@ -57,13 +57,34 @@ export function RecurringPage() {
       header: 'Concepto',
       sort: (r) => r.rule.concept,
       cell: (r) => (
-        <div className="min-w-56 py-1">
+        <div className="min-w-40 py-1">
           <div className="font-medium">{r.rule.concept}</div>
           <div className="t-meta">
             {RECURRING_KIND_LABEL[r.rule.kind]} · {r.rule.kind === 'TRANSFER' ? `${accountName(r.rule.accountId)} → ${accountName(r.rule.toAccountId)}` : `${categoryName(r.rule.categoryId)} · ${accountName(r.rule.accountId)}`}
             {r.rule.essential && ' · esencial'}
           </div>
-                  </div>
+          {/* En ancho estrecho, las columnas secundarias bajan aquí */}
+          <div className="t-meta tnum @4xl:hidden">
+            {FREQUENCY_LABEL[r.rule.frequency]}
+            {r.rule.frequency !== 'ONE_OFF' && ` · ${formatEur(r.status.monthlyEquivalentCents)} al mes`}
+            {r.status.lastMatchedDate && (
+              <>
+                {' · último '}
+                <button
+                  type="button"
+                  className="underline-offset-2 hover:underline"
+                  aria-label={`Ver los movimientos de ${r.rule.concept}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate(`/finanzas/movimientos?recurrente=${r.rule.id}`)
+                  }}
+                >
+                  {formatDate(r.status.lastMatchedDate)}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )
     },
     {
@@ -82,7 +103,7 @@ export function RecurringPage() {
         </div>
       )
     },
-    { key: 'freq', header: 'Frecuencia', cell: (r) => FREQUENCY_LABEL[r.rule.frequency], sort: (r) => r.rule.frequency },
+    { key: 'freq', header: 'Frecuencia', soloAncho: true, cell: (r) => FREQUENCY_LABEL[r.rule.frequency], sort: (r) => r.rule.frequency },
     {
       key: 'next',
       header: 'Próxima fecha',
@@ -100,12 +121,14 @@ export function RecurringPage() {
       key: 'monthly',
       header: 'Equivalente mensual',
       align: 'right',
+      soloAncho: true,
       sort: (r) => r.status.monthlyEquivalentCents,
       cell: (r) => (r.rule.frequency === 'ONE_OFF' ? <span className="text-ink-3">—</span> : <Importe cents={r.status.monthlyEquivalentCents} />)
     },
     {
       key: 'last',
       header: 'Último registrado',
+      soloAncho: true,
       cell: (r) =>
         r.status.lastMatchedDate ? (
           <button

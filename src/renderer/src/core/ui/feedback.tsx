@@ -1,5 +1,6 @@
 import { CheckCircle, Info, Warning, WarningCircle, X, type Icon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { cx } from './cx'
 import { dismiss, subscribe, type ToastItem } from '../../lib/toast'
 import { Button } from './controls'
@@ -49,6 +50,19 @@ export function StatusBadge({ tono, children, className }: { tono: Tono; childre
       <I size={16} weight="fill" aria-hidden className="shrink-0" />
       <span>{children}</span>
     </span>
+  )
+}
+
+const AVISO_FONDO: Record<Exclude<Tono, 'neutral'>, string> = { success: 'bg-success-soft', warning: 'bg-warning-soft', error: 'bg-error-soft', info: 'bg-info-soft' }
+const AVISO_ICONO: Record<Exclude<Tono, 'neutral'>, string> = { success: 'text-success', warning: 'text-warning', error: 'text-error', info: 'text-info' }
+/** Aviso: bloque con icono y varias líneas de texto (listas de advertencias, notas largas). El estado va con icono y texto, no solo con color */
+export function Aviso({ tono, children, className }: { tono: Exclude<Tono, 'neutral'>; children: ReactNode; className?: string }) {
+  const I = ICONO_ESTADO[tono]
+  return (
+    <div role={tono === 'error' ? 'alert' : undefined} className={cx('t-label flex items-start gap-3 r-control px-4 py-3 text-ink', AVISO_FONDO[tono], className)}>
+      <I size={20} weight="fill" aria-hidden className={cx('mt-px shrink-0', AVISO_ICONO[tono])} />
+      <div className="flex min-w-0 flex-col gap-1">{children}</div>
+    </div>
   )
 }
 
@@ -147,11 +161,14 @@ export function Tooltip({ texto, children, lado = 'top', abierto }: { texto: str
       <span className="contents" aria-describedby={mostrar ? id : undefined}>
         {children}
       </span>
-      {mostrar && pos && (
-        <span role="tooltip" id={id} className="tooltip fade-in" style={{ position: 'fixed', left: pos.left, top: pos.top, transform }}>
-          {texto}
-        </span>
-      )}
+      {mostrar &&
+        pos &&
+        createPortal(
+          <span role="tooltip" id={id} className="tooltip fade-in" style={{ position: 'fixed', left: pos.left, top: pos.top, transform }}>
+            {texto}
+          </span>,
+          document.body
+        )}
     </span>
   )
 }
@@ -187,7 +204,21 @@ export function Popover({ etiqueta, boton, children, alinear = 'left', abiertoIn
 }
 
 /* ======================= Modal ======================= */
-export function Modal({ titulo, descripcion, onCerrar, children, pie, ancho = 'md', inicial }: { titulo: string; descripcion?: string; onCerrar: () => void; children?: ReactNode; pie?: ReactNode; ancho?: 'sm' | 'md' | 'lg'; inicial?: React.RefObject<HTMLElement | null> }) {
+/** Modal: se pinta en el <body> (un contenedor con `contain` o con scroll descolocaría un `fixed`) y conserva el módulo
+ *  (data-module) del lugar donde se abre, para que mantenga sus colores de identidad. */
+export function Modal(props: ModalProps) {
+  const ancla = useRef<HTMLSpanElement>(null)
+  const [modulo, setModulo] = useState<string | null | undefined>(undefined)
+  useLayoutEffect(() => setModulo(ancla.current?.closest('[data-module]')?.getAttribute('data-module') ?? null), [])
+  return (
+    <>
+      <span ref={ancla} hidden />
+      {modulo !== undefined && createPortal(<div data-module={modulo ?? undefined} className="contents"><ModalCuerpo {...props} /></div>, document.body)}
+    </>
+  )
+}
+type ModalProps = { titulo: string; descripcion?: string; onCerrar: () => void; children?: ReactNode; pie?: ReactNode; ancho?: 'sm' | 'md' | 'lg' | 'xl'; inicial?: React.RefObject<HTMLElement | null> }
+function ModalCuerpo({ titulo, descripcion, onCerrar, children, pie, ancho = 'md', inicial }: { titulo: string; descripcion?: string; onCerrar: () => void; children?: ReactNode; pie?: ReactNode; ancho?: 'sm' | 'md' | 'lg' | 'xl'; inicial?: React.RefObject<HTMLElement | null> }) {
   const ref = useRef<HTMLDivElement>(null)
   const tid = useId()
   const did = useId()
@@ -201,7 +232,7 @@ export function Modal({ titulo, descripcion, onCerrar, children, pie, ancho = 'm
         aria-modal="true"
         aria-labelledby={tid}
         aria-describedby={descripcion ? did : undefined}
-        className={cx('elevated pop-in r-modal relative flex max-h-full w-full flex-col overflow-y-auto p-6', ancho === 'sm' ? 'max-w-md' : ancho === 'lg' ? 'max-w-xl' : 'max-w-lg')}
+        className={cx('elevated pop-in r-modal relative flex max-h-full w-full flex-col overflow-y-auto p-6', ancho === 'sm' ? 'max-w-md' : ancho === 'xl' ? 'max-w-4xl' : ancho === 'lg' ? 'max-w-xl' : 'max-w-lg')}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.stopPropagation()

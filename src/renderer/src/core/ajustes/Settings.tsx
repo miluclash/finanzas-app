@@ -1,235 +1,324 @@
-import { FolderOpen, Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Copy, DownloadSimple, FloppyDisk, FolderOpen, PencilSimple, Plus, ShieldCheck, UploadSimple } from '@phosphor-icons/react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { formatDate } from '@shared/dates'
 import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import { COST_METHODS, NATURES, type Category, type CategoryGroup, type CostMethod, type GroupKind, type Nature, type Settings } from '@shared/modules/finanzas/types'
 import {
-  Badge,
+  Aviso,
   Button,
   Checkbox,
-  confirmDialog,
+  ConfirmDialog,
   cx,
-  DateInput,
-  ErrorBox,
-  Field,
-  Loading,
+  DatePicker,
+  ErrorState,
+  IconButton,
+  LoadingState,
   Modal,
-  MoneyInput,
-  Notice,
+  MoneyField,
   PageHeader,
-  Section,
-  Segmented,
+  SegmentedControl,
   Select,
-  Tabs,
+  StatusBadge,
+  Tag,
   TextArea,
-  TextInput
-} from '../../components/ui'
+  TextField,
+  Tooltip
+} from '../ui'
 import { api, useApi, useApiMutation } from '../../lib/api'
 import { useCatalog } from '../../lib/catalog'
 import { toast } from '../../lib/toast'
 import type { ImportPreview } from '../../../../main/modules/finanzas/importExcel'
 import { Apariencia } from './Apariencia'
 
-type Tab = 'general' | 'categorias' | 'datos' | 'auditoria'
+/* ======================= Estructura: navegación interna y secciones ======================= */
+const ANCLAS = [
+  ['apariencia', 'Apariencia'],
+  ['seguimiento', 'Seguimiento y liquidez'],
+  ['avisos', 'Avisos'],
+  ['inversiones', 'Inversiones'],
+  ['categorias', 'Categorías'],
+  ['datos', 'Datos y copias'],
+  ['mcp', 'Claude (MCP)'],
+  ['registro', 'Registro de cambios']
+] as const
 
-export function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('general')
+function Bloque({ id, titulo, texto, children }: { id: string; titulo: string; texto?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Ajustes y datos" description="Reglas, categorías, importación, exportación y copias de seguridad. Todo editable." />
-      <Apariencia />
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'general', label: 'General' },
-          { id: 'categorias', label: 'Categorías' },
-          { id: 'datos', label: 'Importar, exportar y copias' },
-          { id: 'auditoria', label: 'Registro de cambios' }
-        ]}
-      />
-      {tab === 'general' && <GeneralSettings />}
-      {tab === 'categorias' && <CategoriesSettings />}
-      {tab === 'datos' && <DataSettings />}
-      {tab === 'auditoria' && <AuditLog />}
-    </div>
+    <section id={id} aria-labelledby={`${id}-t`} className="card scroll-mt-8">
+      <h2 id={`${id}-t`} className="t-section">
+        {titulo}
+      </h2>
+      {texto && <p className="t-label mt-1 max-w-3xl">{texto}</p>}
+      <div className="mt-6">{children}</div>
+    </section>
   )
 }
 
-function GeneralSettings() {
-  const { cat } = useCatalog()
-  const [s, setS] = useState<Settings | null>(null)
+export function SettingsPage() {
+  const [activa, setActiva] = useState<string>('apariencia')
+  // La sección activa sigue al scroll del contenido
   useEffect(() => {
-    if (cat && !s) setS(cat.settings)
-  }, [cat, s])
-  const save = useApiMutation('finanzas:settings.update', { success: 'Ajustes guardados' })
-  if (!s || !cat) return <Loading />
-  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...s, [k]: v })
-  const incomeCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'INCOME')
-  const expenseCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'EXPENSE')
+    const el = document.getElementById('contenido')
+    if (!el) return
+    const o = new IntersectionObserver(
+      (es) => {
+        const visible = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (visible) setActiva(visible.target.id)
+      },
+      { root: el, rootMargin: '0px 0px -60% 0px' }
+    )
+    ANCLAS.forEach(([id]) => document.getElementById(id) && o.observe(document.getElementById(id)!))
+    return () => o.disconnect()
+  }, [])
   return (
-    <div className="flex max-w-[860px] flex-col gap-6">
-      <Section title="Seguimiento y liquidez" boxed>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Moneda base">
-            <TextInput value="EUR" disabled />
-          </Field>
-          <Field label="Inicio del seguimiento" hint="Fecha desde la que registras movimientos">
-            <DateInput value={s.trackingStart} onChange={(v) => set('trackingStart', v)} />
-          </Field>
-          <Field label="Mínimo de liquidez" hint="Por debajo, el panel y la previsión avisan">
-            <MoneyInput value={s.minLiquidityCents} onChange={(v) => set('minLiquidityCents', v ?? 0)} />
-          </Field>
-          <Field label="Meses de gastos para el colchón" hint="Referencia para el fondo de emergencia">
-            <TextInput type="number" min={0} max={36} value={s.emergencyMonths} onChange={(e) => set('emergencyMonths', Number(e.target.value))} />
-          </Field>
+    <div>
+      <PageHeader titulo="Ajustes y datos" texto="Todo lo configurable se cambia desde aquí. Los datos no salen de tu equipo." />
+      <div className="settings-layout">
+        <nav aria-label="Secciones de ajustes" className="h-fit self-start @4xl:sticky @4xl:top-0">
+          <ul className="flex flex-wrap gap-1 @4xl:flex-col">
+            {ANCLAS.map(([id, t]) => (
+              <li key={id}>
+                <a
+                  href={`#${id}`}
+                  aria-current={activa === id ? 'true' : undefined}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setActiva(id)
+                    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                  className="nav-item nav-item-sub"
+                >
+                  {t}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="flex min-w-0 flex-col gap-6">
+          <div id="apariencia" className="scroll-mt-8">
+            <Apariencia />
+          </div>
+          <GeneralSettings />
+          <Bloque id="categorias" titulo="Categorías" texto="Los grupos y categorías con los que clasificas. Puedes cambiarlos cuando quieras.">
+            <CategoriesSettings />
+          </Bloque>
+          <Bloque id="datos" titulo="Datos y copias" texto="Importar, exportar, copiar y restaurar son cuatro cosas distintas. Antes de importar, restaurar o actualizar, la app hace una copia sola.">
+            <DataSettings />
+          </Bloque>
+          <Bloque id="mcp" titulo="Conectar con Claude (MCP)" texto="Claude Desktop podrá leer tus datos (solo lectura) y revisar el plan de inversión.">
+            <ClaudeMcp />
+          </Bloque>
+          <Bloque id="registro" titulo="Registro de cambios" texto="Lo último que ha cambiado en tus datos: altas, cambios, borrados, importaciones y restauraciones.">
+            <AuditLog />
+          </Bloque>
         </div>
-      </Section>
-      <Section title="Avisos" boxed>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Aviso de presupuesto al llegar al (%)">
-            <TextInput type="number" min={1} max={100} value={s.budgetAlertPct} onChange={(e) => set('budgetAlertPct', Number(e.target.value))} />
-          </Field>
-          <Field label="Días de margen para detectar duplicados" hint="Misma cuenta e importe en ± estos días">
-            <TextInput type="number" min={0} max={30} value={s.duplicateWindowDays} onChange={(e) => set('duplicateWindowDays', Number(e.target.value))} />
-          </Field>
-          <Field label="Avisar si una cuenta lleva sin verificar (días)">
-            <TextInput type="number" min={1} max={365} value={s.verifyStaleDays} onChange={(e) => set('verifyStaleDays', Number(e.target.value))} />
-          </Field>
-          <Field label="Concentración máxima por acción (%)" hint="Para acciones sin peso máximo propio">
-            <TextInput type="number" min={1} max={100} value={s.concentrationAlertPct} onChange={(e) => set('concentrationAlertPct', Number(e.target.value))} />
-          </Field>
-        </div>
-      </Section>
-      <Section title="Inversiones" boxed>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Método de coste en ventas">
-            <Select value={s.costMethod} onChange={(e) => set('costMethod', e.target.value as CostMethod)}>
-              {COST_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {COST_METHOD_LABEL[m]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div />
-          <Field label="Categoría para comisiones de inversión" hint="Las comisiones se registran como gasto">
-            <Select value={s.investmentFeeCategoryId ?? ''} onChange={(e) => set('investmentFeeCategoryId', e.target.value || null)}>
-              <option value="">—</option>
-              {expenseCats.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Categoría para dividendos e intereses">
-            <Select value={s.investmentIncomeCategoryId ?? ''} onChange={(e) => set('investmentIncomeCategoryId', e.target.value || null)}>
-              <option value="">—</option>
-              {incomeCats.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-      </Section>
-      <div>
-        <Button
-          variant="primary"
-          loading={save.isPending}
-          onClick={() =>
-            save.mutate([
-              {
-                trackingStart: s.trackingStart,
-                minLiquidityCents: s.minLiquidityCents,
-                emergencyMonths: s.emergencyMonths,
-                budgetAlertPct: s.budgetAlertPct,
-                duplicateWindowDays: s.duplicateWindowDays,
-                verifyStaleDays: s.verifyStaleDays,
-                concentrationAlertPct: s.concentrationAlertPct,
-                costMethod: s.costMethod,
-                investmentFeeCategoryId: s.investmentFeeCategoryId,
-                investmentIncomeCategoryId: s.investmentIncomeCategoryId
-              }
-            ])
-          }
-        >
-          Guardar ajustes
-        </Button>
       </div>
     </div>
   )
 }
 
+/* ======================= General: seguimiento, avisos e inversiones ======================= */
+const NUM = {
+  emergencyMonths: { min: 0, max: 36 },
+  budgetAlertPct: { min: 1, max: 100 },
+  duplicateWindowDays: { min: 0, max: 30 },
+  verifyStaleDays: { min: 1, max: 365 },
+  concentrationAlertPct: { min: 1, max: 100 }
+} as const
+type NumKey = keyof typeof NUM
+type Txt = Record<NumKey, string>
+const aTexto = (s: Settings): Txt => ({
+  emergencyMonths: String(s.emergencyMonths),
+  budgetAlertPct: String(s.budgetAlertPct),
+  duplicateWindowDays: String(s.duplicateWindowDays),
+  verifyStaleDays: String(s.verifyStaleDays),
+  concentrationAlertPct: String(s.concentrationAlertPct)
+})
+const errorNum = (k: NumKey, t: string) => {
+  const { min, max } = NUM[k]
+  return /^\d+$/.test(t.trim()) && Number(t) >= min && Number(t) <= max ? undefined : `Introduce un número entero entre ${min} y ${max}.`
+}
+/** Lo que se envía al guardar (los mismos campos de siempre) */
+const aEnvio = (s: Settings, t: Txt) => ({
+  trackingStart: s.trackingStart,
+  minLiquidityCents: s.minLiquidityCents,
+  emergencyMonths: Number(t.emergencyMonths),
+  budgetAlertPct: Number(t.budgetAlertPct),
+  duplicateWindowDays: Number(t.duplicateWindowDays),
+  verifyStaleDays: Number(t.verifyStaleDays),
+  concentrationAlertPct: Number(t.concentrationAlertPct),
+  costMethod: s.costMethod,
+  investmentFeeCategoryId: s.investmentFeeCategoryId,
+  investmentIncomeCategoryId: s.investmentIncomeCategoryId
+})
+
+function GeneralSettings() {
+  const { cat } = useCatalog()
+  const [s, setS] = useState<Settings | null>(null)
+  const [txt, setTxt] = useState<Txt | null>(null)
+  const [guardado, setGuardado] = useState(false)
+  useEffect(() => {
+    if (cat && !s) {
+      setS(cat.settings)
+      setTxt(aTexto(cat.settings))
+    }
+  }, [cat, s])
+  const save = useApiMutation('finanzas:settings.update', { success: 'Ajustes guardados' })
+  if (!s || !cat || !txt)
+    return (
+      <div className="card">
+        <LoadingState filas={3} etiqueta="Cargando los ajustes" />
+      </div>
+    )
+  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => (setS({ ...s, [k]: v }), setGuardado(false))
+  const setNum = (k: NumKey, v: string) => (setTxt({ ...txt, [k]: v }), setGuardado(false))
+  const errores = (Object.keys(NUM) as NumKey[]).filter((k) => errorNum(k, txt[k]))
+  const hayError = errores.length > 0
+  const sucio = JSON.stringify(aEnvio(s, txt)) !== JSON.stringify(aEnvio(cat.settings, aTexto(cat.settings)))
+  const incomeCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'INCOME')
+  const expenseCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'EXPENSE')
+  const num = (k: NumKey, label: string, unidad: string, ayuda: string) => (
+    <TextField label={label} unidad={unidad} inputMode="numeric" ayuda={ayuda} error={errorNum(k, txt[k])} value={txt[k]} onChange={(e) => setNum(k, e.target.value)} className="[&_input]:tabular-nums [&_input]:text-right" />
+  )
+  return (
+    <>
+      <Bloque id="seguimiento" titulo="Seguimiento y liquidez" texto="Desde cuándo cuentas y qué colchón quieres mantener.">
+        <div className="auto-grid-wide">
+          <TextField label="Moneda base" value="EUR" disabled readOnly ayuda="Por ahora solo euros." />
+          <DatePicker label="Inicio del seguimiento" value={s.trackingStart} onChange={(v) => set('trackingStart', v)} ayuda="Fecha desde la que registras movimientos." />
+          <MoneyField label="Mínimo de liquidez" value={s.minLiquidityCents} onChange={(v) => set('minLiquidityCents', v ?? 0)} ayuda="Por debajo, el panel y la previsión te avisan." />
+          {num('emergencyMonths', 'Colchón de emergencia', 'meses', 'Meses de gastos que quieres tener ahorrados.')}
+        </div>
+      </Bloque>
+      <Bloque id="avisos" titulo="Avisos" texto="Cuándo te avisa el panel.">
+        <div className="auto-grid-wide">
+          {num('budgetAlertPct', 'Avisar al llegar al presupuesto', '%', 'Entre 1 y 100.')}
+          {num('duplicateWindowDays', 'Margen para detectar duplicados', 'días', 'Misma cuenta e importe en ± estos días. Entre 0 y 30.')}
+          {num('verifyStaleDays', 'Avisar si una cuenta lleva sin verificar', 'días', 'Entre 1 y 365.')}
+          {num('concentrationAlertPct', 'Concentración máxima por acción', '%', 'Para acciones sin peso máximo propio. Entre 1 y 100.')}
+        </div>
+      </Bloque>
+      <Bloque id="inversiones" titulo="Inversiones" texto="Cómo se calculan las ventas y dónde se registran comisiones y dividendos.">
+        <div className="auto-grid-wide">
+          <Select label="Método de coste en ventas" value={s.costMethod} onChange={(e) => set('costMethod', e.target.value as CostMethod)}>
+            {COST_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {COST_METHOD_LABEL[m]}
+              </option>
+            ))}
+          </Select>
+          <Select label="Categoría para comisiones de inversión" ayuda="Las comisiones se registran como gasto." value={s.investmentFeeCategoryId ?? ''} onChange={(e) => set('investmentFeeCategoryId', e.target.value || null)}>
+            <option value="">—</option>
+            {expenseCats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          <Select label="Categoría para dividendos e intereses" value={s.investmentIncomeCategoryId ?? ''} onChange={(e) => set('investmentIncomeCategoryId', e.target.value || null)}>
+            <option value="">—</option>
+            {incomeCats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </Bloque>
+      {/* Aviso de guardado: sin cambios, con cambios o con errores. Pegado abajo mientras se edita */}
+      <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 r-card border border-line-strong bg-overlay px-4 py-3" role="region" aria-label="Guardado de ajustes" style={{ boxShadow: 'var(--shadow-raised)' }}>
+        <div role="status" aria-live="polite">
+          {hayError ? (
+            <StatusBadge tono="error">Hay campos con errores: corrígelos para guardar</StatusBadge>
+          ) : sucio ? (
+            <StatusBadge tono="warning">Tienes cambios sin guardar</StatusBadge>
+          ) : guardado ? (
+            <StatusBadge tono="success">Cambios guardados</StatusBadge>
+          ) : (
+            <span className="t-meta">Sin cambios pendientes en seguimiento, avisos e inversiones</span>
+          )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            disabled={!sucio}
+            onClick={() => {
+              setS(cat.settings)
+              setTxt(aTexto(cat.settings))
+            }}
+          >
+            Descartar
+          </Button>
+          <Button variant="accent" disabled={!sucio || hayError} cargando={save.isPending} icon={<FloppyDisk size={16} />} onClick={() => save.mutate([aEnvio(s, txt)], { onSuccess: () => setGuardado(true) })}>
+            Guardar cambios
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ======================= Categorías ======================= */
 function CategoriesSettings() {
   const { cat } = useCatalog()
   const [group, setGroup] = useState<CategoryGroup | 'new' | null>(null)
   const [category, setCategory] = useState<Category | { groupId: string } | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  if (!cat) return <Loading />
+  if (!cat)
+    return (
+      <LoadingState filas={3} etiqueta="Cargando las categorías" />
+    )
   const sel = selected ? cat.categories.find((c) => c.id === selected) : null
   return (
-    <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between">
-          <p className="text-[13px] text-muted">Grupos y categorías. Pulsa una categoría para ver sus subcategorías.</p>
-          <Button size="sm" icon={<Plus className="size-3.5" />} onClick={() => setGroup('new')}>
-            Nuevo grupo
-          </Button>
-        </div>
+    <div>
+      <ul className="divide-line">
         {cat.groups.map((g) => (
-          <section key={g.id} className="rounded-lg border border-line bg-surface">
-            <div className="flex items-center justify-between border-b border-line px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">{g.name}</span>
-                <Badge tone={g.kind === 'INCOME' ? 'pos' : 'neutral'}>{GROUP_KIND_LABEL[g.kind]}</Badge>
-              </div>
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setGroup(g)}>
-                  Editar
-                </Button>
-                <Button size="sm" variant="ghost" icon={<Plus className="size-3.5" />} onClick={() => setCategory({ groupId: g.id })}>
-                  Categoría
-                </Button>
-              </div>
+          <li key={g.id} className="flex flex-wrap items-start gap-4 py-4 first:pt-0">
+            <div className="w-48 shrink-0">
+              <div className="t-body font-semibold">{g.name}</div>
+              <div className="t-meta">{GROUP_KIND_LABEL[g.kind]}</div>
             </div>
-            <ul className="flex flex-wrap gap-1.5 p-3">
+            <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-label={`Categorías de ${g.name}`}>
               {cat.categories
                 .filter((c) => c.groupId === g.id)
                 .map((c) => (
                   <li key={c.id}>
-                    <button
-                      onClick={() => setSelected(c.id)}
-                      className={cx(
-                        'rounded-md border px-2.5 py-1 text-[13px]',
-                        selected === c.id ? 'border-accent bg-accent-soft' : 'border-line hover:bg-surface-2',
-                        !c.active && 'text-muted line-through'
-                      )}
-                    >
+                    <button type="button" aria-pressed={selected === c.id} onClick={() => setSelected(c.id)} className={cx('tag cursor-pointer hover:bg-interactive', selected === c.id && 'border-ink', !c.active && 'text-ink-3 line-through')}>
                       {c.name}
                     </button>
                   </li>
                 ))}
             </ul>
-          </section>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="ghost" icon={<Plus size={14} weight="bold" />} onClick={() => setCategory({ groupId: g.id })}>
+                Categoría
+              </Button>
+              <Tooltip texto={`Editar el grupo ${g.name}`}>
+                <IconButton variant="ghost" size="sm" etiqueta={`Editar el grupo ${g.name}`} icono={<PencilSimple size={16} />} onClick={() => setGroup(g)} />
+              </Tooltip>
+            </div>
+          </li>
         ))}
-      </div>
-      <div>{sel ? <CategoryDetail category={sel} onEdit={() => setCategory(sel)} onDeleted={() => setSelected(null)} /> : <p className="text-[13px] text-muted">Elige una categoría.</p>}</div>
+      </ul>
+      <p className="t-meta mt-4">Pulsa una categoría para ver sus subcategorías, editarla o borrarla.</p>
+      <Button className="mt-4" size="sm" icon={<Plus size={14} weight="bold" />} onClick={() => setGroup('new')}>
+        Nuevo grupo
+      </Button>
+      {sel && <CategoryDetail category={sel} onEdit={() => setCategory(sel)} onClose={() => setSelected(null)} />}
       {group && <GroupForm group={group === 'new' ? null : group} onClose={() => setGroup(null)} />}
       {category && <CategoryForm category={'id' in category ? category : null} groupId={category.groupId} onClose={() => setCategory(null)} />}
     </div>
   )
 }
 
-function CategoryDetail({ category: c, onEdit, onDeleted }: { category: Category; onEdit: () => void; onDeleted: () => void }) {
+function CategoryDetail({ category: c, onEdit, onClose }: { category: Category; onEdit: () => void; onClose: () => void }) {
   const { cat } = useCatalog()
   const usage = useApi('finanzas:categories.usage', [c.id])
   const [reassign, setReassign] = useState('')
   const [newSub, setNewSub] = useState('')
-  const del = useApiMutation('finanzas:categories.delete', { success: 'Categoría borrada', onSuccess: onDeleted })
+  const [fusion, setFusion] = useState<{ from: string; into: string } | null>(null)
+  const del = useApiMutation('finanzas:categories.delete', { success: 'Categoría borrada', onSuccess: onClose })
   const addSub = useApiMutation('finanzas:subcategories.save', { success: 'Subcategoría añadida', onSuccess: () => setNewSub('') })
   const delSub = useApiMutation('finanzas:subcategories.delete', { success: 'Subcategoría borrada' })
   const merge = useApiMutation('finanzas:subcategories.merge', { success: (n) => `Fusionadas (${n} movimientos movidos)` })
@@ -238,142 +327,166 @@ function CategoryDetail({ category: c, onEdit, onDeleted }: { category: Category
   const group = cat?.groups.find((g) => g.id === c.groupId)
   const sameKind = (cat?.categories ?? []).filter((x) => x.id !== c.id && cat?.groups.find((g) => g.id === x.groupId)?.kind === group?.kind)
   const used = (usage.data?.transactions ?? 0) + (usage.data?.recurring ?? 0)
+  const fromSub = fusion ? subs.find((x) => x.id === fusion.from) : null
+  const intoSub = fusion ? subs.find((x) => x.id === fusion.into) : null
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-[16px] font-semibold">{c.name}</h2>
-          <p className="text-[12px] text-muted">
-            {group?.name} · gasto {NATURE_LABEL[c.defaultNature].toLowerCase()} por defecto · {usage.data?.transactions ?? 0} movimientos
-          </p>
-        </div>
-        <Button size="sm" onClick={onEdit}>
-          Editar
-        </Button>
-      </div>
-      <div>
-        <h3 className="mb-1.5 text-[13px] font-medium">Subcategorías</h3>
-        {subs.length === 0 && <p className="text-[13px] text-muted">Sin subcategorías.</p>}
-        <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
-          {subs.map((s) => (
-            <li key={s.id} className="flex items-center gap-2 px-2 py-1.5 text-[13px]">
-              <TextInput
-                defaultValue={s.name}
-                className="h-8"
-                onBlur={(e) => {
-                  const v = e.target.value.trim()
-                  if (v && v !== s.name) renameSub.mutate([{ id: s.id, categoryId: s.categoryId, name: v, active: s.active }])
-                }}
-              />
-              <Select
-                className="h-8 w-40"
-                value=""
-                onChange={async (e) => {
-                  const into = e.target.value
-                  if (!into) return
-                  const target = subs.find((x) => x.id === into)
-                  if (await confirmDialog({ title: 'Fusionar subcategorías', text: `"${s.name}" se unirá a "${target?.name}" y sus movimientos pasarán a esta.`, confirm: 'Fusionar' }))
-                    merge.mutate([s.id, into])
-                }}
-              >
-                <option value="">Fusionar en…</option>
-                {subs
-                  .filter((x) => x.id !== s.id)
-                  .map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-              </Select>
-              <Button size="sm" variant="ghost" onClick={() => delSub.mutate([s.id])}>
+    <>
+      <Modal
+        titulo={c.name}
+        descripcion={`${group?.name} · gasto ${NATURE_LABEL[c.defaultNature].toLowerCase()} por defecto · ${usage.data?.transactions ?? 0} movimientos`}
+        ancho="lg"
+        onCerrar={onClose}
+        pie={
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cerrar
+            </Button>
+            <Button onClick={onEdit}>Editar categoría</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <div>
+            <h3 className="t-card-title mb-2">Subcategorías</h3>
+            {subs.length === 0 && <p className="t-label">Sin subcategorías.</p>}
+            <ul className="divide-line">
+              {subs.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-end gap-2 py-2">
+                  <TextField
+                    label={`Nombre de la subcategoría ${s.name}`}
+                    ocultarEtiqueta
+                    tamano="sm"
+                    defaultValue={s.name}
+                    className="min-w-40 flex-1"
+                    onBlur={(e) => {
+                      const v = e.target.value.trim()
+                      if (v && v !== s.name) renameSub.mutate([{ id: s.id, categoryId: s.categoryId, name: v, active: s.active }])
+                    }}
+                  />
+                  <Select
+                    label={`Fusionar ${s.name} en otra`}
+                    ocultarEtiqueta
+                    tamano="sm"
+                    className="w-44"
+                    value=""
+                    onChange={(e) => {
+                      const into = e.target.value
+                      if (into) setFusion({ from: s.id, into })
+                    }}
+                  >
+                    <option value="">Fusionar en…</option>
+                    {subs
+                      .filter((x) => x.id !== s.id)
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                  </Select>
+                  <Button size="sm" variant="ghost" aria-label={`Borrar la subcategoría ${s.name}`} onClick={() => delSub.mutate([s.id])}>
+                    Borrar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <form
+              className="mt-3 flex items-end gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (newSub.trim()) addSub.mutate([{ categoryId: c.id, name: newSub.trim(), active: true }])
+              }}
+            >
+              <TextField label="Nueva subcategoría" tamano="sm" className="flex-1" value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Nombre" />
+              <Button size="sm" type="submit">
+                Añadir
+              </Button>
+            </form>
+          </div>
+          <div className="border-t border-line pt-6">
+            <h3 className="t-card-title mb-2">Borrar categoría</h3>
+            {used > 0 ? (
+              <div className="flex flex-col gap-3">
+                <p className="t-label">
+                  Se usa en {usage.data?.transactions} movimientos y {usage.data?.recurring} recurrentes. Elige a qué categoría pasan antes de borrarla (o desactívala).
+                </p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <Select label="Pasar a" tamano="sm" className="w-56" value={reassign} onChange={(e) => setReassign(e.target.value)}>
+                    <option value="">Elige…</option>
+                    {sameKind.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button size="sm" variant="danger" disabled={!reassign} onClick={() => del.mutate([c.id, reassign])}>
+                    Pasar y borrar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="danger" onClick={() => del.mutate([c.id, null])}>
                 Borrar
               </Button>
-            </li>
-          ))}
-        </ul>
-        <form
-          className="mt-2 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (newSub.trim()) addSub.mutate([{ categoryId: c.id, name: newSub.trim(), active: true }])
-          }}
-        >
-          <TextInput value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Nueva subcategoría" className="h-8" />
-          <Button size="sm" type="submit">
-            Añadir
-          </Button>
-        </form>
-      </div>
-      <div className="border-t border-line pt-3">
-        <h3 className="mb-1.5 text-[13px] font-medium">Borrar categoría</h3>
-        {used > 0 ? (
-          <div className="flex flex-col gap-2">
-            <p className="text-[12px] text-muted">
-              Se usa en {usage.data?.transactions} movimientos y {usage.data?.recurring} recurrentes. Elige a qué categoría pasan antes de borrarla (o desactívala).
-            </p>
-            <div className="flex gap-2">
-              <Select className="h-8" value={reassign} onChange={(e) => setReassign(e.target.value)}>
-                <option value="">Pasar a…</option>
-                {sameKind.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </Select>
-              <Button size="sm" variant="danger" disabled={!reassign} onClick={() => del.mutate([c.id, reassign])}>
-                Pasar y borrar
-              </Button>
-            </div>
+            )}
           </div>
-        ) : (
-          <Button size="sm" variant="danger" onClick={() => del.mutate([c.id, null])}>
-            Borrar
-          </Button>
-        )}
-      </div>
-    </section>
+        </div>
+      </Modal>
+      {fusion && (
+        <ConfirmDialog
+          titulo="¿Fusionar subcategorías?"
+          texto={`«${fromSub?.name}» se unirá a «${intoSub?.name}» y sus movimientos pasarán a esta.`}
+          confirmar="Fusionar"
+          peligro={false}
+          onCancelar={() => setFusion(null)}
+          onConfirmar={() => (setFusion(null), merge.mutate([fusion.from, fusion.into]))}
+        />
+      )}
+    </>
   )
 }
 
 function GroupForm({ group, onClose }: { group: CategoryGroup | null; onClose: () => void }) {
   const [name, setName] = useState(group?.name ?? '')
   const [kind, setKind] = useState<GroupKind>(group?.kind ?? 'EXPENSE')
+  const nombreRef = useRef<HTMLInputElement>(null)
   const save = useApiMutation('finanzas:groups.save', { success: 'Grupo guardado', onSuccess: onClose })
   const del = useApiMutation('finanzas:groups.delete', { success: 'Grupo borrado', onSuccess: onClose })
   return (
     <Modal
-      open
-      onClose={onClose}
-      width={440}
-      title={group ? `Editar grupo ${group.name}` : 'Nuevo grupo'}
-      footer={
+      titulo={group ? `Editar grupo ${group.name}` : 'Nuevo grupo'}
+      ancho="sm"
+      inicial={nombreRef}
+      onCerrar={onClose}
+      pie={
         <>
           {group && (
-            <Button variant="ghost" className="mr-auto text-neg" onClick={() => del.mutate([group.id])}>
+            <Button variant="danger" className="mr-auto" onClick={() => del.mutate([group.id])}>
               Borrar
             </Button>
           )}
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={() => save.mutate([{ id: group?.id ?? null, name, kind, sortOrder: group?.sortOrder ?? 99 }])}>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="accent" cargando={save.isPending} onClick={() => save.mutate([{ id: group?.id ?? null, name, kind, sortOrder: group?.sortOrder ?? 99 }])}>
             Guardar
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-3">
-        <Field label="Nombre" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        </Field>
-        <Field label="Tipo">
-          <Segmented
+      <div className="flex flex-col gap-4">
+        <TextField ref={nombreRef} label="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
+        <div>
+          <span className="field-label">Tipo</span>
+          <SegmentedControl
+            label="Tipo de grupo"
             value={kind}
             onChange={setKind}
-            options={[
-              { value: 'EXPENSE', label: 'Gastos' },
-              { value: 'INCOME', label: 'Ingresos' }
+            opciones={[
+              { id: 'EXPENSE', texto: 'Gastos' },
+              { id: 'INCOME', texto: 'Ingresos' }
             ]}
           />
-        </Field>
+        </div>
       </div>
     </Modal>
   )
@@ -386,53 +499,69 @@ function CategoryForm({ category, groupId, onClose }: { category: Category | nul
   const [nature, setNature] = useState<Nature>(category?.defaultNature ?? 'VARIABLE')
   const [active, setActive] = useState(category?.active ?? true)
   const [notes, setNotes] = useState(category?.notes ?? '')
+  const nombreRef = useRef<HTMLInputElement>(null)
   const save = useApiMutation('finanzas:categories.save', { success: 'Categoría guardada', onSuccess: onClose })
   return (
     <Modal
-      open
-      onClose={onClose}
-      width={480}
-      title={category ? `Editar ${category.name}` : 'Nueva categoría'}
-      footer={
+      titulo={category ? `Editar ${category.name}` : 'Nueva categoría'}
+      inicial={nombreRef}
+      onCerrar={onClose}
+      pie={
         <>
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button
-            variant="primary"
-            onClick={() => save.mutate([{ id: category?.id ?? null, name, groupId: gid, defaultNature: nature, active, notes, sortOrder: category?.sortOrder ?? 99 }])}
-          >
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="accent" cargando={save.isPending} onClick={() => save.mutate([{ id: category?.id ?? null, name, groupId: gid, defaultNature: nature, active, notes, sortOrder: category?.sortOrder ?? 99 }])}>
             Guardar
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-3">
-        <Field label="Nombre" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        </Field>
-        <Field label="Grupo">
-          <Select value={gid} onChange={(e) => setGid(e.target.value)}>
-            {cat?.groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Tipo de gasto por defecto" hint="Fijo, variable o extraordinario. Cada movimiento puede cambiarlo.">
-          <Select value={nature} onChange={(e) => setNature(e.target.value as Nature)}>
-            {NATURES.map((n) => (
-              <option key={n} value={n}>
-                {NATURE_LABEL[n]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Checkbox checked={active} onChange={setActive} label="Activa" hint="Las inactivas no aparecen al registrar movimientos, pero conservan su historial." />
-        <Field label="Notas">
-          <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
+      <div className="flex flex-col gap-4">
+        <TextField ref={nombreRef} label="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
+        <Select label="Grupo" value={gid} onChange={(e) => setGid(e.target.value)}>
+          {cat?.groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </Select>
+        <Select label="Tipo de gasto por defecto" ayuda="Fijo, variable o extraordinario. Cada movimiento puede cambiarlo." value={nature} onChange={(e) => setNature(e.target.value as Nature)}>
+          {NATURES.map((n) => (
+            <option key={n} value={n}>
+              {NATURE_LABEL[n]}
+            </option>
+          ))}
+        </Select>
+        <Checkbox checked={active} onChange={setActive} label="Activa" ayuda="Las inactivas no aparecen al registrar movimientos, pero conservan su historial." />
+        <TextArea label="Notas" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
     </Modal>
+  )
+}
+
+/* ======================= Datos y copias ======================= */
+const tamano = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${(bytes / 1024).toFixed(0)} KB`)
+const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+const DIA_MS = 24 * 60 * 60 * 1000
+/** «hoy», «ayer» o «hace N días», según la fecha de la copia */
+const hace = (iso: string) => {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS)
+  return d <= 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`
+}
+
+function Fila({ icono, titulo, texto, children }: { icono?: ReactNode; titulo: string; texto: string; children: ReactNode }) {
+  return (
+    <div className="cols-label grid gap-4 py-6 first:pt-0 last:pb-0">
+      <div>
+        <h3 className="t-card-title flex items-center gap-2">
+          {icono}
+          {titulo}
+        </h3>
+        <p className="t-meta mt-1">{texto}</p>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
   )
 }
 
@@ -441,109 +570,139 @@ function DataSettings() {
   const backups = useApi('core:backup.list', [])
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [picking, setPicking] = useState(false)
+  const [restaurar, setRestaurar] = useState<{ nombre: string; ruta: string | null } | null>(null)
   const create = useApiMutation('core:backup.create', { success: (b) => `Copia creada: ${b.name}` })
   // Tras restaurar, con éxito o con error, se refresca todo: la base activa puede haber cambiado.
   const restore = useApiMutation('core:backup.restore', { success: (r) => (r ? 'Copia restaurada' : null), invalidateOnError: true })
   const exportJson = useApiMutation('finanzas:export.json', { success: (f) => (f ? 'Exportado a JSON' : null) })
   const exportXlsx = useApiMutation('finanzas:export.xlsx', { success: (f) => (f ? 'Exportado a Excel' : null) })
   const exportCsv = useApiMutation('finanzas:export.csv', { success: (f) => (f ? `${f.length} archivos CSV exportados` : null) })
+  const ultima = backups.data?.[0]
+  const dias = ultima ? Math.floor((Date.now() - new Date(ultima.createdAt).getTime()) / DIA_MS) : null
   return (
-    <div className="flex max-w-[900px] flex-col gap-6">
-      <Section title="Importar el Excel FINANCIAL_MASTER" description="Verás una vista previa con recuentos, avisos y duplicados antes de importar nada." boxed>
-        <Button
-          loading={picking}
-          onClick={async () => {
-            setPicking(true)
-            try {
-              const p = await api('finanzas:import.pick')
-              if (p) setPreview(p)
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : String(e))
-            } finally {
-              setPicking(false)
-            }
-          }}
-        >
-          Elegir archivo .xlsx…
-        </Button>
-      </Section>
-      <Section title="Exportar" description="Todo, con sus identificadores y relaciones." boxed>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => exportXlsx.mutate([])} loading={exportXlsx.isPending}>
-            Excel (.xlsx)
-          </Button>
-          <Button onClick={() => exportCsv.mutate([])} loading={exportCsv.isPending}>
-            CSV (una tabla por archivo)
-          </Button>
-          <Button onClick={() => exportJson.mutate([])} loading={exportJson.isPending}>
-            JSON completo (restaurable)
-          </Button>
-        </div>
-      </Section>
-      <Section
-        title="Copias de seguridad"
-        description="Se hace una copia automática al abrir la app (una al día; se guardan las 30 últimas). Restaurar guarda antes una copia del estado actual."
-        boxed
-        actions={
+    <div>
+      <div className="flex flex-wrap items-center gap-3 r-card bg-raised p-4" role="status">
+        {ultima ? (
           <>
-            <Button size="sm" icon={<FolderOpen className="size-3.5" />} onClick={() => api('core:backup.openFolder')}>
-              Abrir carpeta
-            </Button>
-            <Button size="sm" onClick={() => create.mutate([])} loading={create.isPending}>
-              Crear copia ahora
-            </Button>
+            <StatusBadge tono={dias !== null && dias > 7 ? 'warning' : 'success'}>
+              Última copia: {hace(ultima.createdAt)}, {formatDate(ultima.createdAt.slice(0, 10))} a las {hora(ultima.createdAt)}
+            </StatusBadge>
+            <span className="t-meta tnum">
+              {tamano(ultima.size)} · {ultima.auto ? 'automática' : 'creada a mano o antes de un cambio'}
+            </span>
           </>
-        }
-      >
-        {backups.data?.length ? (
-          <ul className="divide-y divide-line rounded-md border border-line text-[13px]">
-            {backups.data.slice(0, 12).map((b) => (
-              <li key={b.path} className="flex items-center justify-between gap-3 px-3 py-1.5">
-                <span className="truncate">{b.name}</span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className="text-muted">{(b.size / 1024).toFixed(0)} KB</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => {
-                      if (await confirmDialog({ title: 'Restaurar copia', text: `Se sustituirán tus datos actuales por los de ${b.name}. Antes se guarda una copia del estado actual.`, confirm: 'Restaurar', danger: true }))
-                        restore.mutate([b.path])
-                    }}
-                  >
-                    Restaurar
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
+        ) : backups.isLoading ? (
+          <span className="t-meta">Mirando las copias…</span>
         ) : (
-          <p className="text-[13px] text-muted">Aún no hay copias.</p>
+          <StatusBadge tono="warning">Aún no hay copias</StatusBadge>
         )}
-        <div className="mt-3">
+      </div>
+
+      <div className="divide-line mt-6">
+        <Fila icono={<UploadSimple size={20} weight="duotone" aria-hidden />} titulo="Importar" texto="Traer datos de un archivo.">
+          <p className="t-label">Importa el Excel FINANCIAL_MASTER. Verás una vista previa con recuentos, avisos y duplicados antes de importar nada.</p>
           <Button
+            className="mt-3"
             size="sm"
+            cargando={picking}
             onClick={async () => {
-              if (await confirmDialog({ title: 'Restaurar desde archivo', text: 'Elige una copia .sqlite o una exportación .json. Antes se guarda una copia del estado actual.', confirm: 'Elegir archivo' }))
-                restore.mutate([])
+              setPicking(true)
+              try {
+                const p = await api('finanzas:import.pick')
+                if (p) setPreview(p)
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : String(e))
+              } finally {
+                setPicking(false)
+              }
             }}
           >
+            Elegir archivo .xlsx…
+          </Button>
+        </Fila>
+
+        <Fila icono={<DownloadSimple size={20} weight="duotone" aria-hidden />} titulo="Exportar" texto="Sacar tus datos a un archivo.">
+          <p className="t-label">Todo, con sus identificadores y relaciones.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => exportXlsx.mutate([])} cargando={exportXlsx.isPending}>
+              Excel (.xlsx)
+            </Button>
+            <Button size="sm" onClick={() => exportCsv.mutate([])} cargando={exportCsv.isPending}>
+              CSV (una tabla por archivo)
+            </Button>
+            <Button size="sm" onClick={() => exportJson.mutate([])} cargando={exportJson.isPending}>
+              JSON completo (restaurable)
+            </Button>
+          </div>
+        </Fila>
+
+        <Fila icono={<ShieldCheck size={20} weight="duotone" aria-hidden />} titulo="Copias de seguridad" texto="Guardar una copia de la base.">
+          <p className="t-label">Se hace una copia automática al abrir la app (una al día; se guardan las 30 últimas).</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="accent" icon={<FloppyDisk size={16} />} onClick={() => create.mutate([])} cargando={create.isPending}>
+              Crear copia ahora
+            </Button>
+            <Button size="sm" icon={<FolderOpen size={16} />} onClick={() => api('core:backup.openFolder')}>
+              Abrir carpeta de copias
+            </Button>
+          </div>
+          {info.data && (
+            <div className="t-meta mt-4">
+              <p className="flex items-start gap-2">
+                <FolderOpen size={16} aria-hidden className="mt-px shrink-0" />
+                <code className="min-w-0 break-all">{info.data.dbPath}</code>
+              </p>
+              <p className="mt-1">
+                Versión {info.data.version} · esquema v{info.data.schemaVersion}. Un único archivo SQLite que solo existe en este PC.
+              </p>
+              <Button className="mt-2" size="sm" variant="ghost" icon={<FolderOpen size={14} />} onClick={() => api('core:data.openFolder')}>
+                Mostrar en el Explorador
+              </Button>
+            </div>
+          )}
+        </Fila>
+
+        <Fila titulo="Restaurar" texto="Volver a una copia anterior.">
+          <p className="t-label">Sustituye los datos actuales por los de la copia. Antes se guarda una copia de lo que tienes ahora.</p>
+          {backups.data?.length ? (
+            <ul className="divide-line mt-3 r-card border border-line" aria-label="Copias disponibles">
+              {backups.data.slice(0, 12).map((b) => (
+                <li key={b.path} className="flex flex-wrap items-center gap-3 px-4 py-2">
+                  <span className="t-body tnum min-w-0 flex-1 truncate" title={b.name}>
+                    {b.name}
+                  </span>
+                  {b.auto && <Tag>Automática</Tag>}
+                  <span className="t-meta tnum">{tamano(b.size)}</span>
+                  <Button size="sm" variant="ghost" aria-label={`Restaurar ${b.name}`} onClick={() => setRestaurar({ nombre: b.name, ruta: b.path })}>
+                    Restaurar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="t-meta mt-3">Aún no hay copias.</p>
+          )}
+          <Button className="mt-3" size="sm" variant="danger" onClick={() => setRestaurar({ nombre: 'un archivo', ruta: null })}>
             Restaurar desde un archivo…
           </Button>
-        </div>
-      </Section>
-      {info.data && (
-        <Section title="Dónde están tus datos" boxed>
-          <p className="break-all text-[13px] text-ink-2">{info.data.dbPath}</p>
-          <p className="mt-1 text-[12px] text-muted">
-            Versión {info.data.version} · esquema v{info.data.schemaVersion}. Un único archivo SQLite que solo existe en este PC.
-          </p>
-          <Button size="sm" className="mt-2" icon={<FolderOpen className="size-3.5" />} onClick={() => api('core:data.openFolder')}>
-            Mostrar en el Explorador
-          </Button>
-        </Section>
-      )}
-      <ClaudeMcp />
+        </Fila>
+      </div>
+
       {preview && <ImportPreviewModal preview={preview} onClose={() => setPreview(null)} />}
+      {restaurar && (
+        <ConfirmDialog
+          titulo={restaurar.ruta ? '¿Restaurar esta copia?' : '¿Restaurar desde un archivo?'}
+          texto={
+            restaurar.ruta
+              ? `Se sustituirán tus datos actuales por los de ${restaurar.nombre}. Antes se guarda una copia del estado actual.`
+              : 'Elige una copia .sqlite o una exportación .json. Antes se guarda una copia del estado actual.'
+          }
+          confirmar={restaurar.ruta ? 'Restaurar copia' : 'Elegir archivo'}
+          peligro={!!restaurar.ruta}
+          onCancelar={() => setRestaurar(null)}
+          onConfirmar={() => (restore.mutate(restaurar.ruta ? [restaurar.ruta] : []), setRestaurar(null))}
+        />
+      )}
     </div>
   )
 }
@@ -552,15 +711,15 @@ function ClaudeMcp() {
   const q = useApi('finanzas:mcp.config', [])
   const json = q.data ? JSON.stringify(q.data, null, 2) : ''
   return (
-    <Section
-      title="Conectar con Claude (MCP)"
-      description="Claude Desktop podrá leer tus datos (solo lectura) y revisar el plan de inversión. Pega esto en claude_desktop_config.json y reinicia Claude."
-      boxed
-    >
-      <pre className="max-h-60 overflow-auto rounded-md bg-surface-2 p-3 text-[12px]">{json || 'Cargando…'}</pre>
-      <div className="mt-2 flex gap-2">
+    <div>
+      <p className="t-label">Pega esto en claude_desktop_config.json y reinicia Claude.</p>
+      <pre className="t-meta tnum mt-3 max-h-60 overflow-auto r-control bg-raised p-4" tabIndex={0} aria-label="Configuración para Claude Desktop">
+        {json || 'Cargando…'}
+      </pre>
+      <div className="mt-3 flex gap-2">
         <Button
           size="sm"
+          icon={<Copy size={14} />}
           disabled={!json}
           onClick={async () => {
             await navigator.clipboard.writeText(json)
@@ -570,10 +729,10 @@ function ClaudeMcp() {
           Copiar configuración
         </Button>
       </div>
-      <p className="mt-2 text-[12px] text-muted">
+      <p className="t-meta mt-3">
         En Claude Desktop: Ajustes → Desarrollador → Editar configuración. Si ya tienes otros servidores en «mcpServers», añade solo la entrada «finanzas». Tras actualizar la app, la ruta no cambia.
       </p>
-    </Section>
+    </div>
   )
 }
 
@@ -587,118 +746,116 @@ export function ImportPreviewModal({ preview: p, onClose }: { preview: ImportPre
   const blocking = p.errors.length > 0
   return (
     <Modal
-      open
-      onClose={onClose}
-      width={760}
-      title={`Vista previa · ${p.fileName}`}
-      footer={
+      titulo={`Vista previa · ${p.fileName}`}
+      ancho="xl"
+      onCerrar={onClose}
+      pie={
         <>
-          <Button onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" disabled={(hasData && !confirmReplace) || apply.isPending} loading={apply.isPending} onClick={() => apply.mutate([p.token, hasData])}>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="accent" disabled={(hasData && !confirmReplace) || apply.isPending} cargando={apply.isPending} onClick={() => apply.mutate([p.token, hasData])}>
             {hasData ? 'Reemplazar mis datos e importar' : 'Importar'}
           </Button>
         </>
       }
     >
-      <div className="flex flex-col gap-4 text-[13px]">
-        <div className="grid grid-cols-4 gap-x-6 gap-y-1">
+      <div className="flex flex-col gap-6">
+        <dl className="grid gap-x-8 sm:grid-cols-2 @lg:grid-cols-4">
           {Object.entries(p.counts).map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-line py-1">
-              <span className="text-muted">{k}</span>
-              <span className="num font-medium">{v}</span>
+            <div key={k} className="flex justify-between gap-3 border-b border-line py-2">
+              <dt className="t-label">{k}</dt>
+              <dd className="tnum t-body font-semibold">{v}</dd>
             </div>
           ))}
-        </div>
+        </dl>
         {p.months.from && (
-          <p className="text-muted">
+          <p className="t-label">
             Movimientos del {formatDate(p.months.from)} al {formatDate(p.months.to)}. {p.recurringLinked} enlazados a su recurrente
             {p.recurringUnlinked ? `, ${p.recurringUnlinked} marcados como fijos sin regla` : ''}.
           </p>
         )}
         <div>
-          <h3 className="mb-1 font-medium">Saldos: app frente a Excel</h3>
-          <ul className="divide-y divide-line rounded-md border border-line">
+          <h3 className="t-card-title mb-2">Saldos: app frente a Excel</h3>
+          <ul className="divide-line r-card border border-line">
             {p.balanceCheck.map((b) => (
-              <li key={b.accountId} className="flex justify-between px-3 py-1.5">
-                <span>{b.name}</span>
-                <span className="flex gap-4">
-                  <span className="num">{formatEur(b.appCents)}</span>
-                  <span className={b.ok ? 'text-pos' : 'text-neg'}>{b.ok ? 'cuadra' : `Excel: ${formatEur(b.excelCents)}`}</span>
+              <li key={b.accountId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2">
+                <span className="t-body">{b.name}</span>
+                <span className="flex items-center gap-4">
+                  <span className="tnum t-body">{formatEur(b.appCents)}</span>
+                  {b.ok ? <StatusBadge tono="success">Cuadra</StatusBadge> : <StatusBadge tono="error">Excel: {formatEur(b.excelCents)}</StatusBadge>}
                 </span>
               </li>
             ))}
           </ul>
         </div>
         {p.errors.length > 0 && (
-          <Notice tone="neg">
+          <Aviso tono="error">
             {p.errors.map((e) => (
               <div key={e}>{e}</div>
             ))}
-          </Notice>
+          </Aviso>
         )}
         {p.skipped.length > 0 && (
-          <Notice tone="warn">
-            <div className="font-medium">Filas que no se pueden convertir ({p.skipped.length}):</div>
+          <Aviso tono="warning">
+            <div className="font-semibold">Filas que no se pueden convertir ({p.skipped.length}):</div>
             {p.skipped.map((s, i) => (
               <div key={i}>
                 {s.sheet} fila {s.row}: {s.reason}
               </div>
             ))}
-          </Notice>
+          </Aviso>
         )}
         {p.warnings.length > 0 && (
-          <Notice tone="info">
-            <div className="font-medium">Avisos ({p.warnings.length})</div>
+          <Aviso tono="info">
+            <div className="font-semibold">Avisos ({p.warnings.length})</div>
             {p.warnings.map((w, i) => (
               <div key={i}>{w}</div>
             ))}
-          </Notice>
+          </Aviso>
         )}
         {p.duplicates.length > 0 && (
-          <Notice tone="warn">
-            <div className="font-medium">Posibles duplicados ({p.duplicates.length}). Se importan igual; podrás revisarlos en Movimientos → Por revisar.</div>
+          <Aviso tono="warning">
+            <div className="font-semibold">Posibles duplicados ({p.duplicates.length}). Se importan igual; podrás revisarlos en Movimientos → Por revisar.</div>
             {p.duplicates.map((d) => (
               <div key={d.a + d.b}>
                 {d.a} / {d.b}: {d.text}
               </div>
             ))}
-          </Notice>
+          </Aviso>
         )}
         {hasData && (
-          <div className="rounded-md border border-neg/40 p-3">
-            <Checkbox
-              checked={confirmReplace}
-              onChange={setConfirmReplace}
-              label={`Ya tienes ${p.existing.transactions} movimientos y ${p.existing.accounts} cuentas en la app. Entiendo que se reemplazarán (antes se guarda una copia).`}
-            />
+          <div className="r-control border border-error p-4">
+            <Checkbox checked={confirmReplace} onChange={setConfirmReplace} label={`Ya tienes ${p.existing.transactions} movimientos y ${p.existing.accounts} cuentas en la app. Entiendo que se reemplazarán (antes se guarda una copia).`} />
           </div>
         )}
-        {blocking && <p className="text-neg">Hay saldos que no cuadran con el Excel: revisa antes de importar.</p>}
+        {blocking && <StatusBadge tono="error">Hay saldos que no cuadran con el Excel: revisa antes de importar.</StatusBadge>}
       </div>
     </Modal>
   )
 }
 
+/* ======================= Registro de cambios ======================= */
+const ACCION: Record<string, string> = {
+  create: 'Alta',
+  update: 'Cambio',
+  delete: 'Borrado',
+  cancel: 'Anulado',
+  status: 'Estado',
+  merge: 'Fusión',
+  import: 'Importación',
+  restore: 'Restauración',
+  copy: 'Copia',
+  not_duplicate: 'No duplicado'
+}
 function AuditLog() {
   const [entity, setEntity] = useState('')
   const q = useApi('core:audit.list', [300, entity || undefined])
-  if (q.isLoading) return <Loading />
-  if (q.error) return <ErrorBox error={q.error} />
-  const label: Record<string, string> = {
-    create: 'Alta',
-    update: 'Cambio',
-    delete: 'Borrado',
-    cancel: 'Anulado',
-    status: 'Estado',
-    merge: 'Fusión',
-    import: 'Importación',
-    restore: 'Restauración',
-    copy: 'Copia',
-    not_duplicate: 'No duplicado'
-  }
+  if (q.isLoading) return <LoadingState filas={3} etiqueta="Cargando el registro" />
+  if (q.error || !q.data) return <ErrorState titulo="No se ha podido cargar el registro" texto={q.error?.message ?? 'Inténtalo de nuevo.'} accion={<Button size="sm" onClick={() => q.refetch()}>Reintentar</Button>} />
   return (
-    <div className="flex flex-col gap-3">
-      <Select className="w-56" value={entity} onChange={(e) => setEntity(e.target.value)}>
+    <div className="flex flex-col gap-4">
+      <Select label="Qué" className="w-56" value={entity} onChange={(e) => setEntity(e.target.value)}>
         <option value="">Todo</option>
         {['transactions', 'accounts', 'categories', 'subcategories', 'recurring_rules', 'goals', 'goal_allocations', 'budgets', 'investment_ops', 'instruments', 'prices', 'settings', 'import', 'backup'].map((e) => (
           <option key={e} value={e}>
@@ -706,29 +863,29 @@ function AuditLog() {
           </option>
         ))}
       </Select>
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full text-[13px]">
+      <div className="card card-flush max-h-96 overflow-auto">
+        <table className="table" data-density="compact" aria-label="Registro de cambios">
           <thead>
-            <tr className="border-b border-line bg-surface-2 text-left text-ink-2">
-              <th className="px-3 py-2 font-medium">Cuándo</th>
-              <th className="px-3 py-2 font-medium">Qué</th>
-              <th className="px-3 py-2 font-medium">Registro</th>
-              <th className="px-3 py-2 font-medium">Detalle</th>
+            <tr>
+              <th scope="col">Cuándo</th>
+              <th scope="col">Qué</th>
+              <th scope="col">Registro</th>
+              <th scope="col">Detalle</th>
             </tr>
           </thead>
           <tbody>
-            {q.data!.map((a) => (
-              <tr key={a.id} className="border-b border-line align-top last:border-0">
-                <td className="num whitespace-nowrap px-3 py-1.5 text-muted">
-                  {formatDate(a.ts.slice(0, 10))} {new Date(a.ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            {q.data.map((a) => (
+              <tr key={a.id} className="align-top">
+                <td className="tnum whitespace-nowrap text-ink-2">
+                  {formatDate(a.ts.slice(0, 10))} {hora(a.ts)}
                 </td>
-                <td className="px-3 py-1.5">
-                  <Badge>{label[a.action] ?? a.action}</Badge>
+                <td>
+                  <Tag>{ACCION[a.action] ?? a.action}</Tag>
                 </td>
-                <td className="px-3 py-1.5 text-ink-2">
+                <td className="text-ink-2">
                   {a.entity} {a.entity_id}
                 </td>
-                <td className="px-3 py-1.5">{a.summary}</td>
+                <td className="py-2">{a.summary}</td>
               </tr>
             ))}
           </tbody>

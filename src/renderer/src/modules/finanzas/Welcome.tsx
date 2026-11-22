@@ -1,7 +1,7 @@
 import { FileXls, PlusCircle, Wallet } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useThemeSync } from '../../core/shell/theme'
-import { Button, Notice } from '../../components/ui'
+import { Aviso, Button } from '../../core/ui'
 import { api } from '../../lib/api'
 import { toast } from '../../lib/toast'
 import type { ImportPreview } from '../../../../main/modules/finanzas/importExcel'
@@ -38,14 +38,14 @@ export function WelcomePage() {
             }}
             className="card card-link flex-row items-start gap-4 text-left disabled:cursor-progress disabled:opacity-60"
           >
-            <FileXls size={24} weight="duotone" className="mt-0.5 shrink-0 text-accent-text" aria-hidden />
+            <FileXls size={24} weight="duotone" className="mt-1 shrink-0 text-accent-text" aria-hidden />
             <span>
               <span className="t-card-title block">Importar mi FINANCIAL_MASTER.xlsx</span>
               <span className="t-label mt-1 block">Cuentas, categorías, movimientos, recurrentes y objetivos. Verás una vista previa antes de importar.</span>
             </span>
           </button>
           <button onClick={() => setNewAccount(true)} className="card card-link flex-row items-start gap-4 text-left">
-            <PlusCircle size={24} weight="duotone" className="mt-0.5 shrink-0 text-accent-text" aria-hidden />
+            <PlusCircle size={24} weight="duotone" className="mt-1 shrink-0 text-accent-text" aria-hidden />
             <span>
               <span className="t-card-title block">Empezar de cero</span>
               <span className="t-label mt-1 block">Crea tu primera cuenta y registra movimientos a mano.</span>
@@ -53,10 +53,10 @@ export function WelcomePage() {
           </button>
         </div>
         <div className="mt-6">
-          <Notice tone="info">No se conecta a ningún banco ni pide credenciales. Tú introduces los movimientos a partir de tu historial.</Notice>
+          <Aviso tono="info">No se conecta a ningún banco ni pide credenciales. Tú introduces los movimientos a partir de tu historial.</Aviso>
         </div>
         {picking && (
-          <Button className="mt-3" loading variant="ghost">
+          <Button className="mt-3" cargando variant="ghost">
             Leyendo el Excel…
           </Button>
         )}

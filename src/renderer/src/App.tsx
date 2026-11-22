@@ -1,13 +1,12 @@
 import { useCallback, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { ConfirmHost, ErrorBox, Toaster } from './components/ui'
+import { ErrorState, LoadingState, Toaster } from './core/ui'
 import { SettingsPage } from './core/ajustes/Settings'
 import { Inicio } from './core/inicio/Inicio'
 import { AppShell } from './core/shell/AppShell'
 import { leerRuta, moduloDe, RUTAS_ANTIGUAS, rutaFinanzas } from './core/shell/nav'
 import { useCambiarTema, useThemeSync } from './core/shell/theme'
 import { UpdateFooter } from './core/shell/UpdateFooter'
-import { LoadingState } from './core/ui'
 import { useApi } from './lib/api'
 import { EntrenoPage } from './modules/entreno/Entreno'
 import { AccountsPage } from './modules/finanzas/Accounts'
@@ -84,14 +83,13 @@ export function App() {
   if (info.error)
     return (
       <div className="p-8">
-        <ErrorBox error={info.error} />
+        <ErrorState titulo="No se han podido abrir tus datos" texto={info.error.message} />
       </div>
     )
   return (
     <TxEditorProvider>
       {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
       <ModuloActual>
-        <ConfirmHost />
         <Toaster />
       </ModuloActual>
     </TxEditorProvider>

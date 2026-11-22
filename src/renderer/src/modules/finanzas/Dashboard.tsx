@@ -448,7 +448,7 @@ export function DashboardPage() {
                 </Link>
               )}
             </MesCifra>
-            <MesCifra etiqueta="Ahorro" valor={<CifraEur cents={s.netCashFlowCents} signo />} value={s.netCashFlowCents} >
+            <MesCifra etiqueta="Flujo neto" valor={<CifraEur cents={s.netCashFlowCents} signo />} value={s.netCashFlowCents}>
               <p className="t-meta mt-2">Tasa de ahorro: {formatPct(s.savingsRate)} de los ingresos del mes</p>
               {s.extraordinaryCents !== 0 && <p className="t-meta mt-1">Sin extraordinarios: {formatPct(s.savingsRateOrdinary)}</p>}
             </MesCifra>

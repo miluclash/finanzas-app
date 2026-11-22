@@ -12,6 +12,8 @@ export interface Column<T> {
   align?: 'left' | 'right' | 'center'
   width?: string
   className?: string
+  /** Columna secundaria: en contenedores estrechos se oculta (su información baja a otra celda) */
+  soloAncho?: boolean
 }
 
 export function DataTable<T>({
@@ -78,7 +80,7 @@ export function DataTable<T>({
                   key={c.key}
                   scope="col"
                   style={{ width: c.width }}
-                  className={cx('whitespace-nowrap', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center')}
+                  className={cx('whitespace-nowrap', c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.soloAncho && 'hidden @4xl:table-cell')}
                   aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   {c.sort ? (
@@ -131,7 +133,7 @@ export function DataTable<T>({
                   </td>
                 )}
                 {columns.map((c) => (
-                  <td key={c.key} className={cx(c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.className)}>
+                  <td key={c.key} className={cx(c.align === 'right' && 'text-right', c.align === 'center' && 'text-center', c.soloAncho && 'hidden @4xl:table-cell', c.className)}>
                     {c.cell(r)}
                   </td>
                 ))}

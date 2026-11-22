@@ -75,7 +75,7 @@ export const TextField = forwardRef<HTMLInputElement, FieldProps & Omit<InputHTM
     </div>
   )
 })
-export function Select({ label, ayuda, error, className, tamano, ocultarEtiqueta, children, ...rest }: FieldProps & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'>) {
+export const Select = forwardRef<HTMLSelectElement, FieldProps & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'>>(function Select({ label, ayuda, error, className, tamano, ocultarEtiqueta, children, ...rest }, ref) {
   const id = useId()
   const hid = `${id}-h`
   return (
@@ -83,7 +83,7 @@ export function Select({ label, ayuda, error, className, tamano, ocultarEtiqueta
       <label htmlFor={id} className={cx('field-label', ocultarEtiqueta && 'sr-only')}>
         {label}
       </label>
-      <select id={id} aria-invalid={error ? true : undefined} aria-describedby={error || ayuda ? hid : undefined} {...rest} className={cx('input', tamano === 'sm' && 'input-sm')}>
+      <select id={id} ref={ref} aria-invalid={error ? true : undefined} aria-describedby={error || ayuda ? hid : undefined} {...rest} className={cx('input', tamano === 'sm' && 'input-sm')}>
         {children}
       </select>
       {error ? (
@@ -100,7 +100,7 @@ export function Select({ label, ayuda, error, className, tamano, ocultarEtiqueta
       )}
     </div>
   )
-}
+})
 
 /* ======================= Switch, Checkbox ======================= */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {

@@ -1,4 +1,4 @@
-// Busca valores sueltos en el código nuevo (core/ y modules/entreno/; las páginas de Finanzas sin reestilizar quedan fuera hasta la parte B): colores, tamaños y espaciados que no sean tokens.
+// Busca valores sueltos en todo el código de la interfaz (src/renderer/src): colores, tamaños y espaciados que no sean tokens.
 // Uso: node scripts/auditar-tokens.mjs   (sale con error si encuentra alguno)
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const aqui = path.dirname(fileURLToPath(import.meta.url))
 const raiz = path.join(aqui, '..', 'src', 'renderer', 'src')
-const carpetas = ['core', 'modules/entreno'].map((c) => path.join(raiz, c))
+const carpetas = [raiz]
 const reglas = [
   [/#[0-9a-fA-F]{3,8}\b/, 'color hexadecimal suelto (usa un token)'],
   [/\brgba?\(/, 'color rgb suelto (usa un token)'],
@@ -18,9 +18,7 @@ const reglas = [
 ]
 const hallazgos = []
 const ficheros = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? ficheros(path.join(d, e.name)) : /\.(tsx|ts)$/.test(e.name) ? [path.join(d, e.name)] : []))
-// Páginas de Finanzas ya reestilizadas (B1); el resto se suma al migrar (B2)
-const finanzas = ['Dashboard', 'Transactions', 'Accounts', 'Budgets', 'Recurring', 'components/TxEditor', 'components/charts', 'components/DataTable', 'components/MonthPicker'].map((n) => path.join(raiz, 'modules/finanzas', n + '.tsx'))
-for (const f of [...carpetas.flatMap(ficheros).filter((x) => !x.endsWith('Settings.tsx')), ...finanzas]) {
+for (const f of carpetas.flatMap(ficheros)) {
   fs.readFileSync(f, 'utf8').split('\n').forEach((l, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(l)) return
     for (const [re, msg] of reglas) if (re.test(l)) hallazgos.push(`${path.relative(raiz, f)}:${i + 1}  ${msg}\n    ${l.trim().slice(0, 140)}`)
@@ -31,4 +29,4 @@ if (hallazgos.length) {
   console.log(`\n${hallazgos.length} valores sueltos`)
   process.exit(1)
 }
-console.log('Sin valores sueltos en core/, modules/entreno/ y las páginas de Finanzas ya reestilizadas')
+console.log('Sin valores sueltos en src/renderer/src')

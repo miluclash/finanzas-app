@@ -1107,14 +1107,8 @@
   }
 }
 
-/* ---------- Compatibilidad con las páginas de Finanzas sin reestilizar (parte B) ---------- */
+/* Cursor de los gráficos de barras */
 @layer components {
-  /* Cifras tabulares: nombre de la interfaz anterior */
-  .num {
-    font-variant-numeric: tabular-nums lining-nums;
-    font-feature-settings: 'tnum', 'lnum', 'cv11', 'ss03';
-    white-space: nowrap;
-  }
   .recharts-tooltip-cursor {
     fill: var(--raised);
   }

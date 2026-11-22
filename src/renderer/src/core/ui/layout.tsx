@@ -44,6 +44,22 @@ export function PageHeader({ titulo, texto, acciones, className }: { titulo: str
   )
 }
 
+/** Título de sección de una página (18–20 px) con texto de apoyo y acciones; el contenido (tablas, listas) va debajo */
+export function Seccion({ titulo, texto, acciones, children, className }: { titulo: string; texto?: ReactNode; acciones?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section aria-label={titulo} className={cx('min-w-0', className)}>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="t-section">{titulo}</h2>
+          {texto && <p className="t-label mt-1 max-w-3xl">{texto}</p>}
+        </div>
+        {acciones && <div className="flex shrink-0 flex-wrap items-center gap-2">{acciones}</div>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
 /* ======================= Card y KpiCard ======================= */
 export function Card({ titulo, subtitulo, icono, accion, children, className, hero, flush, as: Tag2 = 'section', etiqueta }: { titulo?: string; subtitulo?: string; icono?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; hero?: boolean; flush?: boolean; as?: 'section' | 'div' | 'article'; etiqueta?: string }) {
   return (
