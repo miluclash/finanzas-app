@@ -1,6 +1,8 @@
-// Kit de componentes de la interfaz.
-import clsx from 'clsx'
-import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from 'lucide-react'
+// Capa de compatibilidad de las páginas de Finanzas que aún no se han reestilizado (parte B de F2).
+// Conserva la API que usan hoy (Button, Field, Segmented, Section…) pero dibuja con el sistema de diseño
+// nuevo (src/renderer/src/core/ui y core/design). Las páginas nuevas importan de core/ui, no de aquí.
+// Cuando la última página migre, este archivo se borra.
+import { CheckCircle, Info, Tray, Warning, WarningCircle, X } from '@phosphor-icons/react'
 import {
   forwardRef,
   useEffect,
@@ -13,9 +15,10 @@ import {
   type TextareaHTMLAttributes
 } from 'react'
 import { formatEur, formatNumber, parseEurToCents } from '@shared/money'
-import { dismiss, subscribe, type ToastItem } from '../lib/toast'
+import { Count, EmptyState as EmptyStateBase, ErrorState, LoadingState, PageHeader as PageHeaderBase, Toaster as ToasterBase, cx } from '../core/ui'
 
-export const cx = clsx
+export { cx }
+export const Toaster = ToasterBase
 
 // ---------- Botones ----------
 
@@ -30,18 +33,11 @@ export const Button = forwardRef<
       ref={ref}
       type={rest.type ?? 'button'}
       disabled={disabled || loading}
-      className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none',
-        size === 'sm' ? 'h-7 px-2.5 text-[13px]' : 'h-9 px-3.5 text-sm',
-        variant === 'primary' && 'bg-accent text-accent-ink hover:brightness-110',
-        variant === 'secondary' && 'border border-line-strong bg-surface text-ink hover:bg-surface-2',
-        variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
-        variant === 'danger' && 'border border-neg/40 bg-surface text-neg hover:bg-neg-soft',
-        className
-      )}
+      aria-busy={loading || undefined}
+      className={cx('btn', variant === 'primary' ? 'btn-accent' : `btn-${variant}`, size === 'sm' && 'btn-sm', className)}
       {...rest}
     >
-      {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
+      {loading ? <span className="spinner" aria-hidden /> : icon}
       {children}
     </button>
   )
@@ -54,13 +50,7 @@ export function IconButton({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={cx('inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink', className)}
-      {...rest}
-    >
+    <button type="button" aria-label={label} title={label} className={cx('btn btn-ghost btn-icon btn-sm', className)} {...rest}>
       {children}
     </button>
   )
@@ -84,42 +74,38 @@ export function Field({
   required?: boolean
 }) {
   return (
-    <label className={cx('flex min-w-0 flex-col gap-1', className)}>
-      <span className="text-[13px] font-medium text-ink-2">
+    <label className={cx('flex min-w-0 flex-col gap-2', className)}>
+      <span className="t-label font-semibold">
         {label}
-        {required && <span className="text-neg"> *</span>}
+        {required && <span className="text-error"> *</span>}
       </span>
       {children}
-      {error ? <span className="text-[12px] text-neg">{error}</span> : hint ? <span className="text-[12px] text-muted">{hint}</span> : null}
+      {error ? (
+        <span className="t-label flex items-start gap-1 text-error">
+          <WarningCircle size={16} weight="fill" className="mt-px shrink-0" aria-hidden />
+          {error}
+        </span>
+      ) : hint ? (
+        <span className="t-meta">{hint}</span>
+      ) : null}
     </label>
   )
 }
 
-const inputCls =
-  'h-9 min-w-0 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none disabled:bg-surface-2 disabled:text-muted'
-
-/** Ancho completo salvo que se indique un ancho (w-…) en className. */
-function widthCls(className?: string) {
-  return className && /(^|\s)w-/.test(className) ? '' : 'w-full'
-}
-
-export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function TextInput(
-  { className, ...rest },
-  ref
-) {
-  return <input ref={ref} className={cx(inputCls, widthCls(className), className)} {...rest} />
+export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function TextInput({ className, ...rest }, ref) {
+  return <input ref={ref} className={cx('input', className)} {...rest} />
 })
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cx(inputCls, 'pr-7', widthCls(className), className)} {...rest}>
+    <select className={cx('input', className)} {...rest}>
       {children}
     </select>
   )
 }
 
 export function TextArea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx(inputCls, 'h-auto min-h-[64px] w-full py-2', className)} {...rest} />
+  return <textarea className={cx('input h-auto min-h-16 py-2', className)} {...rest} />
 }
 
 export function Checkbox({
@@ -136,17 +122,11 @@ export function Checkbox({
   disabled?: boolean
 }) {
   return (
-    <label className={cx('flex items-start gap-2 text-sm', disabled && 'opacity-60')}>
-      <input
-        type="checkbox"
-        className="mt-0.5 size-4 accent-[var(--accent)]"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+    <label className={cx('flex items-start gap-3 t-body', disabled && 'opacity-60')}>
+      <input type="checkbox" className="checkbox size-5" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span>
         {label}
-        {hint && <span className="block text-[12px] text-muted">{hint}</span>}
+        {hint && <span className="t-meta block">{hint}</span>}
       </span>
     </label>
   )
@@ -182,13 +162,15 @@ export function MoneyInput({
     }
   }, [value])
   return (
-    <div className={cx('relative', className)}>
+    <div className={cx('input-wrap', className)}>
       <input
         id={id}
         inputMode="decimal"
         autoFocus={autoFocus}
         disabled={disabled}
-        className={cx(inputCls, 'num w-full pr-7 text-right', invalid && 'border-neg')}
+        aria-invalid={invalid || undefined}
+        className="input tnum has-unit text-right"
+        style={{ '--unit-w': '1ch' } as React.CSSProperties}
         placeholder={placeholder}
         value={text}
         onChange={(e) => {
@@ -204,7 +186,7 @@ export function MoneyInput({
           if (last.current !== null) setText(formatNumber(last.current))
         }}
       />
-      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted">€</span>
+      <span className="input-unit">€</span>
     </div>
   )
 }
@@ -213,7 +195,7 @@ export function DateInput({ value, onChange, className, ...rest }: { value: stri
   InputHTMLAttributes<HTMLInputElement>,
   'value' | 'onChange'
 >) {
-  return <input type="date" className={cx(inputCls, 'num', widthCls(className), className)} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
+  return <input type="date" className={cx('input tnum', className)} value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
 }
 
 export function Segmented<T extends string>({
@@ -228,20 +210,9 @@ export function Segmented<T extends string>({
   size?: 'sm' | 'md'
 }) {
   return (
-    <div role="radiogroup" className="inline-flex flex-wrap rounded-md border border-line-strong bg-surface-2 p-0.5">
+    <div role="radiogroup" className={cx('seg flex-wrap', size === 'sm' && 'seg-sm')}>
       {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cx(
-            'rounded-[5px] font-medium',
-            size === 'sm' ? 'px-2 py-0.5 text-[12px]' : 'px-3 py-1 text-[13px]',
-            value === o.value ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line-strong)]' : 'text-muted hover:text-ink'
-          )}
-        >
+        <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}
@@ -264,25 +235,25 @@ export function Amount({
   className?: string
   strong?: boolean
 }) {
-  if (cents === null || cents === undefined) return <span className={cx('num text-muted', className)}>—</span>
+  if (cents === null || cents === undefined) return <span className={cx('tnum text-ink-3', className)}>—</span>
   return (
-    <span className={cx('num', strong && 'font-semibold', colored && cents > 0 && 'text-pos', className)}>
+    <span className={cx('tnum', strong && 'font-semibold', colored && cents > 0 && 'text-success', className)}>
       {formatEur(cents, { sign: sign && cents > 0 })}
     </span>
   )
 }
 
+/** Etiqueta: un único estilo (borde, fondo y forma); el tono solo cambia el color del texto. */
 export function Badge({ tone = 'neutral', children, title }: { tone?: 'neutral' | 'pos' | 'neg' | 'warn' | 'accent'; children: ReactNode; title?: string }) {
   return (
     <span
       title={title}
       className={cx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-px text-[12px] font-medium',
-        tone === 'neutral' && 'bg-surface-2 text-ink-2 ring-1 ring-line',
-        tone === 'pos' && 'bg-pos-soft text-pos',
-        tone === 'neg' && 'bg-neg-soft text-neg',
-        tone === 'warn' && 'bg-warn-soft text-warn',
-        tone === 'accent' && 'bg-accent-soft text-accent'
+        'tag',
+        tone === 'pos' && 'text-success',
+        tone === 'neg' && 'text-error',
+        tone === 'warn' && 'text-warning',
+        tone === 'accent' && 'text-accent-text'
       )}
     >
       {children}
@@ -292,32 +263,16 @@ export function Badge({ tone = 'neutral', children, title }: { tone?: 'neutral' 
 
 export function Progress({ value, tone = 'accent', className }: { value: number | null; tone?: 'accent' | 'pos' | 'warn' | 'neg'; className?: string }) {
   const v = Math.max(0, Math.min(1, value ?? 0))
+  const color = tone === 'accent' ? 'var(--accent-mark)' : tone === 'pos' ? 'var(--success)' : tone === 'warn' ? 'var(--warning)' : 'var(--error)'
   return (
-    <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-line', className)} role="progressbar" aria-valuenow={Math.round(v * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <div
-        className={cx(
-          'h-full rounded-full',
-          tone === 'accent' && 'bg-accent',
-          tone === 'pos' && 'bg-pos',
-          tone === 'warn' && 'bg-warn',
-          tone === 'neg' && 'bg-neg'
-        )}
-        style={{ width: `${v * 100}%` }}
-      />
+    <div className={cx('progress', className)} role="progressbar" aria-valuenow={Math.round(v * 100)} aria-valuemin={0} aria-valuemax={100}>
+      <i style={{ width: `${v * 100}%`, background: color }} />
     </div>
   )
 }
 
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
-  return (
-    <header className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">{title}</h1>
-        {description && <p className="mt-0.5 max-w-[70ch] text-[13px] text-muted">{description}</p>}
-      </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-    </header>
-  )
+  return <PageHeaderBase titulo={title} texto={description} acciones={actions} className="mb-0!" />
 }
 
 export function Section({
@@ -336,17 +291,17 @@ export function Section({
   description?: ReactNode
 }) {
   return (
-    <section className={cx(boxed && 'rounded-lg border border-line bg-surface', className)}>
+    <section className={cx(boxed && 'card', className)}>
       {(title || actions) && (
-        <div className={cx('flex items-center justify-between gap-2', boxed ? 'border-b border-line px-4 py-2.5' : 'mb-2')}>
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            {title && <h2 className="text-[15px] font-semibold text-ink">{title}</h2>}
-            {description && <p className="text-[12px] text-muted">{description}</p>}
+            {title && <h2 className="t-card-title">{title}</h2>}
+            {description && <p className="t-meta">{description}</p>}
           </div>
-          {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className={cx(boxed && 'p-4')}>{children}</div>
+      <div>{children}</div>
     </section>
   )
 }
@@ -361,23 +316,11 @@ export function Tabs<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <div role="tablist" className="flex gap-1 border-b border-line">
+    <div role="tablist" className="tabs">
       {tabs.map((t) => (
-        <button
-          key={t.id}
-          role="tab"
-          type="button"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={cx(
-            '-mb-px border-b-2 px-3 py-2 text-[13px] font-medium',
-            value === t.id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
-          )}
-        >
+        <button key={t.id} role="tab" type="button" aria-selected={value === t.id} onClick={() => onChange(t.id)}>
           {t.label}
-          {t.count !== undefined && t.count > 0 && (
-            <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 text-[11px] text-ink-2 ring-1 ring-line">{t.count}</span>
-          )}
+          {t.count !== undefined && t.count > 0 && <Count>{t.count}</Count>}
         </button>
       ))}
     </div>
@@ -386,44 +329,46 @@ export function Tabs<T extends string>({
 
 export function EmptyState({ title, text, action }: { title: string; text?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed border-line-strong px-5 py-6">
-      <p className="text-[15px] font-medium text-ink">{title}</p>
-      {text && <p className="max-w-[60ch] text-[13px] text-muted">{text}</p>}
-      {action}
+    <div className="r-card border border-dashed border-line-strong">
+      <EmptyStateBase icono={<Tray size={24} aria-hidden />} titulo={title} texto={typeof text === 'string' ? text : ''} accion={action} compacto />
+      {typeof text !== 'string' && text && <div className="t-label mx-auto max-w-md px-6 pb-6 text-center">{text}</div>}
     </div>
   )
 }
 
 export function Loading({ text = 'Cargando…' }: { text?: string }) {
   return (
-    <div className="flex items-center gap-2 py-8 text-sm text-muted">
-      <Loader2 className="size-4 animate-spin" /> {text}
+    <div className="py-8">
+      <LoadingState etiqueta={text} filas={2} />
+      <p className="t-meta mt-3" aria-hidden>
+        {text}
+      </p>
     </div>
   )
 }
 
 export function ErrorBox({ error }: { error: unknown }) {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-neg/40 bg-neg-soft px-3 py-2 text-sm text-neg">
-      <XCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{error instanceof Error ? error.message : String(error)}</span>
-    </div>
-  )
+  return <ErrorState titulo="Algo no ha salido bien" texto={error instanceof Error ? error.message : String(error)} />
 }
 
 export function Notice({ tone, children }: { tone: 'warn' | 'neg' | 'info' | 'pos'; children: ReactNode }) {
-  const Icon = tone === 'neg' ? XCircle : tone === 'warn' ? AlertTriangle : tone === 'pos' ? CheckCircle2 : Info
+  const Icon = tone === 'neg' ? WarningCircle : tone === 'warn' ? Warning : tone === 'pos' ? CheckCircle : Info
   return (
     <div
       className={cx(
-        'flex items-start gap-2 rounded-md px-3 py-2 text-[13px]',
-        tone === 'neg' && 'bg-neg-soft text-neg',
-        tone === 'warn' && 'bg-warn-soft text-warn',
-        tone === 'info' && 'bg-accent-soft text-ink-2',
-        tone === 'pos' && 'bg-pos-soft text-pos'
+        't-label flex items-start gap-2 r-control px-3 py-2 text-ink',
+        tone === 'neg' && 'bg-error-soft',
+        tone === 'warn' && 'bg-warning-soft',
+        tone === 'info' && 'bg-info-soft',
+        tone === 'pos' && 'bg-success-soft'
       )}
     >
-      <Icon className="mt-0.5 size-4 shrink-0" />
+      <Icon
+        size={16}
+        weight="fill"
+        aria-hidden
+        className={cx('mt-0.5 shrink-0', tone === 'neg' && 'text-error', tone === 'warn' && 'text-warning', tone === 'info' && 'text-info', tone === 'pos' && 'text-success')}
+      />
       <div className="min-w-0">{children}</div>
     </div>
   )
@@ -431,6 +376,7 @@ export function Notice({ tone, children }: { tone: 'warn' | 'neg' | 'info' | 'po
 
 // ---------- Diálogos ----------
 
+/** Diálogo nativo (`<dialog>`): el navegador ya atrapa el foco y cierra con Esc. */
 export function Modal({
   open,
   onClose,
@@ -460,19 +406,19 @@ export function Modal({
         e.preventDefault()
         onClose()
       }}
-      className="m-auto max-h-[90vh] w-[calc(100vw-32px)] overflow-hidden rounded-xl border border-line bg-surface p-0 text-ink shadow-2xl"
+      className="elevated r-modal m-auto max-h-[90vh] w-[calc(100vw-32px)] overflow-hidden p-0 text-ink"
       style={{ maxWidth: width }}
     >
       {open && (
         <div className="flex max-h-[90vh] flex-col">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
-            <h2 className="text-[16px] font-semibold">{title}</h2>
+          <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+            <h2 className="t-section">{title}</h2>
             <IconButton label="Cerrar" onClick={onClose}>
-              <X className="size-4" />
+              <X size={16} aria-hidden />
             </IconButton>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex items-center justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">{footer}</div>}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+          {footer && <div className="flex items-center justify-end gap-2 border-t border-line bg-raised px-6 py-4">{footer}</div>}
         </div>
       )}
     </dialog>
@@ -515,53 +461,25 @@ export function ConfirmHost() {
       width={440}
       footer={
         <>
-          <Button onClick={() => close(false)}>Cancelar</Button>
-          <Button variant={cur?.danger ? 'danger' : 'primary'} onClick={() => close(true)} autoFocus>
-            {cur?.confirm ?? 'Confirmar'}
+          <Button variant="ghost" onClick={() => close(false)}>
+            Cancelar
           </Button>
+          <button type="button" className={cx('btn', cur?.danger ? 'btn-danger-solid' : 'btn-accent')} onClick={() => close(true)} autoFocus>
+            {cur?.confirm ?? 'Confirmar'}
+          </button>
         </>
       }
     >
-      <div className="text-sm text-ink-2">{cur?.text}</div>
+      <div className="t-body text-ink-2">{cur?.text}</div>
     </Modal>
-  )
-}
-
-export function Toaster() {
-  const [items, setItems] = useState<ToastItem[]>([])
-  useEffect(() => subscribe(setItems), [])
-  return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[360px] flex-col gap-2" aria-live="polite">
-      {items.map((t) => (
-        <div
-          key={t.id}
-          className={cx(
-            'pointer-events-auto flex items-start gap-2 rounded-lg border bg-surface px-3 py-2.5 text-sm shadow-lg',
-            t.kind === 'error' ? 'border-neg/50' : 'border-line'
-          )}
-        >
-          {t.kind === 'error' ? (
-            <XCircle className="mt-0.5 size-4 shrink-0 text-neg" />
-          ) : t.kind === 'success' ? (
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-pos" />
-          ) : (
-            <Info className="mt-0.5 size-4 shrink-0 text-accent" />
-          )}
-          <span className="min-w-0 flex-1">{t.text}</span>
-          <button className="text-muted hover:text-ink" onClick={() => dismiss(t.id)} aria-label="Cerrar aviso">
-            <X className="size-3.5" />
-          </button>
-        </div>
-      ))}
-    </div>
   )
 }
 
 /** Fila etiqueta / valor para resúmenes. */
 export function KV({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className={cx('flex items-baseline justify-between gap-4 py-1 text-[13px]', className)}>
-      <span className="text-muted">{label}</span>
+    <div className={cx('t-label flex items-baseline justify-between gap-4 py-1', className)}>
+      <span>{label}</span>
       <span className="text-right text-ink">{children}</span>
     </div>
   )

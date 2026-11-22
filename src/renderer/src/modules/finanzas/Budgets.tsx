@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { addMonthsToMonth, formatMonth, monthOf, todayISO } from '@shared/dates'
 import { BUDGET_STATE_LABEL, type BudgetLine } from '@shared/modules/finanzas/budgets'
 import { formatEur, formatPct } from '@shared/money'
-import { Amount, Badge, Button, cx, ErrorBox, Loading, MoneyInput, PageHeader, Progress, Tabs } from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
+import { Amount, Badge, Button, cx, ErrorBox, Loading, MoneyInput, PageHeader, Progress, Tabs } from '../../components/ui'
+import { useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
 import { MonthPicker } from './Dashboard'
 
 export function BudgetsPage() {
@@ -105,7 +105,7 @@ function BudgetView() {
                     line={l}
                     month={month}
                     name={maps.category.get(l.categoryId)?.name ?? l.categoryId}
-                    onOpen={() => navigate(`/movimientos?mes=${month}&categoria=${l.categoryId}`)}
+                    onOpen={() => navigate(`/finanzas/movimientos?mes=${month}&categoria=${l.categoryId}`)}
                   />
                 ))}
               </tbody>
@@ -171,7 +171,7 @@ function MonthsView() {
   const groups = (cat?.groups ?? []).filter((g) => g.kind === 'EXPENSE').map((g) => g.id)
   const hasNone = months.some((m) => m.expensesByGroup['__none'])
   const groupCols = hasNone ? [...groups, '__none'] : groups
-  const go = (p: Record<string, string>) => navigate(`/movimientos?${new URLSearchParams(p).toString()}`)
+  const go = (p: Record<string, string>) => navigate(`/finanzas/movimientos?${new URLSearchParams(p).toString()}`)
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[12px] text-muted">

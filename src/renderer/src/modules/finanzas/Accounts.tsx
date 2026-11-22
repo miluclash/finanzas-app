@@ -5,8 +5,8 @@ import { formatDate, todayISO } from '@shared/dates'
 import { ACCOUNT_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import { ACCOUNT_TYPES, type Account, type AccountType } from '@shared/modules/finanzas/types'
-import { DataTable, type Column } from '../components/DataTable'
-import { useTxEditor } from '../components/TxEditor'
+import { DataTable, type Column } from './components/DataTable'
+import { useTxEditor } from './components/TxEditor'
 import {
   Amount,
   Badge,
@@ -24,9 +24,9 @@ import {
   Select,
   TextArea,
   TextInput
-} from '../components/ui'
-import { useApi, useApiMutation, type ApiError } from '../lib/api'
-import type { ApiResult } from '../../../main/app'
+} from '../../components/ui'
+import { useApi, useApiMutation, type ApiError } from '../../lib/api'
+import type { ApiResult } from '../../../../main/app'
 
 type Row = ApiResult<'finanzas:accounts.list'>[number]
 
@@ -123,7 +123,7 @@ export function AccountsPage() {
           <Button size="sm" onClick={() => setReconciling(r)}>
             Verificar saldo
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => navigate(`/movimientos?cuenta=${r.account.id}`)}>
+          <Button size="sm" variant="ghost" onClick={() => navigate(`/finanzas/movimientos?cuenta=${r.account.id}`)}>
             Movimientos ({r.txCount})
           </Button>
         </span>

@@ -7,9 +7,9 @@ import { applySign } from '@shared/modules/finanzas/validation'
 import { NATURE_LABEL, TX_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import type { Nature, Transaction, TxStatus, TxType } from '@shared/modules/finanzas/types'
-import { api, useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
-import { Button, confirmDialog, DateInput, Field, Modal, MoneyInput, Notice, Segmented, Select, TextArea, TextInput } from './ui'
+import { api, useApi, useApiMutation } from '../../../lib/api'
+import { useCatalog } from '../../../lib/catalog'
+import { Button, confirmDialog, DateInput, Field, Modal, MoneyInput, Notice, Segmented, Select, TextArea, TextInput } from '../../../components/ui'
 
 type EditorState =
   | { kind: 'tx'; id?: string; defaults?: Partial<Transaction> }
@@ -70,12 +70,15 @@ export function TxEditorProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
+      {/* Los diálogos cuelgan de la raíz, fuera de la página: llevan la identidad de Finanzas */}
+      <div data-module="finanzas" className="contents">
       {state?.kind === 'tx' && (
         <TxModal key={key} id={state.id} defaults={state.defaults} onClose={() => setState(null)} onNew={() => openNew()} onTransfer={() => openTransfer()} />
       )}
       {state?.kind === 'transfer' && (
         <TransferModal key={key} transferId={state.transferId} defaults={state.defaults} onClose={() => setState(null)} onMovement={() => openNew()} />
       )}
+      </div>
     </Ctx.Provider>
   )
 }
@@ -243,7 +246,7 @@ function TxModal({
 
   if (id && existing?.investmentOpId) {
     return (
-      <Modal open onClose={onClose} title="Apunte de inversión" width={480} footer={<Button onClick={() => { onClose(); navigate('/inversiones') }}>Ir a Inversiones</Button>}>
+      <Modal open onClose={onClose} title="Apunte de inversión" width={480} footer={<Button onClick={() => { onClose(); navigate('/finanzas/inversiones') }}>Ir a Inversiones</Button>}>
         <Notice tone="info">
           Este apunte ({existing.description}, {formatEur(existing.amountCents)}) lo genera una operación de inversión. Para cambiarlo, edita la operación en
           Inversiones.

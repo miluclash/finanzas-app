@@ -1,10 +1,10 @@
 import { formatMonth } from '@shared/dates'
 import { ACCOUNT_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur, formatPct } from '@shared/money'
-import { BarList, LinesChart } from '../components/charts'
-import { Amount, ErrorBox, Loading, PageHeader, Section } from '../components/ui'
-import { useApi } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
+import { BarList, LinesChart } from './components/charts'
+import { Amount, ErrorBox, Loading, PageHeader, Section } from '../../components/ui'
+import { useApi } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
 
 export function NetWorthPage() {
   const series = useApi('finanzas:networth.series', [])

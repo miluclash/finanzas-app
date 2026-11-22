@@ -6,7 +6,7 @@ import { GOAL_HEALTH_LABEL } from '@shared/modules/finanzas/goals'
 import { GOAL_STATUS_LABEL, GOAL_TYPE_LABEL, PRIORITY_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur, formatPct } from '@shared/money'
 import { GOAL_STATUSES, GOAL_TYPES, PRIORITIES, type Goal, type GoalStatus, type GoalType, type Priority } from '@shared/modules/finanzas/types'
-import { useTxEditor } from '../components/TxEditor'
+import { useTxEditor } from './components/TxEditor'
 import {
   Badge,
   Button,
@@ -26,10 +26,10 @@ import {
   Select,
   TextArea,
   TextInput
-} from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
-import type { ApiResult } from '../../../main/app'
+} from '../../components/ui'
+import { useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
+import type { ApiResult } from '../../../../main/app'
 
 type Row = ApiResult<'finanzas:goals.list'>[number]
 
@@ -142,7 +142,7 @@ function GoalBlock({ row, onEdit, onAllocate }: { row: Row; onEdit: () => void; 
           Editar
         </Button>
         {row.linkedTxCount > 0 && (
-          <Button size="sm" variant="ghost" onClick={() => navigate(`/movimientos?objetivo=${g.id}`)}>
+          <Button size="sm" variant="ghost" onClick={() => navigate(`/finanzas/movimientos?objetivo=${g.id}`)}>
             Movimientos ({row.linkedTxCount})
           </Button>
         )}

@@ -4,11 +4,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { addMonthsToMonth, formatDate, formatMonth, monthOf, todayISO } from '@shared/dates'
 import { GOAL_HEALTH_LABEL } from '@shared/modules/finanzas/goals'
 import { formatEur, formatPct } from '@shared/money'
-import { BarList, IncomeExpenseChart, LinesChart } from '../components/charts'
-import { useTxEditor } from '../components/TxEditor'
-import { Amount, Button, cx, EmptyState, ErrorBox, IconButton, Loading, PageHeader, Progress, Section } from '../components/ui'
-import { useApi } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
+import { BarList, IncomeExpenseChart, LinesChart } from './components/charts'
+import { useTxEditor } from './components/TxEditor'
+import { Amount, Button, cx, EmptyState, ErrorBox, IconButton, Loading, PageHeader, Progress, Section } from '../../components/ui'
+import { rutaFinanzas } from '../../core/shell/nav'
+import { useApi } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
 
 export function MonthPicker({ month, onChange, max }: { month: string; onChange: (m: string) => void; max?: string }) {
   return (
@@ -44,7 +45,7 @@ export function DashboardPage() {
     .sort((a, b) => b.value - a.value)
   const series = d.series.map((m) => ({ month: m.month, income: m.incomeCents, expenses: -m.totalExpensesCents }))
   const rateSeries = d.series.filter((m) => m.savingsRate !== null).map((m) => ({ month: m.month, rate: m.savingsRate, ord: m.savingsRateOrdinary }))
-  const go = (params: Record<string, string>) => navigate(`/movimientos?${new URLSearchParams(params).toString()}`)
+  const go = (params: Record<string, string>) => navigate(`/finanzas/movimientos?${new URLSearchParams(params).toString()}`)
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,9 +90,9 @@ export function DashboardPage() {
             </details>
           )}
         </div>
-        <Figure label="Liquidez" value={d.position.liquidCents} sub="Cuenta corriente y efectivo gastable" to="/cuentas" />
-        <Figure label="Patrimonio neto" value={d.position.netWorthCents} sub={`Ahorro e huchas ${formatEur(d.position.savingsCents)}`} to="/patrimonio" />
-        <Figure label="Inversiones" value={d.position.investmentsCents} sub="Valor de mercado + efectivo del bróker" to="/inversiones" last />
+        <Figure label="Liquidez" value={d.position.liquidCents} sub="Cuenta corriente y efectivo gastable" to="/finanzas/cuentas" />
+        <Figure label="Patrimonio neto" value={d.position.netWorthCents} sub={`Ahorro e huchas ${formatEur(d.position.savingsCents)}`} to="/finanzas/patrimonio" />
+        <Figure label="Inversiones" value={d.position.investmentsCents} sub="Valor de mercado + efectivo del bróker" to="/finanzas/inversiones" last />
       </section>
 
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
@@ -113,7 +114,7 @@ export function DashboardPage() {
             </div>
             <MonthFigure label="A huchas y ahorro" value={s.toSavingsCents} small />
             <MonthFigure label="A inversión (neto)" value={s.toInvestmentsCents} small />
-            <MonthFigure label="Costes recurrentes / mes" value={-d.recurringMonthlyCents} small to="/recurrentes" />
+            <MonthFigure label="Costes recurrentes / mes" value={-d.recurringMonthlyCents} small to="/finanzas/recurrentes" />
             <div>
               <div className="text-[12px] text-muted">Presupuesto consumido</div>
               {d.budgetTotalCents > 0 ? (
@@ -122,7 +123,7 @@ export function DashboardPage() {
                   <Progress value={d.budgetUsedPct} tone={(d.budgetUsedPct ?? 0) > 1 ? 'neg' : (d.budgetUsedPct ?? 0) > 0.8 ? 'warn' : 'accent'} className="mt-1" />
                 </>
               ) : (
-                <Link to="/presupuestos" className="text-[13px] text-accent hover:underline">
+                <Link to="/finanzas/presupuestos" className="text-[13px] text-accent hover:underline">
                   Sin presupuesto: créalo
                 </Link>
               )}
@@ -141,7 +142,7 @@ export function DashboardPage() {
               <ul className="flex flex-col gap-2">
                 {d.alerts.slice(0, 8).map((a, i) => (
                   <li key={i}>
-                    <Link to={a.link ?? '/'} className="flex items-start gap-2 text-[13px] hover:underline">
+                    <Link to={rutaFinanzas(a.link ?? '/')} className="flex items-start gap-2 text-[13px] hover:underline">
                       {a.level === 'error' ? (
                         <XCircle className="mt-0.5 size-4 shrink-0 text-neg" />
                       ) : a.level === 'warn' ? (
@@ -157,7 +158,7 @@ export function DashboardPage() {
               </ul>
             )}
           </Section>
-          <Section title="Próximos 30 días" boxed actions={<Link to="/recurrentes" className="text-[12px] text-accent hover:underline">Recurrentes</Link>}>
+          <Section title="Próximos 30 días" boxed actions={<Link to="/finanzas/recurrentes" className="text-[12px] text-accent hover:underline">Recurrentes</Link>}>
             {d.upcoming.length === 0 ? (
               <p className="text-[13px] text-muted">No hay cobros ni cargos previstos.</p>
             ) : (
@@ -187,7 +188,7 @@ export function DashboardPage() {
             <p className="text-[13px] text-muted">Sin gastos este mes.</p>
           )}
         </Section>
-        <Section title="Objetivos" boxed actions={<Link to="/objetivos" className="text-[12px] text-accent hover:underline">Ver todos</Link>}>
+        <Section title="Objetivos" boxed actions={<Link to="/finanzas/objetivos" className="text-[12px] text-accent hover:underline">Ver todos</Link>}>
           {d.goals.length === 0 ? (
             <p className="text-[13px] text-muted">No tienes objetivos activos.</p>
           ) : (
@@ -248,7 +249,7 @@ export function DashboardPage() {
         title="Últimos movimientos"
         actions={
           <>
-            <Button size="sm" variant="ghost" onClick={() => navigate('/movimientos')}>
+            <Button size="sm" variant="ghost" onClick={() => navigate('/finanzas/movimientos')}>
               Ver todos
             </Button>
             <Button size="sm" onClick={() => openNew()}>

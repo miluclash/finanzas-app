@@ -16,7 +16,7 @@ import {
 import { formatMonth } from '@shared/dates'
 import { formatEur, formatPct } from '@shared/money'
 import type { MonthKey } from '@shared/modules/finanzas/types'
-import { cx } from './ui'
+import { cx } from '../../../components/ui'
 
 const compact = new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 })
 const eurTick = (v: number) => `${compact.format(v / 100)} €`
@@ -98,9 +98,9 @@ export function LinesChart({
           {reference && (
             <ReferenceLine
               y={reference.value}
-              stroke="var(--muted)"
+              stroke="var(--ink-3)"
               strokeDasharray="4 4"
-              label={{ value: reference.label, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 11 }}
+              label={{ value: reference.label, position: 'insideTopLeft', fill: 'var(--ink-3)', fontSize: 11 }}
             />
           )}
           {series.map((s, i) => (
@@ -111,8 +111,8 @@ export function LinesChart({
               name={s.name}
               stroke={SERIES[i % SERIES.length]}
               strokeWidth={2}
-              dot={data.length <= 14 ? { r: 3, strokeWidth: 2, fill: 'var(--surface)' } : false}
-              activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--surface)' }}
+              dot={data.length <= 14 ? { r: 3, strokeWidth: 2, fill: 'var(--card)' } : false}
+              activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--card)' }}
               connectNulls
               isAnimationActive={false}
             />

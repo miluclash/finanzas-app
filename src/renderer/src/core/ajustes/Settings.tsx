@@ -24,11 +24,12 @@ import {
   Tabs,
   TextArea,
   TextInput
-} from '../components/ui'
-import { api, useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
-import { toast } from '../lib/toast'
-import type { ImportPreview } from '../../../main/modules/finanzas/importExcel'
+} from '../../components/ui'
+import { api, useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
+import { toast } from '../../lib/toast'
+import type { ImportPreview } from '../../../../main/modules/finanzas/importExcel'
+import { Apariencia } from './Apariencia'
 
 type Tab = 'general' | 'categorias' | 'datos' | 'auditoria'
 
@@ -37,6 +38,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Ajustes y datos" description="Reglas, categorías, importación, exportación y copias de seguridad. Todo editable." />
+      <Apariencia />
       <Tabs
         value={tab}
         onChange={setTab}
@@ -133,20 +135,6 @@ function GeneralSettings() {
             </Select>
           </Field>
         </div>
-      </Section>
-      <Section title="Apariencia" boxed>
-        <Segmented
-          value={s.theme}
-          onChange={(v) => {
-            set('theme', v)
-            save.mutate([{ theme: v }])
-          }}
-          options={[
-            { value: 'system', label: 'Como Windows' },
-            { value: 'light', label: 'Claro' },
-            { value: 'dark', label: 'Oscuro' }
-          ]}
-        />
       </Section>
       <div>
         <Button

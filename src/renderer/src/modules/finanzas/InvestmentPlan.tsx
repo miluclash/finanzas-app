@@ -5,10 +5,10 @@ import { formatDate, formatMonth } from '@shared/dates'
 import { formatEur, formatPct } from '@shared/money'
 import { DEFAULT_PLAN, type PlanExecutionMonth, type PlanReport, type RuleStatus } from '@shared/modules/finanzas/investmentPlan'
 import type { InvestmentPlanConfig } from '@shared/modules/finanzas/types'
-import { DataTable, type Column } from '../components/DataTable'
-import { Badge, Button, Checkbox, DateInput, EmptyState, ErrorBox, Field, Loading, Modal, MoneyInput, Notice, Section, Select, TextArea, TextInput } from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
+import { DataTable, type Column } from './components/DataTable'
+import { Badge, Button, Checkbox, DateInput, EmptyState, ErrorBox, Field, Loading, Modal, MoneyInput, Notice, Section, Select, TextArea, TextInput } from '../../components/ui'
+import { useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
 
 const ICON: Record<RuleStatus, ReactNode> = {
   ok: <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-pos" />,

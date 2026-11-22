@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   budgetAlertPct: 80,
   duplicateWindowDays: 3,
   costMethod: 'AVERAGE',
-  theme: 'system',
+  theme: 'dark',
   forecastScenarioId: 'SCN001',
   verifyStaleDays: 35,
   concentrationAlertPct: 10,

@@ -2950,7 +2950,7 @@
    "lastAccountId": "ACC001",
    "lastCategoryId": "CAT008",
    "minLiquidityCents": 150000,
-   "theme": "system",
+   "theme": "dark",
    "trackingStart": "2026-07-01",
    "verifyStaleDays": 35
   },
@@ -27108,7 +27108,7 @@
    "lastAccountId": "ACC001",
    "lastCategoryId": "CAT008",
    "minLiquidityCents": 150000,
-   "theme": "system",
+   "theme": "dark",
    "trackingStart": "2026-07-01",
    "verifyStaleDays": 35
   },

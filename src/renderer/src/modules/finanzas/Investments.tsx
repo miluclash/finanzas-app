@@ -13,11 +13,11 @@ import {
   type InvestmentOp,
   type InvestmentOpType
 } from '@shared/modules/finanzas/types'
-import { BarList, LinesChart } from '../components/charts'
-import { DataTable, type Column } from '../components/DataTable'
-import { useTxEditor } from '../components/TxEditor'
-import { TradeRepublicImportModal } from '../components/TradeRepublicImport'
-import type { TrPreview } from '../../../main/modules/finanzas/importTradeRepublic'
+import { BarList, LinesChart } from './components/charts'
+import { DataTable, type Column } from './components/DataTable'
+import { useTxEditor } from './components/TxEditor'
+import { TradeRepublicImportModal } from './components/TradeRepublicImport'
+import type { TrPreview } from '../../../../main/modules/finanzas/importTradeRepublic'
 import {
   Amount,
   Badge,
@@ -39,10 +39,10 @@ import {
   Tabs,
   TextArea,
   TextInput
-} from '../components/ui'
-import { api, useApi, useApiMutation } from '../lib/api'
-import { toast } from '../lib/toast'
-import { useCatalog } from '../lib/catalog'
+} from '../../components/ui'
+import { api, useApi, useApiMutation } from '../../lib/api'
+import { toast } from '../../lib/toast'
+import { useCatalog } from '../../lib/catalog'
 import { PlanView } from './InvestmentPlan'
 import type { HoldingRow } from '@shared/modules/finanzas/investments'
 
@@ -97,7 +97,7 @@ export function InvestmentsPage() {
         <EmptyState
           title="Primero crea tu cuenta de bróker"
           text="En Cuentas, crea una cuenta de tipo «Inversión / bróker» (por ejemplo, Trade Republic) con su efectivo inicial y lo que aportaste antes de empezar a registrarla. Después da de alta tus activos y operaciones aquí."
-          action={<Button onClick={() => navigate('/cuentas')}>Ir a Cuentas</Button>}
+          action={<Button onClick={() => navigate('/finanzas/cuentas')}>Ir a Cuentas</Button>}
         />
       ) : (
         <>

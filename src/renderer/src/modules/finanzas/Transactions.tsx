@@ -6,12 +6,12 @@ import { TX_STATUS_LABEL, TX_TYPE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import type { TxFilter } from '@shared/modules/finanzas/schemas'
 import { TX_TYPES, type TxStatus, type TxType } from '@shared/modules/finanzas/types'
-import { DataTable, type Column } from '../components/DataTable'
-import { useTxEditor } from '../components/TxEditor'
-import { Amount, Badge, Button, confirmDialog, EmptyState, ErrorBox, Loading, PageHeader, Section, Select, Tabs, TextInput } from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
-import type { TxRow } from '../../../main/modules/finanzas/transactions'
+import { DataTable, type Column } from './components/DataTable'
+import { useTxEditor } from './components/TxEditor'
+import { Amount, Badge, Button, confirmDialog, EmptyState, ErrorBox, Loading, PageHeader, Section, Select, Tabs, TextInput } from '../../components/ui'
+import { useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
+import type { TxRow } from '../../../../main/modules/finanzas/transactions'
 
 const PAGE = 300
 

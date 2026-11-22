@@ -5,7 +5,7 @@ import { formatDate } from '@shared/dates'
 import { FREQUENCY_LABEL, RECURRING_KIND_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
 import { FREQUENCIES, RECURRING_KINDS, type Frequency, type RecurringKind, type RecurringRule } from '@shared/modules/finanzas/types'
-import { DataTable, type Column } from '../components/DataTable'
+import { DataTable, type Column } from './components/DataTable'
 import {
   Amount,
   Badge,
@@ -23,10 +23,10 @@ import {
   Select,
   TextArea,
   TextInput
-} from '../components/ui'
-import { useApi, useApiMutation } from '../lib/api'
-import { useCatalog } from '../lib/catalog'
-import type { ApiResult } from '../../../main/app'
+} from '../../components/ui'
+import { useApi, useApiMutation } from '../../lib/api'
+import { useCatalog } from '../../lib/catalog'
+import type { ApiResult } from '../../../../main/app'
 
 type Row = ApiResult<'finanzas:recurring.list'>[number]
 
@@ -104,7 +104,7 @@ export function RecurringPage() {
             className="num text-ink-2 hover:underline"
             onClick={(e) => {
               e.stopPropagation()
-              navigate(`/movimientos?recurrente=${r.rule.id}`)
+              navigate(`/finanzas/movimientos?recurrente=${r.rule.id}`)
             }}
           >
             {formatDate(r.status.lastMatchedDate)}

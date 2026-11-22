@@ -1,7 +1,7 @@
 // Tabla ordenable y legible, con selección opcional.
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
-import { cx } from './ui'
+import { cx } from '../../../components/ui'
 
 export interface Column<T> {
   key: string
@@ -61,16 +61,16 @@ export function DataTable<T>({
   const allSelected = !!selected && rows.length > 0 && rows.every((r) => selected.has(rowKey(r)))
   if (rows.length === 0 && empty) return <>{empty}</>
   return (
-    <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-      <table className="w-full border-collapse text-[13px]">
+    <div className="overflow-x-auto r-card border border-line bg-card">
+      <table className="t-body w-full border-collapse">
         <thead>
-          <tr className="border-b border-line bg-surface-2 text-left">
+          <tr className="border-b border-line bg-raised text-left">
             {onSelect && (
               <th className="w-8 px-3 py-2">
                 <input
                   type="checkbox"
                   aria-label="Seleccionar todo"
-                  className="size-4 accent-[var(--accent)]"
+                  className="checkbox size-5"
                   checked={allSelected}
                   onChange={(e) => onSelect(e.target.checked ? new Set(rows.map(rowKey)) : new Set())}
                 />
@@ -83,7 +83,7 @@ export function DataTable<T>({
                   key={c.key}
                   style={{ width: c.width }}
                   className={cx(
-                    'whitespace-nowrap px-3 py-2 font-medium text-ink-2',
+                    't-label whitespace-nowrap px-3 py-2 font-semibold',
                     c.align === 'right' && 'text-right',
                     c.align === 'center' && 'text-center'
                   )}
@@ -117,7 +117,7 @@ export function DataTable<T>({
                 onClick={onRowClick ? () => onRowClick(r) : undefined}
                 className={cx(
                   'border-b border-line last:border-b-0',
-                  onRowClick && 'cursor-pointer hover:bg-surface-2',
+                  onRowClick && 'cursor-pointer hover:bg-raised',
                   selected?.has(k) && 'bg-accent-soft',
                   rowClassName?.(r)
                 )}
@@ -127,7 +127,7 @@ export function DataTable<T>({
                     <input
                       type="checkbox"
                       aria-label="Seleccionar fila"
-                      className="size-4 accent-[var(--accent)]"
+                      className="checkbox size-5"
                       checked={selected!.has(k)}
                       onChange={(e) => {
                         const n = new Set(selected)
@@ -156,7 +156,7 @@ export function DataTable<T>({
             )
           })}
         </tbody>
-        {footer && <tfoot className="border-t border-line-strong bg-surface-2">{footer}</tfoot>}
+        {footer && <tfoot className="border-t border-line-strong bg-raised">{footer}</tfoot>}
       </table>
     </div>
   )

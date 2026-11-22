@@ -3,7 +3,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import { App } from './App'
+import { aplicarTemaInicial } from './core/shell/theme'
 import './styles.css'
+
+// Oscuro por defecto: el tema se pone antes del primer pintado y luego lo ajusta `settings.theme`
+aplicarTemaInicial()
 
 const qc = new QueryClient({
   defaultOptions: {
