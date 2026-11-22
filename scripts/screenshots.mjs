@@ -19,6 +19,7 @@ import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { exigirDatosDePrueba } from './datos-prueba.mjs'
 
 const require = createRequire(import.meta.url)
 const outDir = process.argv[2] ?? 'test-output/screens'
@@ -31,10 +32,11 @@ const [vw, vh] = (process.env.VIEWPORT ?? '1440x900').split('x').map(Number)
 const temas = (process.env.TEMAS ?? 'oscuro,claro').split(',')
 fs.mkdirSync(outDir, { recursive: true })
 
+exigirDatosDePrueba('screenshots')
 const app = await electron.launch({
   executablePath: require('electron'),
   args: ['--no-sandbox', '.'],
-  env: { ...process.env, FINANZAS_DATA_DIR: process.env.FINANZAS_DATA_DIR ?? '' }
+  env: { ...process.env, FINANZAS_DATA_DIR: process.env.FINANZAS_DATA_DIR }
 })
 const win = await app.firstWindow()
 const errors = []

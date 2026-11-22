@@ -4,6 +4,7 @@ import { CommandPalette, type AccionesShell } from './CommandPalette'
 import { moduloDe, MODULOS, type Ruta } from './nav'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { hayDialogoModal } from '../ui'
 import { ANCHO_ESTRECHO, guardarLocal, leerLocal, useViewportWidth } from './useViewport'
 
 const CLAVE_PLEGADA = 'finanzas-barra-plegada'
@@ -54,9 +55,10 @@ export function AppShell({
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
-      // Un diálogo abierto (formularios de Finanzas) queda por encima de todo: no se abre nada detrás
-      if (document.querySelector('dialog[open]')) return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      // Un diálogo modal abierto queda por encima de todo: no se abre nada detrás (salvo cerrar el propio buscador con Ctrl+K)
+      const esK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'
+      if (hayDialogoModal() && !(esK && paleta)) return
+      if (esK) {
         e.preventDefault()
         setPaleta((v) => !v)
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
@@ -66,7 +68,7 @@ export function AppShell({
     }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [alternarPlegada])
+  }, [alternarPlegada, paleta])
 
   const accionesPaleta = useMemo<AccionesShell>(() => ({ ...acciones, alternarAsistente: alternarIa }), [acciones, alternarIa])
 

@@ -8,9 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const aqui = path.dirname(fileURLToPath(import.meta.url))
 const cssPath = path.join(aqui, '..', 'src', 'renderer', 'src', 'core', 'design', 'tokens.css')
-const skill =
-  process.env.DATAVIZ_SCRIPTS ??
-  'C:/Users/Michael/AppData/Local/Temp/claude/bundled-skills/2.1.325/924b00f67beb54ec5eb6b9a155e5555a/dataviz/scripts'
+// Carpeta del validador de paletas de la skill dataviz (validate_palette.js). Sin ella, esa parte se salta.
+const skill = process.env.DATAVIZ_SCRIPTS
 
 // Contraste WCAG 2 propio (no depende de la skill)
 const lin = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
@@ -133,10 +132,14 @@ for (const [n, theme, modulo, ps] of destacados) {
 
 // --- validador de paletas de la skill dataviz (series de gráfico) ------------
 let validar = null
-try {
-  validar = (await import(pathToFileURL(path.join(skill, 'validate_palette.js')).href)).validate
-} catch {
-  /* la skill no está en esta máquina: se omite esta parte */
+if (!skill) {
+  console.warn('Aviso: sin DATAVIZ_SCRIPTS no se validan las paletas de series (solo el contraste de los tokens). Apunta la variable a la carpeta del validador de la skill dataviz.')
+} else {
+  try {
+    validar = (await import(pathToFileURL(path.join(skill, 'validate_palette.js')).href)).validate
+  } catch {
+    console.warn(`Aviso: no se pudo cargar validate_palette.js desde DATAVIZ_SCRIPTS (${skill}); se salta la validación de paletas.`)
+  }
 }
 const palLineas = []
 if (validar) {

@@ -1,6 +1,5 @@
 import { FileXls, PlusCircle, Wallet } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { useThemeSync } from '../../core/shell/theme'
 import { Aviso, Button } from '../../core/ui'
 import { api } from '../../lib/api'
 import { toast } from '../../lib/toast'
@@ -13,7 +12,6 @@ export function WelcomePage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [picking, setPicking] = useState(false)
   const [newAccount, setNewAccount] = useState(false)
-  useThemeSync()
   return (
     <div data-module="finanzas" className="flex h-full items-center justify-center bg-canvas p-8 text-ink">
       <div className="w-full" style={{ maxWidth: '35rem' }}>

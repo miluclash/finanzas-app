@@ -119,35 +119,41 @@ export function SettingsPage() {
 }
 
 /* ======================= General: seguimiento, avisos e inversiones ======================= */
+/** Rangos y tipo de cada campo: lo mismo que pide el esquema Zod de main (SettingsInput): entero donde dice int, decimal donde no */
 const NUM = {
-  emergencyMonths: { min: 0, max: 36 },
-  budgetAlertPct: { min: 1, max: 100 },
-  duplicateWindowDays: { min: 0, max: 30 },
-  verifyStaleDays: { min: 1, max: 365 },
-  concentrationAlertPct: { min: 1, max: 100 }
+  emergencyMonths: { min: 0, max: 36, entero: true },
+  budgetAlertPct: { min: 1, max: 100, entero: true },
+  duplicateWindowDays: { min: 0, max: 30, entero: true },
+  verifyStaleDays: { min: 1, max: 365, entero: true },
+  concentrationAlertPct: { min: 1, max: 100, entero: false }
 } as const
 type NumKey = keyof typeof NUM
 type Txt = Record<NumKey, string>
+/** Con coma decimal, como se escribe en España */
+const aTextoNum = (v: number) => String(v).replace('.', ',')
+const deTexto = (t: string) => Number(t.trim().replace(',', '.'))
 const aTexto = (s: Settings): Txt => ({
-  emergencyMonths: String(s.emergencyMonths),
-  budgetAlertPct: String(s.budgetAlertPct),
-  duplicateWindowDays: String(s.duplicateWindowDays),
-  verifyStaleDays: String(s.verifyStaleDays),
-  concentrationAlertPct: String(s.concentrationAlertPct)
+  emergencyMonths: aTextoNum(s.emergencyMonths),
+  budgetAlertPct: aTextoNum(s.budgetAlertPct),
+  duplicateWindowDays: aTextoNum(s.duplicateWindowDays),
+  verifyStaleDays: aTextoNum(s.verifyStaleDays),
+  concentrationAlertPct: aTextoNum(s.concentrationAlertPct)
 })
 const errorNum = (k: NumKey, t: string) => {
-  const { min, max } = NUM[k]
-  return /^\d+$/.test(t.trim()) && Number(t) >= min && Number(t) <= max ? undefined : `Introduce un número entero entre ${min} y ${max}.`
+  const { min, max, entero } = NUM[k]
+  const formato = entero ? /^\d+$/ : /^\d+([.,]\d+)?$/
+  const v = deTexto(t)
+  return formato.test(t.trim()) && v >= min && v <= max ? undefined : `Introduce un número ${entero ? 'entero ' : ''}entre ${min} y ${max}.`
 }
 /** Lo que se envía al guardar (los mismos campos de siempre) */
 const aEnvio = (s: Settings, t: Txt) => ({
   trackingStart: s.trackingStart,
   minLiquidityCents: s.minLiquidityCents,
-  emergencyMonths: Number(t.emergencyMonths),
-  budgetAlertPct: Number(t.budgetAlertPct),
-  duplicateWindowDays: Number(t.duplicateWindowDays),
-  verifyStaleDays: Number(t.verifyStaleDays),
-  concentrationAlertPct: Number(t.concentrationAlertPct),
+  emergencyMonths: deTexto(t.emergencyMonths),
+  budgetAlertPct: deTexto(t.budgetAlertPct),
+  duplicateWindowDays: deTexto(t.duplicateWindowDays),
+  verifyStaleDays: deTexto(t.verifyStaleDays),
+  concentrationAlertPct: deTexto(t.concentrationAlertPct),
   costMethod: s.costMethod,
   investmentFeeCategoryId: s.investmentFeeCategoryId,
   investmentIncomeCategoryId: s.investmentIncomeCategoryId
@@ -179,7 +185,7 @@ function GeneralSettings() {
   const incomeCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'INCOME')
   const expenseCats = cat.categories.filter((c) => cat.groups.find((g) => g.id === c.groupId)?.kind === 'EXPENSE')
   const num = (k: NumKey, label: string, unidad: string, ayuda: string) => (
-    <TextField label={label} unidad={unidad} inputMode="numeric" ayuda={ayuda} error={errorNum(k, txt[k])} value={txt[k]} onChange={(e) => setNum(k, e.target.value)} className="[&_input]:tabular-nums [&_input]:text-right" />
+    <TextField label={label} unidad={unidad} inputMode={NUM[k].entero ? 'numeric' : 'decimal'} ayuda={ayuda} error={errorNum(k, txt[k])} value={txt[k]} onChange={(e) => setNum(k, e.target.value)} className="[&_input]:tabular-nums [&_input]:text-right" />
   )
   return (
     <>
@@ -542,11 +548,19 @@ function CategoryForm({ category, groupId, onClose }: { category: Category | nul
 
 /* ======================= Datos y copias ======================= */
 const tamano = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${(bytes / 1024).toFixed(0)} KB`)
-const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-const DIA_MS = 24 * 60 * 60 * 1000
-/** «hoy», «ayer» o «hace N días», según la fecha de la copia */
+/** Fechas y horas de las copias y del registro: siempre en hora de Madrid, no en UTC */
+const ZONA = 'Europe/Madrid'
+const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: ZONA })
+const fechaLocal = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: ZONA })
+/** Día de calendario (en hora de Madrid) como número de días, para contar «hoy», «ayer» o «hace N días» sin depender de las horas */
+const diaCalendario = (d: Date) => {
+  const [y, m, dia] = d.toLocaleDateString('en-CA', { timeZone: ZONA }).split('-').map(Number)
+  return Math.round(Date.UTC(y, m - 1, dia) / 86400000)
+}
+const diasDesde = (iso: string) => diaCalendario(new Date()) - diaCalendario(new Date(iso))
+/** «hoy», «ayer» o «hace N días», según el día de calendario de la copia */
 const hace = (iso: string) => {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / DIA_MS)
+  const d = diasDesde(iso)
   return d <= 0 ? 'hoy' : d === 1 ? 'ayer' : `hace ${d} días`
 }
 
@@ -578,14 +592,14 @@ function DataSettings() {
   const exportXlsx = useApiMutation('finanzas:export.xlsx', { success: (f) => (f ? 'Exportado a Excel' : null) })
   const exportCsv = useApiMutation('finanzas:export.csv', { success: (f) => (f ? `${f.length} archivos CSV exportados` : null) })
   const ultima = backups.data?.[0]
-  const dias = ultima ? Math.floor((Date.now() - new Date(ultima.createdAt).getTime()) / DIA_MS) : null
+  const dias = ultima ? diasDesde(ultima.createdAt) : null
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 r-card bg-raised p-4" role="status">
         {ultima ? (
           <>
             <StatusBadge tono={dias !== null && dias > 7 ? 'warning' : 'success'}>
-              Última copia: {hace(ultima.createdAt)}, {formatDate(ultima.createdAt.slice(0, 10))} a las {hora(ultima.createdAt)}
+              Última copia: {hace(ultima.createdAt)}, {fechaLocal(ultima.createdAt)} a las {hora(ultima.createdAt)}
             </StatusBadge>
             <span className="t-meta tnum">
               {tamano(ultima.size)} · {ultima.auto ? 'automática' : 'creada a mano o antes de un cambio'}
@@ -877,7 +891,7 @@ function AuditLog() {
             {q.data.map((a) => (
               <tr key={a.id} className="align-top">
                 <td className="tnum whitespace-nowrap text-ink-2">
-                  {formatDate(a.ts.slice(0, 10))} {hora(a.ts)}
+                  {fechaLocal(a.ts)} {hora(a.ts)}
                 </td>
                 <td>
                   <Tag>{ACCION[a.action] ?? a.action}</Tag>

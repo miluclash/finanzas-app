@@ -278,7 +278,7 @@ function ListView() {
               ))}
             </Select>
             <Select className="w-44" label="Estado" ocultarEtiqueta value={params.get('estado') ?? ''} onChange={(e) => set('estado', e.target.value || null)}>
-              <option value="">Cualquier estado</option>
+              <option value="">Sin anulados</option>
               {(['CONFIRMED', 'PENDING_REVIEW', 'CANCELLED'] as TxStatus[]).map((s) => (
                 <option key={s} value={s}>
                   {TX_STATUS_LABEL[s]}
@@ -487,22 +487,30 @@ function Detalle({ t, categoria, cuenta, recurrente, objetivo, onEditar, onEstad
         <Button size="sm" variant="secondary" onClick={onEditar}>
           Editar
         </Button>
-        {t.status === 'PENDING_REVIEW' ? (
-          <Button size="sm" variant="ghost" onClick={() => onEstado('CONFIRMED')}>
-            Confirmar
-          </Button>
-        ) : t.status === 'CANCELLED' ? (
-          <Button size="sm" variant="ghost" onClick={() => onEstado('CONFIRMED')}>
-            Reactivar
-          </Button>
+        {t.investmentOpId ? (
+          <StatusBadge tono="info" className="items-start">
+            Lo genera una operación de inversión: gestiónalo desde Inversiones.
+          </StatusBadge>
         ) : (
-          <Button size="sm" variant="ghost" onClick={() => onEstado('PENDING_REVIEW')}>
-            Marcar pendiente
-          </Button>
+          <>
+            {t.status === 'PENDING_REVIEW' ? (
+              <Button size="sm" variant="ghost" onClick={() => onEstado('CONFIRMED')}>
+                Confirmar
+              </Button>
+            ) : t.status === 'CANCELLED' ? (
+              <Button size="sm" variant="ghost" onClick={() => onEstado('CONFIRMED')}>
+                Reactivar
+              </Button>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => onEstado('PENDING_REVIEW')}>
+                Marcar pendiente
+              </Button>
+            )}
+            <Button size="sm" variant="danger" className="ml-auto" onClick={onAnular} disabled={t.status === 'CANCELLED'}>
+              Anular
+            </Button>
+          </>
         )}
-        <Button size="sm" variant="danger" className="ml-auto" onClick={onAnular} disabled={t.status === 'CANCELLED'}>
-          Anular
-        </Button>
       </div>
     </div>
   )

@@ -6,15 +6,19 @@
 // Cada gráfico lleva título, periodo, unidad y una referencia para interpretarlo (ChartFrame).
 import { ArrowClockwise, ChartLine, Table as TableIcon, Tray } from '@phosphor-icons/react'
 import { useRef, useState, type ReactNode } from 'react'
-import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis, Area, AreaChart } from 'recharts'
+import { type TooltipPayloadEntry, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis, Area, AreaChart } from 'recharts'
 import { cx } from '../lib'
 import { Button, IconButton } from './controls'
 import { EmptyState, ErrorState, StatusBadge, type Tono } from './feedback'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /** Espejo en números de los tokens --mark-* (Recharts necesita números en sus atributos) */
 export const MARCA = { linea: 2, punto: 4, anillo: 2, barraMax: 24, radioBarra: 4 }
-type TipProps = { active?: boolean; payload?: readonly any[]; label?: string | number }
+/** Lo que Recharts entrega al tooltip y a las etiquetas: solo los campos que usamos */
+type TipProps = { active?: boolean; payload?: readonly TooltipPayloadEntry[]; label?: string | number }
+type EtiquetaProps = { index?: number; x?: number | string; y?: number | string; width?: number | string; value?: unknown }
+type PuntoProps = { index?: number; cx?: number; cy?: number }
+/** Una fila de datos de un gráfico: la clave X y las series */
+type Fila = Record<string, string | number | null | undefined>
 export type Patron = 'solida' | 'discontinua' | 'punteada'
 const DASH: Record<Patron, string | undefined> = { solida: undefined, discontinua: '8 4', punteada: '2 4' }
 
@@ -228,7 +232,7 @@ export function Spark({
               strokeLinecap="round"
               strokeLinejoin="round"
               fill={area ? `url(#${id})` : 'none'}
-              dot={(p: any) => (p.index === ultimo ? <circle key={p.index} cx={p.cx} cy={p.cy} r={MARCA.punto} fill={color} stroke="var(--card)" strokeWidth={MARCA.anillo} /> : <g key={p.index} />)}
+              dot={(p: PuntoProps) => (p.index === ultimo ? <circle key={p.index} cx={p.cx} cy={p.cy} r={MARCA.punto} fill={color} stroke="var(--card)" strokeWidth={MARCA.anillo} /> : <g key={p.index} />)}
               activeDot={{ r: MARCA.punto, fill: color, stroke: 'var(--card)', strokeWidth: MARCA.anillo }}
               isAnimationActive={false}
             />
@@ -263,7 +267,7 @@ export function Columnas({
   claseGrafico,
   etiquetaUltima = true
 }: {
-  datos: any[]
+  datos: object[]
   claveX: string
   claveY: string
   nombre: string
@@ -296,13 +300,13 @@ export function Columnas({
             maxBarSize={MARCA.barraMax}
             radius={[MARCA.radioBarra, MARCA.radioBarra, 0, 0]}
             isAnimationActive={false}
-            label={(p: any) => {
+            label={(p: EtiquetaProps) => {
               const esUltima = etiquetaUltima && p.index === resaltada
               const esNota = anotada && p.index === anotada.i
               if (!esUltima && !esNota) return <g key={p.index} />
               return (
-                <text key={p.index} x={p.x + p.width / 2} y={p.y - 8} textAnchor="middle" className="tnum" fontWeight={600} fill="var(--lbl, var(--ink))" style={{ fontSize: 'var(--fs-label)' }}>
-                  {esNota ? anotada!.texto : formato(p.value)}
+                <text key={p.index} x={Number(p.x) + Number(p.width) / 2} y={Number(p.y) - 8} textAnchor="middle" className="tnum" fontWeight={600} fill="var(--lbl, var(--ink))" style={{ fontSize: 'var(--fs-label)' }}>
+                  {esNota ? anotada!.texto : formato(Number(p.value))}
                 </text>
               )
             }}
@@ -320,8 +324,8 @@ export function Columnas({
 /* ======================= Líneas ======================= */
 export type SerieLinea = { key: string; nombre: string; color: string; patron?: Patron; marcadorFinal?: 'relleno' | 'hueco' }
 export type Referencia = { y: number; texto: string; patron?: Patron; posicion?: 'insideTopLeft' | 'insideTopRight' | 'insideBottomRight' }
-const ultimoDe = (datos: any[], key: string) => {
-  for (let i = datos.length - 1; i >= 0; i--) if (datos[i][key] !== null && datos[i][key] !== undefined) return i
+const ultimoDe = (datos: object[], key: string) => {
+  for (let i = datos.length - 1; i >= 0; i--) if ((datos[i] as Fila)[key] !== null && (datos[i] as Fila)[key] !== undefined) return i
   return -1
 }
 /** Líneas sobre un solo eje. Referencias (presupuesto, objetivo) con patrón y rótulo; etiqueta directa al final de la primera serie */
@@ -338,7 +342,7 @@ export function Lineas({
   dominio,
   ticks
 }: {
-  datos: any[]
+  datos: object[]
   claveX: string
   series: SerieLinea[]
   alto?: string
@@ -378,12 +382,12 @@ export function Lineas({
               isAnimationActive={false}
               label={
                 etiquetaFinal && si === 0
-                  ? (p: any) =>
+                  ? (p: EtiquetaProps) =>
                       p.index === ultimoDe(datos, s.key) ? (
                         <g key="e">
-                          <circle cx={p.x} cy={p.y} r={MARCA.punto} fill={s.marcadorFinal === 'hueco' ? 'var(--card)' : s.color} stroke={s.marcadorFinal === 'hueco' ? s.color : 'var(--card)'} strokeWidth={MARCA.anillo} />
-                          <text x={p.x + 10} y={p.y + 4} fontWeight={600} fill="var(--ink)" className="tnum" style={{ fontSize: 'var(--fs-label)' }}>
-                            {formato(p.value, s.key)}
+                          <circle cx={Number(p.x)} cy={Number(p.y)} r={MARCA.punto} fill={s.marcadorFinal === 'hueco' ? 'var(--card)' : s.color} stroke={s.marcadorFinal === 'hueco' ? s.color : 'var(--card)'} strokeWidth={MARCA.anillo} />
+                          <text x={Number(p.x) + 10} y={Number(p.y) + 4} fontWeight={600} fill="var(--ink)" className="tnum" style={{ fontSize: 'var(--fs-label)' }}>
+                            {formato(Number(p.value), s.key)}
                           </text>
                         </g>
                       ) : (

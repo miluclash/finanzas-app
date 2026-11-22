@@ -5,7 +5,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { exigirDatosDePrueba } from './datos-prueba.mjs'
 
+exigirDatosDePrueba('e2e')
 const require = createRequire(import.meta.url)
 const out = process.argv[2] ?? 'test-output/e2e'
 fs.mkdirSync(out, { recursive: true })

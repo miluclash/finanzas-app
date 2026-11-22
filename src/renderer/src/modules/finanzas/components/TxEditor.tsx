@@ -11,7 +11,7 @@ import { formatEur } from '@shared/money'
 import type { Nature, Transaction, TxStatus, TxType } from '@shared/modules/finanzas/types'
 import { api, useApi, useApiMutation } from '../../../lib/api'
 import { useCatalog } from '../../../lib/catalog'
-import { Button, ConfirmDialog, DatePicker, Modal, MoneyField, SegmentedControl, Select, StatusBadge, TextArea, TextField } from '../../../core/ui'
+import { Button, ConfirmDialog, DatePicker, hayCapaAbierta, Modal, MoneyField, SegmentedControl, Select, StatusBadge, TextArea, TextField } from '../../../core/ui'
 
 type TransferDefaults = { fromAccountId?: string; toAccountId?: string; amountCents?: number; description?: string; goalId?: string; date?: string }
 type EditorState = { kind: 'tx'; id?: string; defaults?: Partial<Transaction> } | { kind: 'transfer'; transferId?: string; defaults?: TransferDefaults } | null
@@ -27,9 +27,6 @@ export function useTxEditor() {
   if (!c) throw new Error('TxEditorProvider no encontrado')
   return c
 }
-
-/** Hay un diálogo abierto (editor, confirmación, buscador): los atajos de una tecla no actúan */
-const HAY_DIALOGO = 'dialog[open], [role="dialog"][aria-modal="true"]'
 
 export function TxEditorProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<EditorState>(null)
@@ -57,7 +54,7 @@ export function TxEditorProvider({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
-      if (document.querySelector(HAY_DIALOGO)) return
+      if (hayCapaAbierta()) return
       if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
         openNew()
@@ -242,7 +239,7 @@ function TxModal({
     const t = setTimeout(() => setDebounced(JSON.parse(draftKey)), 250)
     return () => clearTimeout(t)
   }, [draftKey])
-  const check = useApi('finanzas:tx.validate', [debounced], { enabled: loaded && !!debounced.accountId && !!amount, placeholderData: (p) => p })
+  const check = useApi('finanzas:tx.validate', [debounced], { enabled: loaded && !!debounced.accountId && (!!amount || type === 'ADJUSTMENT'), placeholderData: (p) => p })
 
   // Autocompletado desde el historial, con flechas e Intro
   const [focusDesc, setFocusDesc] = useState(false)
@@ -272,7 +269,8 @@ function TxModal({
   const warnings = check.data?.warnings ?? []
   // Errores por campo: los locales (vacíos) y los que devuelve la validación. Se muestran al intentar guardar
   const errCampo = (campo: string) => errors.find((e) => e.field === campo)?.message
-  const errImporte = amount === null || amount <= 0 ? ERROR_IMPORTE : errCampo('amountCents')
+  // Igual que la validación de main: el importe no puede ser 0 salvo en un ajuste de saldo
+  const errImporte = type !== 'ADJUSTMENT' && (amount === null || amount === 0) ? ERROR_IMPORTE : errCampo('amountCents')
   const errConcepto = description.trim() === '' ? 'Escribe un concepto.' : errCampo('description')
   const errCategoria = wantKind ? errCampo('categoryId') : undefined
   const errCuenta = errCampo('accountId')
@@ -555,7 +553,7 @@ function TxModal({
                     <option value="__new">+ Nueva subcategoría…</option>
                   </Select>
                 ))}
-              <DatePicker label="Fecha" value={date} onChange={setDate} ayuda={mostrar(errFecha)} />
+              <DatePicker label="Fecha" value={date} onChange={setDate} error={mostrar(errFecha)} />
             </div>
             {type === 'REFUND' && (
               <Select

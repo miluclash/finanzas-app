@@ -69,6 +69,7 @@ Después hay que separar a mano lo que es nombre de la app de lo que es el módu
 | `src/main/index.ts` | Comentario de la carpeta de datos (línea 18) |
 | `src/renderer/src/core/shell/theme.ts` | Clave de caché del tema en localStorage `finanzas-tema` (línea 10), para evitar destello al arrancar. Cambiarla solo invalida la caché, no los datos |
 | `src/renderer/src/core/shell/AppShell.tsx` | Claves de localStorage `finanzas-barra-plegada` (línea 9) y `finanzas-asistente-ancho` (línea 10): preferencias de interfaz. `scripts/screenshots.mjs` (53) usa `finanzas-barra-plegada` y debe cambiar a la vez |
+| `src/renderer/src/modules/finanzas/Transactions.tsx` | Clave de localStorage `finanzas-densidad-tabla` (línea 39): densidad elegida en la tabla de movimientos |
 | `src/renderer/src/env.d.ts` (3 y 20), `src/renderer/src/lib/api.ts` (18), `src/preload/index.ts` (12), `src/renderer/src/core/shell/UpdateFooter.tsx` (13 y 29), `src/renderer/src/core/shell/theme.ts` (33) | Puente `window.finanzas` (nombre interno del bridge de IPC) y su tipo `FinanzasBridge`. `Layout.tsx` y `components/UpdateFooter.tsx` ya no existen: el puente se usa ahora desde `core/shell/` |
 | `src/mcp/server.ts` | Nombre del servidor MCP `finanzas` (82), prompt «Finanzas» del menú de Claude (comentario en 207, visible), logs `[finanzas-mcp]` (229 y 233). Se elimina en la fase de IA local |
 | `.claude/agents/arquitecto-datos.md` | Línea 8: «app Finanzas» (el resto de agentes solo nombra el módulo) |

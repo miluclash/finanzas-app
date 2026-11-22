@@ -176,7 +176,7 @@ export function Inicio() {
               <div>
                 <div className="t-label">Flujo neto del mes</div>
                 <div className="t-kpi mt-1">
-                  <CifraEur cents={s.netCashFlowCents} />
+                  <CifraEur cents={s.netCashFlowCents} signo />
                 </div>
                 {s.savingsRate !== null && <p className="t-meta mt-1">Tasa de ahorro: {formatPct(s.savingsRate)} de los ingresos del mes</p>}
               </div>

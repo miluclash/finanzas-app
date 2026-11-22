@@ -195,7 +195,7 @@ export function Popover({ etiqueta, boton, children, alinear = 'left', abiertoIn
         {boton({ abierto, alternar: () => setAbierto((v) => !v), id })}
       </span>
       {abierto && (
-        <div id={id} role="dialog" aria-label={etiqueta} className={cx('elevated pop-in absolute top-full z-30 mt-2 r-card p-4', alinear === 'right' ? 'right-0' : 'left-0')}>
+        <div id={id} role="dialog" data-popover-panel aria-label={etiqueta} className={cx('elevated pop-in absolute top-full z-30 mt-2 r-card p-4', alinear === 'right' ? 'right-0' : 'left-0')}>
           {children(cerrar)}
         </div>
       )}

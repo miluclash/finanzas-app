@@ -32,7 +32,6 @@ function ShellConectado({ version }: { version: string }) {
   const { openNew, openTransfer } = useTxEditor()
   const review = useApi('finanzas:tx.reviewQueue', [])
   const porRevisar = (review.data?.pending.length ?? 0) + (review.data?.issues.length ?? 0) + (review.data?.duplicates.length ?? 0)
-  useThemeSync()
   const cambiarTema = useCambiarTema()
   const { pathname } = useLocation()
   const ruta = leerRuta(pathname)
@@ -73,6 +72,8 @@ function ModuloActual({ children }: { children: ReactNode }) {
 }
 
 export function App() {
+  // El tema sigue a settings.theme en todas las pantallas: carga, error, bienvenida (base vacía) y la app
+  useThemeSync()
   const info = useApi('core:app.info', [])
   if (info.isLoading)
     return (

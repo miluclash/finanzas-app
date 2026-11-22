@@ -158,8 +158,9 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 const fmt = (s: string) => s.split('-').reverse().join('/')
 
 /** Selector de fecha: campo con calendario. Flechas mueven el día, Intro elige, Esc cierra y devuelve el foco */
-export function DatePicker({ label, value, onChange, ayuda, abiertoInicial }: { label: string; value: string; onChange: (v: string) => void; ayuda?: string; abiertoInicial?: boolean }) {
+export function DatePicker({ label, value, onChange, ayuda, error, abiertoInicial }: { label: string; value: string; onChange: (v: string) => void; ayuda?: string; error?: string; abiertoInicial?: boolean }) {
   const id = useId()
+  const hid = `${id}-h`
   return (
     <div>
       <span id={id} className="field-label">
@@ -169,7 +170,7 @@ export function DatePicker({ label, value, onChange, ayuda, abiertoInicial }: { 
         etiqueta={`Calendario: ${label}`}
         abiertoInicial={abiertoInicial}
         boton={({ abierto, alternar }) => (
-          <button type="button" data-popover-trigger aria-labelledby={id} aria-haspopup="dialog" aria-expanded={abierto} onClick={alternar} className="input flex min-w-48 items-center justify-between gap-3 text-left">
+          <button type="button" data-popover-trigger aria-labelledby={id} aria-invalid={error ? true : undefined} aria-describedby={error || ayuda ? hid : undefined} aria-haspopup="dialog" aria-expanded={abierto} onClick={alternar} className="input flex min-w-48 items-center justify-between gap-3 text-left">
             <span className="tnum">{fmt(value)}</span>
             <CalendarBlank size={18} className="text-ink-3" aria-hidden />
           </button>
@@ -177,7 +178,18 @@ export function DatePicker({ label, value, onChange, ayuda, abiertoInicial }: { 
       >
         {(cerrar) => <Calendario value={value} onElegir={(v) => (onChange(v), cerrar())} />}
       </Popover>
-      {ayuda && <p className="field-help">{ayuda}</p>}
+      {error ? (
+        <p id={hid} className="field-error">
+          <WarningCircle size={16} weight="fill" className="mt-px shrink-0" aria-hidden />
+          {error}
+        </p>
+      ) : (
+        ayuda && (
+          <p id={hid} className="field-help">
+            {ayuda}
+          </p>
+        )
+      )}
     </div>
   )
 }
