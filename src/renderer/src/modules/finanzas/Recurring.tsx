@@ -170,7 +170,7 @@ export function RecurringPage() {
           <div>
             <dt className="t-label">Ingresos al mes</dt>
             <dd className="t-kpi mt-1">
-              <CifraEur cents={income} />
+              <CifraEur cents={income} signo />
             </dd>
           </div>
           <div>
@@ -188,7 +188,7 @@ export function RecurringPage() {
           <div>
             <dt className="t-label">Saldo recurrente</dt>
             <dd className="t-kpi mt-1">
-              <CifraEur cents={income + expense + transfers} />
+              <CifraEur cents={income + expense + transfers} signo />
             </dd>
           </div>
         </dl>
