@@ -245,6 +245,13 @@ describe('reglas de arquitectura: prefijos de tablas (regla 6)', () => {
   })
 
   it('el registro de la app incluye los módulos esperados (control)', () => {
-    expect(createAppRegistry().modules.map((m) => m.id)).toEqual(APP_MODULES.map((m) => m.id))
+    expect(createAppRegistry().modules.map((m) => m.id)).toEqual(['finanzas', 'entreno'])
+    expect(APP_MODULES.map((m) => m.id)).toEqual(['finanzas', 'entreno'])
+  })
+
+  it('el módulo entreno crea tablas (la regla de prefijos tiene algo que mirar)', () => {
+    const entreno = createAppRegistry().migrations.filter((m) => m.version >= MIGRATION_RANGES.entreno[0])
+    expect(entreno.length).toBeGreaterThan(0)
+    expect(entreno.some((m) => /CREATE\s+TABLE\s+trn_/i.test(m.up))).toBe(true)
   })
 })

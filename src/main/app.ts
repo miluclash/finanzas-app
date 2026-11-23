@@ -9,10 +9,11 @@
 import type { CoreContext } from './core/context'
 import { createCoreHandlers, type CoreHandlers, type DialogProvider } from './core/handlers'
 import { createRegistry, mergeHandlers, type ModuleDeps, type Registry } from './core/registry'
+import { entrenoModule } from './modules/entreno'
 import { finanzasModule } from './modules/finanzas'
 
 /** Módulos de la app, en el orden en que se siembran y se juntan sus handlers. */
-export const APP_MODULES = [finanzasModule] as const
+export const APP_MODULES = [finanzasModule, entrenoModule] as const
 
 /** Registro validado con los módulos de la app. */
 export function createAppRegistry(): Registry {

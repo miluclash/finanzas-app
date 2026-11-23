@@ -251,12 +251,13 @@ describe('migraciones', () => {
 })
 
 describe('registro de módulos', () => {
-  it('el de la app tiene finanzas y exige las mismas tablas que antes', () => {
+  it('el de la app tiene finanzas y entreno y exige las mismas tablas que antes', () => {
     const r = createAppRegistry()
-    expect(r.modules.map((m) => m.id)).toEqual(['finanzas'])
-    expect(APP_MODULES.map((m) => m.name)).toEqual(['Finanzas'])
+    expect(r.modules.map((m) => m.id)).toEqual(['finanzas', 'entreno'])
+    expect(APP_MODULES.map((m) => m.name)).toEqual(['Finanzas', 'Entreno'])
+    // Entreno no exige tablas: una copia de antes de F3 (sin trn_) se tiene que poder restaurar.
     expect(r.requiredTables).toEqual(['schema_migrations', 'accounts', 'transactions', 'categories'])
-    expect(r.migrations.map((m) => m.version)).toEqual([1])
+    expect(r.migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005])
   })
 
   it('rechaza ids repetidos', () => {
