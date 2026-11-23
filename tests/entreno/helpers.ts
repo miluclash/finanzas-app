@@ -21,10 +21,10 @@ export interface EntrenoApp {
 }
 
 /** App con todos los módulos, migrada y sembrada. Sin archivo salvo que se pase `paths`. */
-export async function entrenoApp(paths: CorePaths = { dbPath: null, backupsDir: null }): Promise<EntrenoApp> {
+export async function entrenoApp(paths: CorePaths = { dbPath: null, backupsDir: null }, dialogs: DialogProvider = noDialogs): Promise<EntrenoApp> {
   const ctx = createCoreContext(await Db.open(paths.dbPath), paths, createAppRegistry())
   initCore(ctx)
-  return { ctx, get db() { return ctx.db }, h: createAppHandlers(ctx, noDialogs, '0.0.0') }
+  return { ctx, get db() { return ctx.db }, h: createAppHandlers(ctx, dialogs, '0.0.0') }
 }
 
 /** Ejecuta `fn` como una operación de la cola (síncrona, con la cola libre). */

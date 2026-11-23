@@ -43,13 +43,17 @@ export function formatHevyRows(sessions: HevySessionData[]): string[][] {
 const UNQUOTED = new Set(['superset_id', 'set_index', 'weight_kg', 'reps', 'distance_km', 'duration_seconds', 'rpe'])
 
 /**
- * CSV con el estilo real de Hevy: cabecera y columnas de texto entre comillas (también vacías),
- * numéricas sin comillas, comas, CRLF y sin salto de línea al final del archivo.
+ * Tabla de texto (cabecera + filas) → CSV con el estilo real de Hevy: cabecera y columnas de texto
+ * entre comillas (también vacías), numéricas sin comillas, comas, CRLF y sin salto de línea final.
  */
-export function formatHevyCsv(sessions: HevySessionData[], opts: CsvWriteOptions = {}): string {
-  return writeCsv(formatHevyRows(sessions), {
+export function hevyTableToCsv(table: string[][], opts: CsvWriteOptions = {}): string {
+  return writeCsv(table, {
     trailingEol: false,
     quote: (_v, col, row) => row === 0 || !UNQUOTED.has(HEVY_COLUMNS[col]),
     ...opts
   })
+}
+
+export function formatHevyCsv(sessions: HevySessionData[], opts: CsvWriteOptions = {}): string {
+  return hevyTableToCsv(formatHevyRows(sessions), opts)
 }

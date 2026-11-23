@@ -376,3 +376,64 @@ export interface ApplyHevyResult {
   exercisesNew: number
   setsWritten: number
 }
+
+// ---------- Importar y exportar (contrato IPC: entreno:import.*, entreno:export.*, entreno:restore.json) ----------
+
+/** Sesión resumida en la vista previa de una importación de Hevy. */
+export interface HevyWorkoutBrief {
+  hevyKey: string
+  title: string
+  startTime: LocalDateTime
+  /** Tipo deducido con las reglas (en una sesión cambiada con tipo corregido a mano, el que ya tiene). */
+  kind: WorkoutKind
+  exerciseCount: number
+  setCount: number
+}
+
+/** Error de una fila del archivo. El mensaje nunca incluye el contenido de la celda. */
+export interface HevyImportError {
+  line: number
+  column: string | null
+  message: string
+}
+
+/** Resultado de `import.preview`. No se ha escrito nada. */
+export interface HevyImportPreview {
+  /** Hay que devolverlo a `import.apply` (o a `import.cancel`). Caduca a los 30 minutos. */
+  token: string
+  /** Solo el nombre del archivo, sin la ruta. */
+  fileName: string
+  format: ImportFormat
+  rowsTotal: number
+  rowsValid: number
+  newWorkouts: HevyWorkoutBrief[]
+  changedWorkouts: HevyWorkoutBrief[]
+  /** Sesiones que ya estaban iguales en la app. */
+  duplicateCount: number
+  /** Sesiones con alguna fila con error: no se importan. */
+  sessionsWithErrors: number
+  errors: HevyImportError[]
+  /** Títulos de ejercicios que no existen todavía en el catálogo. */
+  newExercises: string[]
+  warnings: string[]
+  /** Ya se importó un archivo idéntico antes (aviso, no bloquea). */
+  alreadyImported: boolean
+}
+
+export interface HevyImportResult {
+  importId: number
+  workoutsNew: number
+  workoutsChanged: number
+  workoutsDuplicate: number
+  sessionsWithErrors: number
+  rowsError: number
+  exercisesNew: number
+  setsWritten: number
+  /** Copia de seguridad hecha justo antes (null si no hay carpeta de copias). */
+  backup: string | null
+}
+
+/** Resultado de `restore.json` (null si se cancela el diálogo). */
+export interface EntrenoRestoreResult {
+  safetyBackup: string | null
+}

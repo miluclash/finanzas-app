@@ -1,27 +1,22 @@
 import type { IsoLocalDateTime } from './dates'
+import {
+  HEVY_VIEW_COLUMNS,
+  SET_TYPES,
+  type HevySetInput,
+  type KindRule as StoredKindRule,
+  type SetType,
+  type WorkoutKind
+} from '../types'
 
-export const HEVY_COLUMNS = [
-  'title',
-  'start_time',
-  'end_time',
-  'description',
-  'exercise_title',
-  'superset_id',
-  'exercise_notes',
-  'set_index',
-  'set_type',
-  'weight_kg',
-  'reps',
-  'distance_km',
-  'duration_seconds',
-  'rpe'
-] as const
+// Las constantes y tipos del esquema viven en ../types; aquí solo se reexportan con los nombres del parser.
+export { SET_TYPES }
+
+export const HEVY_COLUMNS = HEVY_VIEW_COLUMNS
 export type HevyColumn = (typeof HEVY_COLUMNS)[number]
 
-export const SET_TYPES = ['normal', 'warmup', 'dropset', 'failure'] as const
-export type HevySetType = (typeof SET_TYPES)[number]
+export type HevySetType = SetType
 
-export type SessionKind = 'GYM' | 'SWIM' | 'HYROX' | 'RUN' | 'OTHER'
+export type SessionKind = WorkoutKind
 
 /** Fila de Hevy ya validada y normalizada (una serie con los datos de su sesión). */
 export interface HevyRow {
@@ -49,19 +44,7 @@ export interface RowError {
   message: string
 }
 
-export interface HevySet {
-  exerciseTitle: string
-  exerciseOrder: number
-  supersetId: string | null
-  exerciseNotes: string | null
-  setIndex: number
-  setType: HevySetType
-  weightKg: number | null
-  reps: number | null
-  distanceKm: number | null
-  durationSeconds: number | null
-  rpe: number | null
-}
+export type HevySet = HevySetInput
 
 /** Sesión sin metadatos de agrupado: lo que necesita el formateo inverso. */
 export interface HevySessionData {
@@ -82,10 +65,5 @@ export interface HevySession extends HevySessionData {
   signature: string
 }
 
-export interface KindRule {
-  field: 'title' | 'exercise'
-  contains: string
-  kind: SessionKind
-  priority: number
-  active: boolean
-}
+/** Regla de tipo de sesión (la de la base, con o sin `id`). */
+export type KindRule = Omit<StoredKindRule, 'id'> & { id?: number }

@@ -3,6 +3,7 @@
 // cola de escritura (`entreno:<nombre>`) y devuelven su promesa. Los servicios apuntan sus cambios
 // en `audit_log` dentro de esa misma operación.
 import type {
+  EntrenoRestoreResult,
   EntrenoSettings,
   ExerciseInput,
   KindRuleInput,
@@ -11,9 +12,13 @@ import type {
   WorkoutExtrasInput,
   WorkoutFilter
 } from '@shared/modules/entreno/types'
+import { restoreBackup } from '../../core/backup'
 import type { CoreContext } from '../../core/context'
+import type { DialogProvider } from '../../core/handlers'
 import * as catalog from './catalog'
 import * as exercises from './exercises'
+import { exportEntrenoJson, exportEntrenoXlsx, exportHevyCsv } from './exports'
+import { createHevyImporter } from './hevyImport'
 import * as workouts from './workouts'
 
 /** Entreno no tiene datos del usuario (ninguna sesión). */
@@ -23,7 +28,8 @@ export function isEmpty(ctx: CoreContext): boolean {
   return !db.get('SELECT 1 AS x FROM trn_workouts LIMIT 1')
 }
 
-export function createEntrenoHandlers(ctx: CoreContext) {
+export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider) {
+  const importer = createHevyImporter(ctx, dialogs)
   const write = <T>(name: string, fn: () => T): Promise<T> => ctx.queue.enqueue(`entreno:${name}`, fn)
   return {
     // Sesiones
@@ -58,7 +64,41 @@ export function createEntrenoHandlers(ctx: CoreContext) {
     // Ajustes e importaciones
     'settings.get': () => catalog.getSettings(ctx.db),
     'settings.save': (patch: Partial<EntrenoSettings>) => write('settings.save', () => catalog.saveSettings(ctx.db, patch)),
-    'imports.list': () => catalog.listImports(ctx.db)
+    'imports.list': () => catalog.listImports(ctx.db),
+
+    // Importar Hevy: vista previa (no escribe), aplicar (una sola operación de la cola) y cancelar
+    'import.preview': () => importer.preview(),
+    'import.apply': (token: string) => importer.apply(token),
+    'import.cancel': (token: string) => importer.cancel(token),
+
+    // Exportar y restaurar
+    'export.csv': async () => {
+      const f = await dialogs.saveFile('Exportar entreno (CSV de Hevy)', `entreno-hevy-${ctx.today()}.csv`, [{ name: 'CSV', extensions: ['csv'] }])
+      if (!f) return null
+      exportHevyCsv(ctx.db, f)
+      dialogs.showItem(f)
+      return f
+    },
+    'export.xlsx': async () => {
+      const f = await dialogs.saveFile('Exportar entreno a Excel', `entreno-${ctx.today()}.xlsx`, [{ name: 'Excel', extensions: ['xlsx'] }])
+      if (!f) return null
+      await exportEntrenoXlsx(ctx.db, f)
+      dialogs.showItem(f)
+      return f
+    },
+    'export.json': async () => {
+      const f = await dialogs.saveFile('Exportar entreno (JSON)', `entreno-${ctx.today()}.json`, [{ name: 'JSON', extensions: ['json'] }])
+      if (!f) return null
+      exportEntrenoJson(ctx.db, f)
+      dialogs.showItem(f)
+      return f
+    },
+    // Copia previa y sustitución de todos los datos trn_ en una sola operación (restoreBackup del núcleo).
+    'restore.json': async (): Promise<EntrenoRestoreResult | null> => {
+      const f = await dialogs.openFile('Elige un JSON exportado de Entreno', [{ name: 'JSON', extensions: ['json'] }])
+      if (!f) return null
+      return restoreBackup(ctx, f)
+    }
   }
 }
 
