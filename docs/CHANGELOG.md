@@ -4,6 +4,16 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 
 ## Sin publicar
 
+### F3 Datos de entreno (evolución a panel de vida)
+
+- **Entreno ya tiene datos.** Tablas nuevas `trn_` (migraciones 2001–2005, solo tablas nuevas): sesiones y series con las mismas columnas que la exportación de Hevy, catálogo de ejercicios con grupos musculares y alias, reglas de tipo de sesión, ajustes, historial de importaciones y, sin pantallas todavía, bloques, rutinas, objetivos y eventos (llegan en F4). Antes de migrar se hace la copia `antes-de-migrar`, como siempre.
+- **Importar de Hevy** (CSV, TSV o el mismo contenido en `.xlsx`): vista previa con sesiones nuevas, cambiadas, duplicadas, filas con error (línea, columna y motivo), ejercicios nuevos y avisos. Al confirmar se escribe todo en una sola operación, con copia `antes-de-importar`. Reimportar no duplica. Una sesión que cambiaste en Hevy sustituye sus series y conserva tus notas, el esfuerzo y el tipo si lo cambiaste a mano. Comprobado con una exportación real (fuera del repo): dos importaciones sin duplicar y el CSV exportado reproduce el original celda a celda.
+- **Pantallas de Entreno**: Resumen con las últimas sesiones; Sesiones (lista, detalle, valoración, borrado); alta y edición manual (pensada para natación); Ejercicios (categoría, medida, peso corporal, grupos musculares, alias y unir dos); Ajustes › Entreno (grupos musculares, reglas de tipo, historial de importaciones, exportar y restaurar). Accesos en Ctrl+K.
+- **Exportar Entreno** a CSV con la forma exacta de Hevy, a Excel (una hoja por tabla) y a JSON restaurable. Restaurar ese JSON solo toca Entreno, con copia previa.
+- **Copias**: la copia completa ya incluye Entreno. Las copias de antes de esta versión se siguen pudiendo restaurar (Entreno queda vacío, con los grupos musculares y las reglas iniciales).
+- `ISODate` y `MonthKey` pasan a `src/shared/types.ts`. Finanzas no cambia: los dos dorados dan las mismas cifras sin regenerar nada.
+- Las capturas de las maquetas quedan solo a 1440×900. `.gitattributes` guarda las muestras inventadas de Hevy byte a byte.
+
 ### F2 Diseño (evolución a panel de vida)
 
 - **Sistema de diseño nuevo.** Inter (cifras tabulares), iconos Phosphor, tokens de color, tipografía, espaciado, radios y densidades en `src/renderer/src/core/design/`, y componentes en `src/renderer/src/core/ui/`. Tema oscuro y claro con el mismo cuidado y contraste AA comprobado (`scripts/contrastes.mjs`); `scripts/auditar-tokens.mjs` avisa si una pantalla usa colores o medidas sueltas. Cada módulo tiene su identidad: Finanzas sobrio con un acento azul apagado, Entreno con lima.
