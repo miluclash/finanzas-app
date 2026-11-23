@@ -1,0 +1,10 @@
+// Componentes base del sistema de diseño. Las páginas importan de aquí.
+export { cx } from './cx'
+export * from './controls'
+export * from './feedback'
+export * from './layout'
+export * from './charts'
+export * from './session'
+export * from './money'
+export * from './textarea'
+export * from './dialogos'

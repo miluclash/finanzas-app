@@ -208,11 +208,11 @@ Cada fase es una rama y un PR. Versiones internas 0.6 → 0.9; la 1.0.0 cierra l
 
 ## 11. Equipo de agentes
 
-La sesión principal (orquestador) va con **Fable 5.2**. Al lanzar cada agente se le pasa el effort de esta tabla.
+La sesión principal (orquestador) va con **Opus 5.5** (desde F2; en F0 y F1 fue Fable 5.2). Al lanzar cada agente se le pasa el effort de esta tabla.
 
 | Agente | Modelo | Effort | Rol |
 |---|---|---|---|
-| orquestador (sesión principal) | fable | high | Planifica cada fase, reparte, integra, decide, habla con Michael |
+| orquestador (sesión principal) | opus | high | Planifica cada fase, reparte, integra, decide, habla con Michael |
 | arquitecto-datos | opus | high | Esquema, migraciones, núcleo, módulos, cola de escritura |
 | dominio-entreno | opus | high | Métricas y lógica de entreno (funciones puras + tests) |
 | motor-graficos | opus | high | Constructor de gráficos, paneles, registro de métricas |

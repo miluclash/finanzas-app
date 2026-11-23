@@ -1,0 +1,495 @@
+/* CONTRASTES (generado por design/maquetas/contrastes.mjs; 408 comprobaciones, 0 fallos)
+Mínimos: texto normal 4,5:1 · elementos de interfaz y marcas 3:1.
+  oscuro núcleo   OK   peor texto 6.08:1 (ink-3/interactive)  peor interfaz 3.38:1 (control/interactive)
+  oscuro Finanzas OK   peor texto 5.91:1 (on-accent/accent)  peor interfaz 3.38:1 (control/interactive)
+  oscuro Entreno  OK   peor texto 6.08:1 (ink-3/interactive)  peor interfaz 3.38:1 (control/interactive)
+  claro  núcleo   OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
+  claro  Finanzas OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
+  claro  Entreno  OK   peor texto 4.73:1 (success/interactive)  peor interfaz 3.16:1 (control/interactive)
+Destacados:
+  oscuro Entreno: accent-text/card 14.05 · on-primary/primary 14.82 · ink-3/card 7.56 · success/card 8.10
+  claro Entreno: accent-text/card 6.26 · accent-mark/card 3.95 · primary-edge/card 3.95 · on-primary/primary 14.82 · hero-accent/hero-bg 14.96
+  oscuro Finanzas: accent-text/card 7.85 · success/card 8.10 · error/card 7.58 · ink-3/card 7.56
+  claro Finanzas: accent-text/card 6.62 · success/card 5.97 · error/card 6.26 · ink-3/card 6.21
+Paletas de series (validador de la skill dataviz, adyacentes, sobre card):
+  oscuro Finanzas [#5b93cd #b58a3a #23a39d #926abe] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
+      #926abe↔#23a39d ΔE 9.5 (deutan) · tritan 15.5
+  oscuro Entreno [#78a000 #139ec6 #e36927 #9d6fe3] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
+      #139ec6↔#78a000 ΔE 20.9 (protan) · tritan 8.9
+  claro Finanzas [#2666a2 #a77612 #008e89 #6b46a0] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
+      #008e89↔#a77612 ΔE 13.3 (protan) · tritan 17.1
+  claro Entreno [#6f9600 #007fa6 #cf5604 #7447c8] PASA · Lightness band: pasa · Chroma floor: pasa · CVD separation: pass · Normal-vision floor: pass · Contrast vs surface: pass
+      #cf5604↔#007fa6 ΔE 19.0 (protan) · tritan 8.7
+*/
+/*@@FIN-CONTRASTES@@*/
+
+/* ==========================================================================
+   Tokens del sistema de diseño (F2, revisión 1). Se copian tal cual a la app.
+
+   Estructura
+   1. Sin color: tipografía, espaciado, radios, alturas, movimiento, shell.
+   2. Densidades: data-density="compact | normal | comfortable". Por defecto,
+      Finanzas va cómoda, Entreno compacta y el resto normal.
+   3. Núcleo neutro: oscuro por defecto y claro con data-theme="light".
+      Superficies en cuatro capas (lienzo < tarjeta < elevado < interactivo),
+      texto en cuatro niveles y estados (éxito, aviso, error, información)
+      con tokens propios, distintos de la identidad.
+   4. Identidad por módulo con data-module="finanzas | entreno": solo cambian
+      acento, series de gráfico y densidad. Las superficies y los estados son
+      del sistema, no de cada módulo.
+   5. Puente con Tailwind 4 (@theme inline).
+
+   Reglas
+   - Ninguna pantalla lleva colores ni medidas sueltas: si hace falta un valor,
+     es un token (lo comprueba design/maquetas/auditar.mjs).
+   - Los bloques oscuros van antes que los claros: `:root [data-module]` y
+     `[data-theme="light"] [data-module]` tienen la misma especificidad y gana
+     el último.
+   - Todos los colores son hexadecimales opacos para poder medir su contraste
+     con contrastes.mjs (que lee este archivo).
+
+   Botones principales (regla)
+   - Una sola acción principal por vista.
+   - Finanzas y núcleo: «primario» en tinta invertida (blanco en oscuro, negro
+     en claro) para la acción principal de la página (Nuevo movimiento).
+     «Primario azul» (--accent) para confirmar dentro de un diálogo o panel
+     (Guardar, Aplicar), donde el botón de tinta ya no es el protagonista.
+   - Entreno: el primario es lima (--accent) en la página y en los diálogos.
+   - Destructivo: contorno en error; relleno en error solo en la confirmación.
+   - Secundario y fantasma para el resto. Nunca dos primarios juntos.
+   ========================================================================== */
+
+/* 1. Sin color ----------------------------------------------------------- */
+:root {
+  --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  /* Escala tipográfica (rangos del pliego entre paréntesis) */
+  --fs-kpi-hero: 2.75rem; /* 44 px · KPI protagonista (40–44) */
+  --fs-kpi: 2rem; /* 32 px · KPI de tarjeta (30–36) */
+  --fs-page: 1.75rem; /* 28 px · título de página (26–28) */
+  --fs-section: 1.1875rem; /* 19 px · título de sección (18–20) */
+  --fs-card-title: 0.9375rem; /* 15 px · título de tarjeta (14–16) */
+  --fs-body: 0.875rem; /* 14 px · texto habitual */
+  --fs-label: 0.8125rem; /* 13 px · etiqueta secundaria (12–13) */
+  --fs-micro: 0.75rem; /* 12 px · microtexto, solo excepcional (11–12) */
+  --lh-tight: 1.1;
+  --lh-snug: 1.3;
+  --lh-body: 1.5;
+  --tracking-kpi-hero: -0.025em;
+  --tracking-kpi: -0.02em;
+  --tracking-page: -0.02em;
+  --tracking-section: -0.012em;
+  --tracking-caps: 0.05em;
+  --w-body: 420;
+  --w-medium: 520;
+  --w-strong: 600;
+  --w-kpi: 620;
+  --w-title: 650;
+
+  /* Espaciado en base 4 px: 4 / 8 / 12 / 16 / 24 / 32 / 40 / 48 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radios: tarjetas 12, modales 16, botones y campos 8, etiquetas 6, pastillas del todo */
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --radius-control: 8px;
+  --radius-tag: 6px;
+  --radius-mark: 4px; /* extremos de barra */
+  --radius-full: 999px;
+
+  /* Alturas normalizadas de botones y campos */
+  --h-sm: 32px;
+  --h-md: 40px;
+  --h-lg: 48px;
+
+  /* Movimiento: cortas y suaves. Se anulan con prefers-reduced-motion */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 220ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Shell */
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 56px;
+  --content-max: 1200px;
+  --ai-w-min: 320px;
+  --ai-w-default: 360px;
+  --ai-w-max: 560px;
+  --z-sticky: 30;
+  --z-overlay: 50;
+  --z-toast: 60;
+
+  /* Marcas de gráfico */
+  --mark-line: 2px;
+  --mark-dot: 4px;
+  --mark-bar: 3px; /* indicador de elemento activo y asa del interruptor */
+  --chart-h: 200px;
+  --chart-h-sm: 120px;
+  --chart-h-xs: 48px;
+
+  /* Reflow de cuadrículas: columnas mínimas antes de bajar de fila */
+  --min-kpi: 10rem;
+  --min-kpi-wide: 15rem;
+  --settings-nav-w: 12rem;
+
+  /* Columnas de filas con etiqueta, medidores y esquemas */
+  --col-label: 14rem;
+  --col-spec: 18rem;
+  --col-meter-name: 5rem;
+  --col-meter-name-wide: 10rem;
+  --col-meter-value: 4rem;
+  --col-meter-value-wide: 6rem;
+  --col-meter-status: 6rem;
+
+  /* Etiquetas en mayúsculas: solo Entreno, solo cortas */
+  --caps-transform: none;
+  --caps-tracking: 0;
+  --caps-weight: 600;
+}
+
+/* 2. Densidades --------------------------------------------------------- */
+:root,
+[data-density='normal'] {
+  --row-h: 44px; /* alto de fila de tabla o lista */
+  --card-pad: 24px;
+  --gap: 16px;
+}
+[data-density='compact'],
+[data-module='entreno']:not([data-density]) {
+  --row-h: 36px;
+  --card-pad: 16px;
+  --gap: 12px;
+}
+[data-density='comfortable'],
+[data-module='finanzas']:not([data-density]) {
+  --row-h: 52px;
+  --card-pad: 24px;
+  --gap: 24px;
+}
+[data-module='entreno'] {
+  --caps-transform: uppercase;
+  --caps-tracking: var(--tracking-caps);
+  --caps-weight: 650;
+}
+
+/* 3. Núcleo oscuro (por defecto) ---------------------------------------- */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Superficies: la profundidad sale de la luminosidad, sin negro puro */
+  --canvas: #0b0c0f;
+  --sidebar: #0f1115;
+  --card: #14161a;
+  --raised: #1b1e23;
+  --interactive: #252932;
+  --overlay: #1b1e23; /* menús, popovers y modales */
+  --line: #23262c; /* separadores y borde de tarjeta */
+  --line-strong: #30343b; /* borde sutil de elementos elevados */
+  --control: #747a86; /* borde de campos y botones (3:1) */
+
+  /* Texto en cuatro niveles */
+  --ink: #f2f4f7;
+  --ink-2: #c5cad3;
+  --ink-3: #a0a8b5; /* metadatos que hay que poder leer */
+  --ink-disabled: #636b77; /* solo para lo deshabilitado */
+  --focus: #8ab4ff;
+  --scrim: rgb(5 6 8 / 0.62);
+
+  /* Botón primario del núcleo y de Finanzas: tinta invertida */
+  --primary: #f2f4f7;
+  --on-primary: #0b0c0f;
+  --primary-edge: #f2f4f7;
+
+  /* Acento neutro del núcleo (Inicio, shell): gris azulado sin identidad */
+  --accent: #e4e8ee;
+  --on-accent: #0b0c0f;
+  --accent-text: #c5cad3;
+  --accent-mark: #a9b3c3;
+  --accent-soft: #1e232b;
+  --accent-line: #3a404b;
+
+  /* Estados: propios, distintos de la identidad (el lima y el azul no son estados) */
+  --success: #3fc38c;
+  --warning: #f0b24a;
+  --error: #f28b82;
+  --info: #9db0cc;
+  --success-soft: #12261e;
+  --warning-soft: #2b2314;
+  --error-soft: #2d1b1c;
+  --info-soft: #1b2330;
+
+  /* Gráficos */
+  --grid: #20232a;
+  --axis: #30343b;
+  --track: #252932;
+  --muted-mark: #747a86; /* histórico y contexto */
+  --ref: #a0a8b5; /* líneas de referencia */
+  --series-1: #a9b3c3;
+  --series-2: #b58a3a;
+  --series-3: #23a39d;
+  --series-4: #926abe;
+  --seq-1: #1f242c;
+  --seq-2: #343c49;
+  --seq-3: #566073;
+  --seq-4: #8591a6;
+  --seq-5: #c5cdda;
+
+  /* Marcador (la única tarjeta intensa de Entreno) */
+  --hero-bg: var(--card);
+  --hero-ink: var(--ink);
+  --hero-ink-2: var(--ink-2);
+  --hero-accent: var(--accent-text);
+  --hero-mark: var(--accent-mark);
+  --hero-mark-dim: var(--muted-mark);
+
+  /* Sombras: solo en lo elevado (modales, menús, tooltips) */
+  --shadow-raised: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+/* Núcleo claro */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #f3f4f6;
+  --sidebar: #eceef2;
+  --card: #ffffff;
+  --raised: #f6f7f9;
+  --interactive: #e1e5ec;
+  --overlay: #ffffff;
+  --line: #e3e6eb;
+  --line-strong: #d1d5dc;
+  --control: #77808e;
+
+  --ink: #14161a;
+  --ink-2: #424752;
+  --ink-3: #5b616e;
+  --ink-disabled: #9aa0ab;
+  --focus: #1f5fd1;
+  --scrim: rgb(20 22 28 / 0.4);
+
+  --primary: #14161a;
+  --on-primary: #ffffff;
+  --primary-edge: #14161a;
+
+  --accent: #2b3340;
+  --on-accent: #ffffff;
+  --accent-text: #424752;
+  --accent-mark: #566074;
+  --accent-soft: #eceef2;
+  --accent-line: #c5cad6;
+
+  --success: #187150;
+  --warning: #85580a;
+  --error: #b0332b;
+  --info: #43596f;
+  --success-soft: #e3f3eb;
+  --warning-soft: #f8edd4;
+  --error-soft: #fbe7e5;
+  --info-soft: #e6ecf4;
+
+  --grid: #ebedf1;
+  --axis: #d1d5dc;
+  --track: #e6e9ee;
+  --muted-mark: #8a909c;
+  --ref: #5b616e;
+  --series-1: #566074;
+  --series-2: #a77612;
+  --series-3: #008e89;
+  --series-4: #6b46a0;
+  --seq-1: #eceef2;
+  --seq-2: #cfd5df;
+  --seq-3: #9aa5b7;
+  --seq-4: #6b778c;
+  --seq-5: #3f4859;
+
+  --hero-bg: var(--card);
+  --hero-ink: var(--ink);
+  --hero-ink-2: var(--ink-2);
+  --hero-accent: var(--accent-text);
+  --hero-mark: var(--accent-mark);
+  --hero-mark-dim: var(--muted-mark);
+
+  --shadow-raised: 0 8px 24px rgb(20 22 28 / 0.14), 0 0 0 1px rgb(20 22 28 / 0.06);
+}
+
+/* 4. Finanzas: azul apagado. Densidad cómoda */
+:root [data-module='finanzas'],
+[data-theme='dark'] [data-module='finanzas'] {
+  --primary: #f2f4f7;
+  --on-primary: #0b0c0f;
+  --primary-edge: #f2f4f7;
+
+  --accent: #5b93cd; /* «primario azul» y relleno */
+  --on-accent: #08101a;
+  --accent-text: #7fafdf;
+  --accent-mark: #5b93cd;
+  --accent-soft: #14202d;
+  --accent-line: #2d4b69;
+
+  --series-1: #5b93cd;
+  --series-2: #b58a3a;
+  --series-3: #23a39d;
+  --series-4: #926abe;
+  --seq-1: #1a2430;
+  --seq-2: #27405c;
+  --seq-3: #386088;
+  --seq-4: #5b93cd;
+  --seq-5: #9ac0eb;
+}
+
+/* 4. Entreno: lima. Densidad compacta, títulos cortos en mayúsculas */
+:root [data-module='entreno'],
+[data-theme='dark'] [data-module='entreno'] {
+  --accent: #c8f31d;
+  --on-accent: #0d1105;
+  --accent-text: #c8f31d;
+  --accent-mark: #c8f31d;
+  --accent-soft: #212a09;
+  --accent-line: #566a10;
+  --primary: #c8f31d;
+  --on-primary: #0d1105;
+  --primary-edge: #c8f31d;
+
+  --series-1: #78a000;
+  --series-2: #139ec6;
+  --series-3: #e36927;
+  --series-4: #9d6fe3;
+  --seq-1: #202a0a;
+  --seq-2: #3b5209;
+  --seq-3: #628210;
+  --seq-4: #98c41a;
+  --seq-5: #d4f84b;
+
+  /* Marcador: en oscuro, pastilla lima con tinta oscura */
+  --hero-bg: #c8f31d;
+  --hero-ink: #0d1105;
+  --hero-ink-2: #36440a;
+  --hero-accent: #0d1105;
+  --hero-mark: #0d1105;
+  --hero-mark-dim: #62761a;
+}
+
+/* Finanzas, claro */
+[data-theme='light'] [data-module='finanzas'] {
+  --primary: #14161a;
+  --on-primary: #ffffff;
+  --primary-edge: #14161a;
+
+  --accent: #2666a2;
+  --on-accent: #ffffff;
+  --accent-text: #245f99;
+  --accent-mark: #2666a2;
+  --accent-soft: #e8eff7;
+  --accent-line: #b4cbe3;
+
+  --series-1: #2666a2;
+  --series-2: #a77612;
+  --series-3: #008e89;
+  --series-4: #6b46a0;
+  --seq-1: #e6eef7;
+  --seq-2: #bdd1e8;
+  --seq-3: #88acd2;
+  --seq-4: #4d82b8;
+  --seq-5: #245b8f;
+}
+
+/* Entreno, claro: el lima no da contraste sobre blanco, así que relleno,
+   texto y marca van separados y el botón lleva borde oscurecido. */
+[data-theme='light'] [data-module='entreno'] {
+  --accent: #c8f31d;
+  --on-accent: #0d1105;
+  --accent-text: #4a6a00;
+  --accent-mark: #668c00;
+  --accent-soft: #eef8c8;
+  --accent-line: #668c00;
+  --primary: #c8f31d;
+  --on-primary: #0d1105;
+  --primary-edge: #668c00;
+
+  --series-1: #6f9600;
+  --series-2: #007fa6;
+  --series-3: #cf5604;
+  --series-4: #7447c8;
+  --seq-1: #eef6c9;
+  --seq-2: #d2e68a;
+  --seq-3: #a6c92e;
+  --seq-4: #709600;
+  --seq-5: #466000;
+
+  /* Marcador: en claro, pastilla casi negra con cifras lima */
+  --hero-bg: #0d0f08;
+  --hero-ink: #f7f8f1;
+  --hero-ink-2: #c3c7b3;
+  --hero-accent: #c8f31d;
+  --hero-mark: #c8f31d;
+  --hero-mark-dim: #6e7260;
+}
+
+/* Reducir movimiento: todo fuera */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 5. Puente con Tailwind 4: utilidades bg-card, text-ink-2, etc. -----------
+   Con `inline`, cada utilidad apunta a la variable y respeta el data-module
+   más cercano. */
+@theme inline {
+  --font-sans: var(--font-ui);
+  --color-canvas: var(--canvas);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-interactive: var(--interactive);
+  --color-overlay: var(--overlay);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-control: var(--control);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-focus: var(--focus);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-mark: var(--accent-mark);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-error-soft: var(--error-soft);
+  --color-info-soft: var(--info-soft);
+  --color-track: var(--track);
+  --color-grid: var(--grid);
+  --color-hero-bg: var(--hero-bg);
+  --color-hero-ink: var(--hero-ink);
+  --color-hero-ink-2: var(--hero-ink-2);
+  --color-hero-accent: var(--hero-accent);
+}

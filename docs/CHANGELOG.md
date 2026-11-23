@@ -4,6 +4,18 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 
 ## Sin publicar
 
+### F2 Diseño (evolución a panel de vida)
+
+- **Sistema de diseño nuevo.** Inter (cifras tabulares), iconos Phosphor, tokens de color, tipografía, espaciado, radios y densidades en `src/renderer/src/core/design/`, y componentes en `src/renderer/src/core/ui/`. Tema oscuro y claro con el mismo cuidado y contraste AA comprobado (`scripts/contrastes.mjs`); `scripts/auditar-tokens.mjs` avisa si una pantalla usa colores o medidas sueltas. Cada módulo tiene su identidad: Finanzas sobrio con un acento azul apagado, Entreno con lima.
+- **Shell nuevo.** Barra lateral plegable con Inicio, Finanzas y Entreno, buscador de comandos con Ctrl+K, hueco para el asistente de IA (llega en la fase de IA local) y transiciones que respetan "reducir movimiento".
+- **Inicio "panel de vida".** Disponible, por revisar, resumen de Finanzas y tendencia, con datos que ya calculaba la app. La parte de Entreno sale vacía hasta F3.
+- **Finanzas reestilizada** con el mismo contenido y las mismas cifras. Lo secundario del Panel queda en "Más detalle". Movimientos tiene filtros avanzados, pastillas de filtros activos y tres densidades. Ajustes tiene navegación interna, barra de guardado y el estado de la última copia.
+- **Rutas.** Finanzas pasa a `/finanzas/...`; las rutas antiguas redirigen a las nuevas.
+- **Tema.** Oscuro / Claro / Sistema arriba en Ajustes, guardado como antes. Las instalaciones nuevas empiezan en oscuro (una base que ya tenía tema guardado lo conserva). Por eso el dorado sintético se ha regenerado: solo cambia `theme` de `system` a `dark`.
+- **Maquetas** con datos inventados en `design/maquetas/` (`npm run maquetas`, accesible desde la red local) y sus capturas en `design/capturas/`. El brief y la revisión de diseño están en `docs/DISENO.md`.
+- Se quitan `lucide-react` y la fuente IBM Plex. El orquestador de la evolución pasa a ser Opus 5.5.
+- Sin cambios en el proceso principal salvo el tema por defecto y el color inicial de la ventana. Los dorados (sintético y con datos reales) dan las mismas cifras y los totales que suma la interfaz se han comparado contra `main`.
+
 ### F1 Núcleo (evolución a panel de vida)
 
 - **Núcleo y módulos.** El proceso principal se reorganiza en `src/main/core/` (base de datos, cola de escritura, migraciones, registro de módulos, copias) y `src/main/modules/finanzas/`. La lógica de finanzas solo cambia de sitio: el test dorado (sintético y con datos reales) da exactamente las mismas cifras.

@@ -1,47 +1,98 @@
-import { Route, Routes } from 'react-router-dom'
-import { Layout } from './components/Layout'
-import { TxEditorProvider } from './components/TxEditor'
-import { ConfirmHost, ErrorBox, Loading, Toaster } from './components/ui'
+import { useCallback, type ReactNode } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { ErrorState, LoadingState, Toaster } from './core/ui'
+import { SettingsPage } from './core/ajustes/Settings'
+import { Inicio } from './core/inicio/Inicio'
+import { AppShell } from './core/shell/AppShell'
+import { leerRuta, moduloDe, RUTAS_ANTIGUAS, rutaFinanzas } from './core/shell/nav'
+import { useCambiarTema, useThemeSync } from './core/shell/theme'
+import { UpdateFooter } from './core/shell/UpdateFooter'
 import { useApi } from './lib/api'
-import { AccountsPage } from './pages/Accounts'
-import { BudgetsPage } from './pages/Budgets'
-import { DashboardPage } from './pages/Dashboard'
-import { ForecastPage } from './pages/Forecast'
-import { GoalsPage } from './pages/Goals'
-import { InvestmentsPage } from './pages/Investments'
-import { NetWorthPage } from './pages/NetWorth'
-import { RecurringPage } from './pages/Recurring'
-import { SettingsPage } from './pages/Settings'
-import { TransactionsPage } from './pages/Transactions'
-import { WelcomePage } from './pages/Welcome'
+import { EntrenoPage } from './modules/entreno/Entreno'
+import { AccountsPage } from './modules/finanzas/Accounts'
+import { BudgetsPage } from './modules/finanzas/Budgets'
+import { TxEditorProvider, useTxEditor } from './modules/finanzas/components/TxEditor'
+import { DashboardPage } from './modules/finanzas/Dashboard'
+import { ForecastPage } from './modules/finanzas/Forecast'
+import { GoalsPage } from './modules/finanzas/Goals'
+import { InvestmentsPage } from './modules/finanzas/Investments'
+import { NetWorthPage } from './modules/finanzas/NetWorth'
+import { RecurringPage } from './modules/finanzas/Recurring'
+import { TransactionsPage } from './modules/finanzas/Transactions'
+import { WelcomePage } from './modules/finanzas/Welcome'
+
+/** Rutas de la versión anterior (/movimientos, /cuentas…): llevan a la nueva, con sus parámetros. */
+function RedirigirAntigua() {
+  const { pathname, search } = useLocation()
+  return <Navigate to={rutaFinanzas(pathname) + search} replace />
+}
+
+/** Une el shell (core) con lo que viene de Finanzas: contador de revisión, editor de movimientos, actualizador y tema. */
+function ShellConectado({ version }: { version: string }) {
+  const { openNew, openTransfer } = useTxEditor()
+  const review = useApi('finanzas:tx.reviewQueue', [])
+  const porRevisar = (review.data?.pending.length ?? 0) + (review.data?.issues.length ?? 0) + (review.data?.duplicates.length ?? 0)
+  const cambiarTema = useCambiarTema()
+  const { pathname } = useLocation()
+  const ruta = leerRuta(pathname)
+  const acciones = { nuevoMovimiento: () => openNew(), transferencia: () => openTransfer(), cambiarTema }
+  const pie = useCallback((plegada: boolean) => <UpdateFooter plegada={plegada} version={version} />, [version])
+  return (
+    <AppShell ruta={ruta} porRevisar={porRevisar} acciones={acciones} pie={pie}>
+      <Routes>
+        <Route path="/" element={<Inicio />} />
+        <Route path="/finanzas" element={<DashboardPage />} />
+        <Route path="/finanzas/movimientos" element={<TransactionsPage />} />
+        <Route path="/finanzas/cuentas" element={<AccountsPage />} />
+        <Route path="/finanzas/presupuestos" element={<BudgetsPage />} />
+        <Route path="/finanzas/recurrentes" element={<RecurringPage />} />
+        <Route path="/finanzas/objetivos" element={<GoalsPage />} />
+        <Route path="/finanzas/patrimonio" element={<NetWorthPage />} />
+        <Route path="/finanzas/prevision" element={<ForecastPage />} />
+        <Route path="/finanzas/inversiones" element={<InvestmentsPage />} />
+        <Route path="/entreno" element={<EntrenoPage />} />
+        <Route path="/ajustes" element={<SettingsPage />} />
+        {RUTAS_ANTIGUAS.map((r) => (
+          <Route key={r} path={`/${r}`} element={<RedirigirAntigua />} />
+        ))}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppShell>
+  )
+}
+
+/** Los avisos y la confirmación cuelgan de la raíz: heredan la identidad del módulo de la ruta. */
+function ModuloActual({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  return (
+    <div data-module={moduloDe(leerRuta(pathname))} className="contents">
+      {children}
+    </div>
+  )
+}
 
 export function App() {
+  // El tema sigue a settings.theme en todas las pantallas: carga, error, bienvenida (base vacía) y la app
+  useThemeSync()
   const info = useApi('core:app.info', [])
-  if (info.isLoading) return <Loading text="Abriendo tus datos…" />
-  if (info.error) return <div className="p-8"><ErrorBox error={info.error} /></div>
+  if (info.isLoading)
+    return (
+      <div className="p-8">
+        <LoadingState filas={2} etiqueta="Abriendo tus datos" />
+      </div>
+    )
+  if (info.error)
+    return (
+      <div className="p-8">
+        <ErrorState titulo="No se han podido abrir tus datos" texto={info.error.message} />
+      </div>
+    )
   return (
     <TxEditorProvider>
-      {info.data?.isEmpty ? (
-        <WelcomePage />
-      ) : (
-        <Layout>
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/movimientos" element={<TransactionsPage />} />
-            <Route path="/cuentas" element={<AccountsPage />} />
-            <Route path="/presupuestos" element={<BudgetsPage />} />
-            <Route path="/recurrentes" element={<RecurringPage />} />
-            <Route path="/objetivos" element={<GoalsPage />} />
-            <Route path="/patrimonio" element={<NetWorthPage />} />
-            <Route path="/prevision" element={<ForecastPage />} />
-            <Route path="/inversiones" element={<InvestmentsPage />} />
-            <Route path="/ajustes" element={<SettingsPage />} />
-            <Route path="*" element={<DashboardPage />} />
-          </Routes>
-        </Layout>
-      )}
-      <ConfirmHost />
-      <Toaster />
+      {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
+      <ModuloActual>
+        <Toaster />
+      </ModuloActual>
     </TxEditorProvider>
   )
 }
