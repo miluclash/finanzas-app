@@ -1,0 +1,16 @@
+"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+"Natación técnica","20 Nov 2026, 18:30","20 Nov 2026, 19:15","Series cortas","Crol",,"",0,"normal",,,0.4,600,
+"Natación técnica","20 Nov 2026, 18:30","20 Nov 2026, 19:15","Series cortas","Crol",,"",1,"normal",,,0.4,590,
+"Natación técnica","20 Nov 2026, 18:30","20 Nov 2026, 19:15","Series cortas","Pies con tabla",,"Con aletas, ""suave""",0,"normal",,4,0.2,,
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Press banca ficticio",1,"Agarre medio, codos a 45°",0,"warmup",40,12,,,
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Press banca ficticio",1,"Agarre medio, codos a 45°",1,"normal",82.5,8,,,8
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Press banca ficticio",1,"Agarre medio, codos a 45°",2,"failure",82.5,6,,,9.5
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Remo ficticio",1,"",0,"normal",60,10,,,7
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Dominadas ficticias",,"Primera línea
+segunda línea, con coma y ""comillas""",0,"normal",,12,,,
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Dominadas ficticias",,"Primera línea
+segunda línea, con coma y ""comillas""",1,"normal",,10,,,
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Curl ficticio",,"",0,"normal",12.25,12,,,7
+"Torso A","5 Nov 2026, 07:05","5 Nov 2026, 08:10","Buen día, sin prisas","Curl ficticio",,"",1,"dropset",8,15,,,
+"Core rápido","29 Feb 2024, 00:00","29 Feb 2024, 00:20","","Plancha ficticia",,"",0,"normal",,,,60,
+"Core rápido","29 Feb 2024, 00:00","29 Feb 2024, 00:20","","Plancha ficticia",,"",1,"normal",,,,45,
