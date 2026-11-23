@@ -2,8 +2,9 @@
 // Todos los importes monetarios van en céntimos enteros (number entero) para evitar
 // errores de coma flotante. Cantidades y precios de inversión van como string decimal.
 
-export type ISODate = string // 'YYYY-MM-DD'
-export type MonthKey = string // 'YYYY-MM'
+// ISODate y MonthKey viven en src/shared/types.ts; se reexportan para no tocar los imports de finanzas.
+import type { ISODate, MonthKey } from '../../types'
+export type { ISODate, MonthKey }
 
 export const TX_TYPES = [
   'INCOME',
