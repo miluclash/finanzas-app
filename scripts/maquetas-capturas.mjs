@@ -1,5 +1,4 @@
-// Captura las maquetas de design/maquetas en oscuro y claro (1440x900 y, si la pantalla es más alta, página completa).
-// Además: Inicio y Entreno a 1024x768 y una muestra de Inicio y Finanzas con el escalado de Windows al 125 % y al 150 %.
+// Captura las maquetas de design/maquetas en oscuro y claro a 1440x900 (y, si la pantalla es más alta, también la página completa).
 // Uso: npm run maquetas:capturas [-- <filtro>]   (el filtro es un trozo del nombre, p. ej. "entreno")
 // Arranca el servidor de Vite de las maquetas, captura con Edge y lo cierra. Falla si hay errores de consola.
 import { chromium } from 'playwright-core'
@@ -36,14 +35,7 @@ const pantallas = [
   { n: '18', slug: 'asistente-abierto', hash: '#/finanzas', query: 'ia=1', sinCompleta: true },
   { n: '19', slug: 'nuevo-movimiento', hash: '#/movimientos', query: 'nuevo=1', sinCompleta: true },
   { n: '20', slug: 'nuevo-transferencia', hash: '#/movimientos', query: 'nuevo=transferencia', sinCompleta: true },
-  { n: '21', slug: 'nuevo-error-guardando', hash: '#/movimientos', query: 'nuevo=error', sinCompleta: true },
-  { n: '22', slug: 'inicio-1024', hash: '#/inicio', vp: { w: 1024, h: 768, scale: 1 } },
-  { n: '23', slug: 'entreno-1024', hash: '#/entreno', vp: { w: 1024, h: 768, scale: 1 } },
-  { n: '28', slug: 'asistente-1024-superpuesto', hash: '#/finanzas', query: 'ia=1', vp: { w: 1024, h: 768, scale: 1 } },
-  { n: '24', slug: 'inicio-125', hash: '#/inicio', vp: { w: 1152, h: 720, scale: 1.25 } },
-  { n: '25', slug: 'finanzas-125', hash: '#/finanzas', vp: { w: 1152, h: 720, scale: 1.25 } },
-  { n: '26', slug: 'inicio-150', hash: '#/inicio', vp: { w: 960, h: 600, scale: 1.5 } },
-  { n: '27', slug: 'finanzas-150', hash: '#/finanzas', vp: { w: 960, h: 600, scale: 1.5 } }
+  { n: '21', slug: 'nuevo-error-guardando', hash: '#/movimientos', query: 'nuevo=error', sinCompleta: true }
 ].filter((p) => !filtro || `${p.n}-${p.slug}`.includes(filtro))
 
 const edge = [process.env.MSEDGE_PATH, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'].filter(Boolean).find((p) => fs.existsSync(p))
