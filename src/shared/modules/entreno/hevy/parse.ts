@@ -142,13 +142,14 @@ function parseRecord(rec: CsvRecord, idx: Record<HevyColumn, number>, allowComma
     err('set_type', `tipo de serie desconocido en set_type, línea ${line}`)
   }
 
+  // weight_kg puede ser negativo (ejercicios asistidos); el resto no.
   const num = (c: HevyColumn, kind: NumKind): number | null => {
     const v = parseNumberCell(get(c), kind, allowComma)
     if (v === undefined) {
       err(c, `número no válido en ${c}, línea ${line}`)
       return null
     }
-    if (v !== null && v < 0) {
+    if (v !== null && v < 0 && c !== 'weight_kg') {
       err(c, `valor negativo en ${c}, línea ${line}`)
       return null
     }

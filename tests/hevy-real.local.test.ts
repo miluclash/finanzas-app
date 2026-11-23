@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { readCsv } from '../src/shared/csv'
 import { HEVY_COLUMNS } from '../src/shared/modules/entreno/hevy'
 import { entrenoApp, noDialogs } from './entreno/helpers'
@@ -35,12 +35,14 @@ function normalizeRecordEnds(text: string): string {
 }
 
 const file = findFile()
+const tmpOut = path.join(os.tmpdir(), `hevy-real-${process.pid}.csv`)
+afterAll(() => fs.rmSync(tmpOut, { force: true }))
 const run = file ? describe : describe.skip
 
 run('Hevy real: importar, reimportar y exportar', () => {
   it('ida y vuelta completa contra la base', async () => {
     const original = fs.readFileSync(file!, 'utf8').replace(/^﻿/, '')
-    const dialogs = { ...noDialogs, openFile: async () => file!, saveFile: async () => path.join(os.tmpdir(), `hevy-real-${process.pid}.csv`) }
+    const dialogs = { ...noDialogs, openFile: async () => file!, saveFile: async () => tmpOut }
     const app = await entrenoApp(undefined, dialogs)
     const count = (t: string): number => app.db.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t}`)!.n
 
@@ -67,7 +69,6 @@ run('Hevy real: importar, reimportar y exportar', () => {
     // Exportar y comparar celda a celda con el original.
     const out = (await app.h['entreno:export.csv']())!
     const exported = fs.readFileSync(out, 'utf8')
-    fs.rmSync(out)
     const a = readCsv(original).records
     const b = readCsv(exported).records
     expect(b.length).toBe(a.length)

@@ -109,7 +109,7 @@ function insertSets(db: Db, workoutId: number, sets: readonly HevySetInput[], ex
  *   perceived_effort, notes, block_id, routine_id y el tipo si se corrigió a mano (si no, lo
  *   recalcula con las reglas).
  * - Apunta la importación en `trn_imports` y enlaza las sesiones nuevas y cambiadas con ella.
- * No escribe en `audit_log`: eso lo hace quien encola (opción `audit` de la cola).
+ * No escribe en `audit_log`: de eso se encarga el importador (hevyImport.ts), dentro de la misma operación.
  */
 export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResult {
   const d = parseInput(ApplyHevySchema, input)
@@ -161,7 +161,7 @@ export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResul
         let setsWritten = 0
         for (const w of d.newWorkouts) {
           if (db.get('SELECT 1 AS x FROM trn_workouts WHERE hevy_key = ?', [w.hevyKey]))
-            throw new UserError(`La sesión «${w.title}» (${w.startTime.replace('T', ' ')}) ya estaba importada.`)
+            throw new UserError(`La sesión del ${w.startTime.replace('T', ' ')} ya estaba importada.`)
           const kind = d.kinds?.[w.hevyKey] ?? kindFor(rules, w.title, w.sets.map((s) => s.exerciseTitle))
           db.run(
             `INSERT INTO trn_workouts (title, start_time, end_time, description, kind, kind_manual, source, import_id, hevy_key,
@@ -174,7 +174,7 @@ export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResul
 
         for (const w of d.changedWorkouts) {
           const old = db.get<WorkoutRow>("SELECT * FROM trn_workouts WHERE hevy_key = ? AND source = 'HEVY'", [w.hevyKey])
-          if (!old) throw new UserError(`La sesión «${w.title}» (${w.startTime.replace('T', ' ')}) ya no está en la app: vuelve a importar.`)
+          if (!old) throw new UserError(`La sesión del ${w.startTime.replace('T', ' ')} ya no está en la app: vuelve a importar.`)
           const kind = old.kind_manual === 1 ? old.kind : kindFor(rules, w.title, w.sets.map((s) => s.exerciseTitle))
           db.run('DELETE FROM trn_sets WHERE workout_id = ?', [old.id])
           db.run(

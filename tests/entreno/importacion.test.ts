@@ -268,4 +268,111 @@ describe('exportar y restaurar', () => {
       expect(JSON.stringify(exportJsonObject(a.db).tables)).toBe(before)
     }
   })
+  it('un JSON de finanzas se rechaza sin copia y sin cambiar nada', async () => {
+    const backups = path.join(tmp, 'copias-fin')
+    const a = await setup({ dbPath: null, backupsDir: backups })
+    await a.importFile(path.join(FX, 'hevy-ficticio-sesiones.csv'))
+    const dump = (): string =>
+      JSON.stringify(
+        a.db
+          .all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'")
+          .filter((t) => t.name !== 'audit_log' && !t.name.startsWith('sqlite_'))
+          .map((t) => [t.name, a.db.all(`SELECT * FROM ${t.name}`)])
+      )
+    const before = dump()
+    const copiasAntes = fs.existsSync(backups) ? fs.readdirSync(backups).length : 0
+    const f = path.join(tmp, 'finanzas.json')
+    fs.writeFileSync(f, JSON.stringify({ app: 'finanzas-app', format: 1, tables: {} }))
+    a.d.open = f
+    await expect(a.h['entreno:restore.json']()).rejects.toThrow(/no es una exportación de Entreno/)
+    fs.writeFileSync(f, 'esto no es json')
+    await expect(a.h['entreno:restore.json']()).rejects.toThrow(/no es una exportación de Entreno/)
+    expect(dump()).toBe(before)
+    expect(fs.existsSync(backups) ? fs.readdirSync(backups).length : 0).toBe(copiasAntes)
+  })
+  it('datos que no cuadran (clave ajena rota): mensaje en español y nada cambia', async () => {
+    const a = await setup()
+    await a.importFile(path.join(FX, 'hevy-ficticio-sesiones.csv'))
+    const o = JSON.parse(JSON.stringify(exportJsonObject(a.db)))
+    o.tables.trn_sets[0].workout_id = 99999
+    const f = path.join(tmp, 'roto.json')
+    fs.writeFileSync(f, JSON.stringify(o))
+    a.d.open = f
+    const before = JSON.stringify(exportJsonObject(a.db).tables)
+    await expect(a.h['entreno:restore.json']()).rejects.toThrow(/no cuadran entre sí/)
+    expect(JSON.stringify(exportJsonObject(a.db).tables)).toBe(before)
+  })
+})
+
+describe('casos de la revisión', () => {
+  const CABECERA = '"title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"'
+  const fila = (ex: string, i: number, w: string, title = 'Mixta', start = '5 Nov 2026, 07:05'): string =>
+    `"${title}","${start}","30 Nov 2026, 08:00","","${ex}",,"",${i},"normal",${w},8,,,`
+  const csv = (...rows: string[]): string => [CABECERA, ...rows].join('\r\n')
+  const write = (name: string, txt: string): string => {
+    const f = path.join(tmp, name)
+    fs.writeFileSync(f, txt)
+    return f
+  }
+
+  it('el mismo ejercicio separado por otro cuenta como dos bloques (ida y vuelta exacta)', async () => {
+    const txt = csv(fila('Press', 0, '60'), fila('Press', 1, '60'), fila('Remo', 0, '50'), fila('Press', 0, '55'), fila('Press', 1, '55'))
+    const a = await setup()
+    const f = write('dos-bloques.csv', txt)
+    const { p, r } = await a.importFile(f)
+    expect(p.errors).toEqual([])
+    expect([p.newWorkouts[0].exerciseCount, r.setsWritten]).toEqual([3, 5])
+    expect(a.db.all<{ exercise_order: number; set_index: number }>('SELECT exercise_order, set_index FROM trn_sets ORDER BY exercise_order, set_index').map((x) => [x.exercise_order, x.set_index])).toEqual([[0, 0], [0, 1], [1, 0], [2, 0], [2, 1]])
+    const again = await a.importFile(f)
+    expect([again.p.duplicateCount, again.p.changedWorkouts.length, again.p.newWorkouts.length]).toEqual([1, 0, 0])
+    a.d.save = path.join(tmp, 'dos-bloques-out.csv')
+    await a.h['entreno:export.csv']()
+    expect(fs.readFileSync(a.d.save, 'utf8')).toBe(txt)
+  })
+
+  it('doble apply: el segundo se rechaza; preview B sin esperar a A no rompe', async () => {
+    const a = await setup()
+    const fa = path.join(FX, 'hevy-ficticio-sesiones.csv')
+    a.d.open = fa
+    const pa = (await a.h['entreno:import.preview']())!
+    const ra = a.h['entreno:import.apply'](pa.token)
+    const rb = a.h['entreno:import.apply'](pa.token)
+    await expect(rb).rejects.toThrow(/en curso/)
+    await ra
+    expect(countTrn(a.db).trn_imports).toBe(1)
+
+    // A sin esperar -> preview B -> apply B
+    const a2 = await setup()
+    a2.d.open = fa
+    const p1 = (await a2.h['entreno:import.preview']())!
+    const run1 = a2.h['entreno:import.apply'](p1.token)
+    a2.d.open = write('b.csv', csv(fila('Press', 0, '60', 'Otra', '6 Nov 2026, 07:05')))
+    const p2 = (await a2.h['entreno:import.preview']())!
+    await run1
+    const r2 = await a2.h['entreno:import.apply'](p2.token)
+    expect(r2.workoutsNew).toBe(1)
+    expect(countTrn(a2.db).trn_imports).toBe(2)
+  })
+
+  it('weight_kg negativo vale (asistidos); otros negativos no', async () => {
+    const a = await setup()
+    a.d.open = write('neg.csv', csv(fila('Dominadas asistidas', 0, '-20')))
+    const p = (await a.h['entreno:import.preview']())!
+    expect(p.errors).toEqual([])
+    await a.h['entreno:import.apply'](p.token)
+    expect(a.db.get<{ w: number }>('SELECT weight_kg AS w FROM trn_sets')!.w).toBe(-20)
+    a.d.open = write('neg2.csv', csv(fila('X', -1, '5')))
+    expect((await a.h['entreno:import.preview']())!.errors[0].column).toBe('set_index')
+  })
+
+  it('avisa si hay una sesión manual a la misma hora', async () => {
+    const a = await setup()
+    a.d.open = write('m.csv', csv(fila('Press', 0, '60')))
+    const p0 = (await a.h['entreno:import.preview']())!
+    await a.h['entreno:import.apply'](p0.token)
+    // La pasa a manual (simula una sesión apuntada a mano a esa hora) y reimporta con otro título.
+    escribir(a.ctx, () => a.db.run("UPDATE trn_workouts SET source = 'MANUAL', hevy_key = NULL"))
+    const p = (await a.h['entreno:import.preview']())!
+    expect(p.warnings.join(' ')).toMatch(/apuntada a mano/)
+  })
 })

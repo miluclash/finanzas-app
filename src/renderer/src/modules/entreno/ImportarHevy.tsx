@@ -150,11 +150,13 @@ function Bloque({ titulo, children }: { titulo: string; children: ReactNode }) {
 }
 
 function VistaPrevia({ p }: { p: HevyImportPreview }) {
+  // Filas, no errores: una fila puede tener varios.
+  const errorLines = new Set(p.errors.map((e) => e.line)).size
   const stats: { etiqueta: string; valor: number; aviso?: boolean }[] = [
     { etiqueta: 'Sesiones nuevas', valor: p.newWorkouts.length },
     { etiqueta: 'Sesiones cambiadas', valor: p.changedWorkouts.length },
     { etiqueta: 'Ya estaban', valor: p.duplicateCount },
-    { etiqueta: 'Filas con error', valor: p.errors.length, aviso: p.errors.length > 0 },
+    { etiqueta: 'Filas con error', valor: errorLines, aviso: errorLines > 0 },
     { etiqueta: 'Ejercicios nuevos', valor: p.newExercises.length }
   ]
   const nada = p.newWorkouts.length === 0 && p.changedWorkouts.length === 0
@@ -189,7 +191,7 @@ function VistaPrevia({ p }: { p: HevyImportPreview }) {
       )}
       {p.changedWorkouts.length > 0 && (
         <Bloque titulo={`Sesiones cambiadas (${p.changedWorkouts.length})`}>
-          <Aviso tono="info">Estas sesiones ya estaban, pero en el archivo son distintas. Se sustituyen sus series por las del archivo; se conservan tus notas, el tipo y el esfuerzo percibido.</Aviso>
+          <Aviso tono="info">Estas sesiones ya estaban, pero en el archivo son distintas. Se sustituyen sus series por las del archivo; se conservan tus notas, el esfuerzo y el tipo si lo cambiaste a mano.</Aviso>
           <ListaSesiones lista={p.changedWorkouts} etiqueta="Sesiones cambiadas" />
         </Bloque>
       )}
@@ -213,7 +215,7 @@ function VistaPrevia({ p }: { p: HevyImportPreview }) {
         </Bloque>
       )}
       {p.errors.length > 0 && (
-        <Bloque titulo={`Filas con error (${p.errors.length})`}>
+        <Bloque titulo={`Filas con error (${errorLines})`}>
           <Aviso tono="error">
             {p.sessionsWithErrors === 0
               ? 'Estas filas no se importan.'

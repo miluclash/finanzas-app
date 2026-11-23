@@ -131,6 +131,8 @@ interface Pending {
   fileName: string
   hash: string
   createdAt: number
+  /** Un `apply` con este token ya está en curso. */
+  busy: boolean
 }
 
 export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
@@ -143,6 +145,8 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
       pending = null
       throw new UserError('La vista previa ha caducado: vuelve a elegir el archivo.')
     }
+    if (pending.busy) throw new UserError('Esta importación ya está en curso.')
+    pending.busy = true
     return pending
   }
 
@@ -164,22 +168,25 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
       warnings.push(
         `${a.withErrors.length} ${a.withErrors.length === 1 ? 'sesión tiene' : 'sesiones tienen'} filas con error y no se importará${a.withErrors.length === 1 ? '' : 'n'}.`
       )
-    // Misma hora que una sesión guardada con otro título: probablemente renombrada en Hevy.
+    // Misma hora que otra sesión guardada: renombrada en Hevy o apuntada a mano.
     for (const s of a.newWorkouts) {
-      const clash = db.get<{ x: number }>(
-        "SELECT 1 AS x FROM trn_workouts WHERE source = 'HEVY' AND start_time = ? AND hevy_key <> ?",
+      const clash = db.all<{ source: string }>(
+        'SELECT DISTINCT source FROM trn_workouts WHERE start_time = ? AND (hevy_key IS NULL OR hevy_key <> ?)',
         [s.startTime, s.hevyKey]
       )
-      if (clash)
+      const when = formatHevyDate(s.startTime)
+      if (clash.some((c) => c.source === 'HEVY'))
         warnings.push(
-          `La sesión del ${formatHevyDate(s.startTime)} tiene la misma hora que una sesión que ya tienes con otro título: ¿la renombraste en Hevy? Se importará como una sesión nueva.`
+          `La sesión del ${when} tiene la misma hora que una sesión que ya tienes con otro título: ¿la renombraste en Hevy? Se importará como una sesión nueva.`
         )
+      if (clash.some((c) => c.source === 'MANUAL'))
+        warnings.push(`Ya hay una sesión apuntada a mano a esta hora (${when}). Si es la misma, se duplicará al importar.`)
     }
     const alreadyImported = !!db.get('SELECT 1 AS x FROM trn_imports WHERE file_hash = ?', [hash])
     if (alreadyImported) warnings.push('Este mismo archivo ya se importó antes.')
 
     const token = crypto.randomUUID()
-    pending = { token, file, fileName: path.basename(file), hash, createdAt: Date.now() }
+    pending = { token, file, fileName: path.basename(file), hash, createdAt: Date.now(), busy: false }
     return {
       token,
       fileName: path.basename(file),
@@ -201,6 +208,7 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
     const p = take(token)
     let current: ReadFile | null = null
     let backup: string | null = null
+    try {
     return await ctx.queue.enqueue(
       'entreno:import.apply',
       () => {
@@ -240,7 +248,7 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
           null,
           { workoutsNew: res.workoutsNew, workoutsChanged: res.workoutsChanged, workoutsDuplicate: res.workoutsDuplicate, rowsError, exercisesNew: res.exercisesNew, setsWritten: res.setsWritten, format }
         )
-        pending = null
+        if (pending?.token === p.token) pending = null
         return result
       },
       {
@@ -248,7 +256,7 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
         before: async () => {
           const again = await readHevyFile(p.file)
           if (again.hash !== p.hash) {
-            pending = null
+            if (pending?.token === p.token) pending = null
             throw new UserError('El archivo ha cambiado desde la vista previa: vuelve a elegirlo.')
           }
           current = again
@@ -256,6 +264,10 @@ export function createHevyImporter(ctx: CoreContext, dialogs: DialogProvider) {
         }
       }
     )
+    } catch (e) {
+      p.busy = false
+      throw e
+    }
   }
 
   function cancel(token: string): void {

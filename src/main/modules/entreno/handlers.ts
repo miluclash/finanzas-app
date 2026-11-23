@@ -12,12 +12,11 @@ import type {
   WorkoutExtrasInput,
   WorkoutFilter
 } from '@shared/modules/entreno/types'
-import { restoreBackup } from '../../core/backup'
 import type { CoreContext } from '../../core/context'
 import type { DialogProvider } from '../../core/handlers'
 import * as catalog from './catalog'
 import * as exercises from './exercises'
-import { exportEntrenoJson, exportEntrenoXlsx, exportHevyCsv } from './exports'
+import { exportEntrenoJson, restoreEntrenoFile, exportEntrenoXlsx, exportHevyCsv } from './exports'
 import { createHevyImporter } from './hevyImport'
 import * as workouts from './workouts'
 
@@ -93,11 +92,11 @@ export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider)
       dialogs.showItem(f)
       return f
     },
-    // Copia previa y sustitución de todos los datos trn_ en una sola operación (restoreBackup del núcleo).
+    // Solo acepta exportaciones de Entreno; copia previa y sustitución de los datos trn_ en una sola operación.
     'restore.json': async (): Promise<EntrenoRestoreResult | null> => {
       const f = await dialogs.openFile('Elige un JSON exportado de Entreno', [{ name: 'JSON', extensions: ['json'] }])
       if (!f) return null
-      return restoreBackup(ctx, f)
+      return restoreEntrenoFile(ctx, f)
     }
   }
 }

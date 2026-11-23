@@ -4,7 +4,8 @@ import ExcelJS from 'exceljs'
 import fs from 'node:fs'
 import { z } from 'zod'
 import { hevyTableToCsv } from '@shared/modules/entreno/hevy/format'
-import { HEVY_VIEW_COLUMNS, type HevyViewRow } from '@shared/modules/entreno/types'
+import { HEVY_VIEW_COLUMNS, type EntrenoRestoreResult, type HevyViewRow } from '@shared/modules/entreno/types'
+import { createBackup } from '../../core/backup'
 import type { CoreContext } from '../../core/context'
 import type { Db } from '../../core/db'
 import { UserError } from '../../core/errors'
@@ -104,37 +105,72 @@ const RestoreSchema = z.object({
   tables: z.object(Object.fromEntries(TRN_TABLES.map((t) => [t, z.array(RowSchema)])) as Record<(typeof TRN_TABLES)[number], z.ZodArray<typeof RowSchema>>)
 })
 
-/**
- * Sustituye todos los datos `trn_` por los de una exportación JSON. Tiene que llamarse dentro de
- * una operación de la cola (la copia previa la hace `restoreBackup`). Devuelve `false` si el JSON
- * no es de Entreno (no toca nada). Si el JSON es de Entreno pero no vale, lanza UserError.
- * Los nombres de columna se comprueban contra la base: nada de SQL con texto del archivo.
- */
-export function restoreEntrenoJson(ctx: CoreContext, obj: unknown): boolean {
-  if ((obj as { app?: unknown } | null)?.app !== ENTRENO_JSON_APP) return false
+type RestoreData = z.infer<typeof RestoreSchema>
+
+/** Valida el JSON de Entreno contra el esquema y la base actual. Lanza UserError si no sirve; no escribe. */
+export function validateEntrenoJson(db: Db, obj: unknown): RestoreData {
+  if ((obj as { app?: unknown } | null)?.app !== ENTRENO_JSON_APP) throw new UserError('Este archivo no es una exportación de Entreno.')
   const parsed = RestoreSchema.safeParse(obj)
   if (!parsed.success) throw new UserError('El JSON de Entreno no es válido o está incompleto.')
   const o = parsed.data
-  const db = ctx.db
   const current = schemaVersion(db, MIGRATION_RANGES.entreno)
   if (o.schemaVersion > current) throw new UserError('Ese JSON es de una versión más nueva de la app. Actualiza la app e inténtalo otra vez.')
-
   const columns = new Map<string, Set<string>>()
   for (const t of TRN_TABLES) columns.set(t, new Set(db.all<{ name: string }>(`PRAGMA table_info(${t})`).map((c) => c.name)))
   for (const t of TRN_TABLES)
     for (const r of o.tables[t])
       for (const k of Object.keys(r)) if (!columns.get(t)!.has(k)) throw new UserError(`El JSON tiene una columna desconocida en ${t}.`)
+  return o
+}
 
-  db.tx(() => {
-    for (const t of [...TRN_TABLES].reverse()) db.run(`DELETE FROM ${t}`)
-    for (const t of TRN_TABLES)
-      for (const r of o.tables[t]) {
-        const cols = Object.keys(r)
-        if (cols.length === 0) continue
-        db.run(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => r[c]))
-      }
-    const counts = Object.fromEntries(TRN_TABLES.map((t) => [t, o.tables[t].length]))
-    audit(db, 'entreno', 'all', 'restore', 'Entreno restaurado desde un JSON', null, counts)
-  })
+/** Sustituye todos los datos `trn_` por los del JSON ya validado. Dentro de una operación de la cola. */
+function writeEntrenoData(db: Db, o: RestoreData): void {
+  try {
+    db.tx(() => {
+      for (const t of [...TRN_TABLES].reverse()) db.run(`DELETE FROM ${t}`)
+      for (const t of TRN_TABLES)
+        for (const r of o.tables[t]) {
+          const cols = Object.keys(r)
+          if (cols.length === 0) continue
+          db.run(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => r[c]))
+        }
+      const counts = Object.fromEntries(TRN_TABLES.map((t) => [t, o.tables[t].length]))
+      audit(db, 'entreno', 'all', 'restore', 'Entreno restaurado desde un JSON', null, counts)
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ''
+    if (/FOREIGN KEY|CHECK constraint|UNIQUE constraint|NOT NULL constraint/.test(msg))
+      throw new UserError('El archivo tiene datos que no cuadran entre sí (referencias rotas o valores no válidos). No se ha cambiado nada.')
+    throw e
+  }
+}
+
+/**
+ * Gancho `restoreJson` del módulo (lo llama `core:backup.restore`). Devuelve `false` si el JSON no
+ * es de Entreno y no toca nada. Dentro de una operación de la cola.
+ */
+export function restoreEntrenoJson(ctx: CoreContext, obj: unknown): boolean {
+  if ((obj as { app?: unknown } | null)?.app !== ENTRENO_JSON_APP) return false
+  writeEntrenoData(ctx.db, validateEntrenoJson(ctx.db, obj))
   return true
+}
+
+/**
+ * `entreno:restore.json`: lee el archivo, rechaza todo lo que no sea una exportación de Entreno
+ * (sin copia ni escritura) y, si vale, hace la copia `antes-de-restaurar` y sustituye los datos
+ * `trn_` en una sola operación. No puede tocar finanzas.
+ */
+export function restoreEntrenoFile(ctx: CoreContext, file: string): Promise<EntrenoRestoreResult> {
+  return ctx.queue.enqueueTask('entreno:restore.json', async ({ runOp }) => {
+    let obj: unknown
+    try {
+      obj = JSON.parse(fs.readFileSync(file, 'utf8'))
+    } catch {
+      throw new UserError('Este archivo no es una exportación de Entreno.')
+    }
+    const data = validateEntrenoJson(ctx.db, obj)
+    const safetyBackup = ctx.paths.backupsDir ? createBackup(ctx, 'antes-de-restaurar').path : null
+    runOp('entreno:restore.json', () => writeEntrenoData(ctx.db, data))
+    return { safetyBackup }
+  })
 }

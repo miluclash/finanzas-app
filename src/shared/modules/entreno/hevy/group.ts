@@ -138,22 +138,25 @@ export function groupHevySessions(parsed: HevyParseResult): HevyGrouping {
   const sessions: HevySession[] = []
   for (const a of order) {
     if (a.rows.length === 0) continue // solo filas erróneas: ya constan en `errors`
-    // exercise_order por primera aparición del ejercicio
-    const orderOf = new Map<string, number>()
+    // exercise_order: un bloque nuevo cada vez que cambia el ejercicio respecto a la fila anterior
+    // (el mismo ejercicio separado por otro cuenta como dos bloques, como en Hevy).
+    let block = -1
+    let prevTitle: string | null = null
     const sets: HevySet[] = []
     const seenSet = new Set<string>()
     for (const r of a.rows) {
-      if (!orderOf.has(r.exerciseTitle)) orderOf.set(r.exerciseTitle, orderOf.size)
-      const dupKey = `${r.exerciseTitle}\u001f${r.setIndex}`
+      if (r.exerciseTitle !== prevTitle) block++
+      prevTitle = r.exerciseTitle
+      const dupKey = `${block}\u001f${r.setIndex}`
       if (seenSet.has(dupKey)) {
-        errors.push({ line: r.line, column: 'set_index', message: `serie repetida (mismo ejercicio y set_index), línea ${r.line}` })
+        errors.push({ line: r.line, column: 'set_index', message: `serie repetida (mismo bloque de ejercicio y set_index), línea ${r.line}` })
         a.hasErrors = true
         continue
       }
       seenSet.add(dupKey)
       sets.push({
         exerciseTitle: r.exerciseTitle,
-        exerciseOrder: orderOf.get(r.exerciseTitle)!,
+        exerciseOrder: block,
         supersetId: r.supersetId,
         exerciseNotes: r.exerciseNotes,
         setIndex: r.setIndex,
