@@ -46,8 +46,8 @@ export const SECCIONES: Record<'finanzas' | 'entreno', Seccion[]> = {
   ],
   entreno: [
     { id: 'resumen', texto: 'Resumen', icono: SquaresFour, ruta: '/entreno' },
-    { id: 'sesiones', texto: 'Sesiones', icono: CalendarCheck, ruta: '/entreno', proximamente: true },
-    { id: 'ejercicios', texto: 'Ejercicios', icono: PersonSimpleRun, ruta: '/entreno', proximamente: true },
+    { id: 'sesiones', texto: 'Sesiones', icono: CalendarCheck, ruta: '/entreno/sesiones' },
+    { id: 'ejercicios', texto: 'Ejercicios', icono: PersonSimpleRun, ruta: '/entreno/ejercicios' },
     { id: 'objetivos', texto: 'Objetivos', icono: Target, ruta: '/entreno', proximamente: true },
     { id: 'plan', texto: 'Plan', icono: CalendarBlank, ruta: '/entreno', proximamente: true }
   ]
@@ -72,7 +72,10 @@ export function leerRuta(pathname: string): Ruta {
     const s = SECCIONES.finanzas.find((x) => x.id === b) ?? SECCIONES.finanzas[0]
     return { modulo: 'finanzas', seccion: s.id, titulo: s.texto }
   }
-  if (a === 'entreno') return { modulo: 'entreno', seccion: 'resumen', titulo: 'Resumen' }
+  if (a === 'entreno') {
+    const s = SECCIONES.entreno.find((x) => x.id === b && !x.proximamente) ?? SECCIONES.entreno[0]
+    return { modulo: 'entreno', seccion: s.id, titulo: s.texto }
+  }
   if (a === 'ajustes') return { modulo: 'ajustes', seccion: 'ajustes', titulo: 'Ajustes' }
   return { modulo: 'inicio', seccion: 'inicio', titulo: 'Inicio' }
 }

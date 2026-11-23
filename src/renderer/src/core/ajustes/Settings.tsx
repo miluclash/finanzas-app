@@ -29,6 +29,7 @@ import { api, useApi, useApiMutation } from '../../lib/api'
 import { useCatalog } from '../../lib/catalog'
 import { toast } from '../../lib/toast'
 import type { ImportPreview } from '../../../../main/modules/finanzas/importExcel'
+import { AjustesEntreno } from '../../modules/entreno/AjustesEntreno'
 import { Apariencia } from './Apariencia'
 
 /* ======================= Estructura: navegación interna y secciones ======================= */
@@ -38,6 +39,7 @@ const ANCLAS = [
   ['avisos', 'Avisos'],
   ['inversiones', 'Inversiones'],
   ['categorias', 'Categorías'],
+  ['entreno', 'Entreno'],
   ['datos', 'Datos y copias'],
   ['mcp', 'Claude (MCP)'],
   ['registro', 'Registro de cambios']
@@ -102,6 +104,9 @@ export function SettingsPage() {
           <GeneralSettings />
           <Bloque id="categorias" titulo="Categorías" texto="Los grupos y categorías con los que clasificas. Puedes cambiarlos cuando quieras.">
             <CategoriesSettings />
+          </Bloque>
+          <Bloque id="entreno" titulo="Entreno" texto="Grupos musculares, reglas para decidir el tipo de sesión, importaciones de Hevy y los datos de entreno.">
+            <AjustesEntreno />
           </Bloque>
           <Bloque id="datos" titulo="Datos y copias" texto="Importar, exportar, copiar y restaurar son cuatro cosas distintas. Antes de importar, restaurar o actualizar, la app hace una copia sola.">
             <DataSettings />
