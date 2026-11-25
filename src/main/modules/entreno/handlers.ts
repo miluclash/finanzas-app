@@ -32,7 +32,7 @@ import * as catalog from './catalog'
 import * as exercises from './exercises'
 import { exportEntrenoJson, restoreEntrenoFile, exportEntrenoXlsx, exportHevyCsv } from './exports'
 import * as goals from './goals'
-import { createMetricsService } from './metrics'
+import { metricsServiceFor } from './metrics'
 import { createHevyImporter } from './hevyImport'
 import * as planning from './planning'
 import { parseInput } from './repo'
@@ -48,7 +48,7 @@ export function isEmpty(ctx: CoreContext): boolean {
 
 export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider) {
   const importer = createHevyImporter(ctx, dialogs)
-  const metrics = createMetricsService(ctx)
+  const metrics = metricsServiceFor(ctx)
   const write = <T>(name: string, fn: () => T): Promise<T> => ctx.queue.enqueue(`entreno:${name}`, fn)
   return {
     // Sesiones

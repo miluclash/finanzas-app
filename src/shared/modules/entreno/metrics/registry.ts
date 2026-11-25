@@ -1,7 +1,8 @@
 // Registro de métricas de Entreno para el constructor de gráficos (F5) y la IA local (F6).
 // Cada métrica: id estable, nombre en español, unidad, agrupaciones y filtros admitidos y una
 // función que devuelve una serie `{ key, value }[]` (solo claves con datos, ordenadas).
-// Es compatible con el contrato actual del núcleo (`MetricDef = { id, name }`).
+// Estas son las de `entreno:metrics.compute` (ids sin prefijo, resultados de siempre). Para el
+// constructor de gráficos se publican con el contrato del núcleo en `chart.ts` (`entreno.<id>`).
 import type { WorkoutKind } from '../types'
 import { type CountedSet, type MetricsContext, setE1rm, isBodyweight } from './context'
 import { adherenceWeekly } from './plan'
@@ -41,7 +42,7 @@ export interface EntrenoMetricDef {
 const TIME: Grouping[] = ['week', 'month', 'day']
 const ALL_FILTERS: MetricFilterKey[] = ['from', 'to', 'exerciseId', 'groupId', 'kind']
 
-function workoutKey(ctx: MetricsContext, w: WorkoutFact, by: Grouping): string | null {
+export function workoutKey(ctx: MetricsContext, w: WorkoutFact, by: Grouping): string | null {
   const d = dateOf(w.startTime)
   switch (by) {
     case 'workout':
@@ -50,6 +51,8 @@ function workoutKey(ctx: MetricsContext, w: WorkoutFact, by: Grouping): string |
       return weekKeyOf(d, ctx.settings.weekStartsOn)
     case 'month':
       return monthKeyOf(d)
+    case 'year':
+      return monthKeyOf(d).slice(0, 4)
     case 'day':
       return d
     case 'kind':

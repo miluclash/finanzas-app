@@ -1,7 +1,6 @@
 // Registro de métricas: ids estables, contrato y cálculo por agrupación.
 import { describe, expect, it } from 'vitest'
-import type { MetricDef } from '../../src/main/core/registry'
-import { ENTRENO_METRICS, computeMetric, getEntrenoMetric } from '../../src/shared/modules/entreno/metrics'
+import { ENTRENO_CHART_METRICS, ENTRENO_METRICS, computeMetric, getEntrenoMetric } from '../../src/shared/modules/entreno/metrics'
 import { ctxOf, ex, grp, rt, st, wk } from './metrics-helpers'
 
 function datos() {
@@ -30,17 +29,16 @@ function datos() {
 }
 
 describe('registro de métricas', () => {
-  it('ids únicos en kebab, nombres en español y compatibles con MetricDef del núcleo', () => {
+  it('ids únicos en kebab, nombres en español y publicados en el núcleo como entreno.<id>', () => {
     const ids = ENTRENO_METRICS.map((m) => m.id)
     expect(new Set(ids).size).toBe(ids.length)
     for (const m of ENTRENO_METRICS) {
       expect(m.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
       expect(m.name.length).toBeGreaterThan(0)
       expect(m.groupings.length).toBeGreaterThan(0)
-      const core: MetricDef = m
-      expect(core.id).toBe(m.id)
     }
     expect(getEntrenoMetric('volumen-carga')!.unit).toBe('kg')
+    expect(ENTRENO_CHART_METRICS.map((m) => m.id)).toEqual(ids.map((id) => `entreno.${id}`))
   })
 
   it('calcula cada métrica con su agrupación', () => {

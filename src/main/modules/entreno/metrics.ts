@@ -76,8 +76,22 @@ export interface EntrenoMetricsService {
   hyrox(eventId: number): HyroxStatus | null
   compute(metricId: string, query: MetricQuery): Bucket[]
   inicio(): EntrenoInicio
+  /** Contexto de métricas preparado (de la caché): lo usan las métricas del constructor de gráficos. */
+  context(): MetricsContext
   /** Para tests: cuántas veces se ha leído la base. */
   readonly loads: number
+}
+
+/** Un servicio (y una caché) por contexto del núcleo: lo comparten los handlers y el registro de métricas. */
+const services = new WeakMap<CoreContext, EntrenoMetricsService>()
+
+export function metricsServiceFor(ctx: CoreContext): EntrenoMetricsService {
+  let s = services.get(ctx)
+  if (!s) {
+    s = createMetricsService(ctx)
+    services.set(ctx, s)
+  }
+  return s
 }
 
 export function createMetricsService(ctx: CoreContext): EntrenoMetricsService {
@@ -128,6 +142,7 @@ export function createMetricsService(ctx: CoreContext): EntrenoMetricsService {
       const c = get()
       return buildInicio(c.m, c.records, ctx.today())
     },
+    context: () => get().m,
     get loads() {
       return loads
     }

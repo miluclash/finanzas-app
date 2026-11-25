@@ -189,7 +189,8 @@ export interface ChartInput {
   spec: ChartSpec
 }
 
-export type ChartRule = 'schema' | 'grouping' | 'unit' | 'split' | 'stack' | 'scatter' | 'metric'
+/** `filter`: una serie usa un filtro que su métrica no admite. */
+export type ChartRule = 'schema' | 'grouping' | 'unit' | 'split' | 'stack' | 'scatter' | 'metric' | 'filter'
 
 export interface ChartValidationIssue {
   rule: ChartRule
