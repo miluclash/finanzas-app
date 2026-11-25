@@ -82,6 +82,7 @@ export function createCoreContext(db: Db, paths: CorePaths, registry: Registry):
  *    `antes-de-migrar` en el paso previo de la primera operación.
  * 2. Migraciones pendientes de todos los módulos, en orden de versión, una operación cada una.
  * 3. La semilla de cada módulo (`<modulo>:semilla`), en el orden del registro.
+ * 4. El paso de arranque de cada módulo (`<modulo>:arranque`), en el orden del registro.
  *
  * Abrir una base que ya está al día no guarda nada (no toca el archivo).
  */
@@ -98,6 +99,10 @@ export function initCore(ctx: CoreContext): void {
   for (const m of ctx.registry.modules) {
     const seed = m.seed
     if (seed) ctx.queue.runNow(`${m.id}:semilla`, () => seed(ctx.db))
+  }
+  for (const m of ctx.registry.modules) {
+    const startup = m.startup
+    if (startup) ctx.queue.runNow(`${m.id}:arranque`, () => startup(ctx))
   }
 }
 

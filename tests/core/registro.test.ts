@@ -257,7 +257,7 @@ describe('registro de módulos', () => {
     expect(APP_MODULES.map((m) => m.name)).toEqual(['Finanzas', 'Entreno'])
     // Entreno no exige tablas: una copia de antes de F3 (sin trn_) se tiene que poder restaurar.
     expect(r.requiredTables).toEqual(['schema_migrations', 'accounts', 'transactions', 'categories'])
-    expect(r.migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005])
+    expect(r.migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005, 2006])
   })
 
   it('rechaza ids repetidos', () => {

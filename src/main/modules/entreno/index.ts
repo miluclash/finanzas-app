@@ -7,6 +7,7 @@ import { defineModule } from '../../core/registry'
 import { restoreEntrenoJson } from './exports'
 import { createEntrenoHandlers, isEmpty } from './handlers'
 import { MIGRATIONS } from './migrations'
+import { autosaveWeeks } from './planning'
 import { seedEntreno } from './seed'
 
 export const entrenoModule = defineModule({
@@ -18,5 +19,7 @@ export const entrenoModule = defineModule({
   metrics: [],
   aiTools: [],
   seed: (db) => seedEntreno(db),
+  // Guarda con el boceto las semanas empezadas sin plan (no escribe nada si no falta ninguna).
+  startup: (ctx) => void autosaveWeeks(ctx.db, ctx.today()),
   isEmpty: (ctx) => isEmpty(ctx)
 })

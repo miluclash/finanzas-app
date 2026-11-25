@@ -2,22 +2,39 @@
 // leen de la base en memoria; los que escriben llaman al servicio dentro de una operación de la
 // cola de escritura (`entreno:<nombre>`) y devuelven su promesa. Los servicios apuntan sus cambios
 // en `audit_log` dentro de esa misma operación.
+import { WeekStartSchema } from '@shared/modules/entreno/schemas'
 import type {
+  BaseWeekSlotInput,
+  BlockInput,
   EntrenoRestoreResult,
   EntrenoSettings,
   ExerciseInput,
+  GoalInput,
+  GoalStatus,
+  ISODate,
   KindRuleInput,
   ManualWorkoutInput,
   MuscleGroupInput,
+  RoutineInput,
+  TrainingEventInput,
+  WeekPlan,
+  WeekPlanMoveInput,
+  WeekPlanSlotInput,
+  WeekPlanSlotRef,
   WorkoutExtrasInput,
   WorkoutFilter
 } from '@shared/modules/entreno/types'
 import type { CoreContext } from '../../core/context'
 import type { DialogProvider } from '../../core/handlers'
+import * as blocks from './blocks'
 import * as catalog from './catalog'
 import * as exercises from './exercises'
 import { exportEntrenoJson, restoreEntrenoFile, exportEntrenoXlsx, exportHevyCsv } from './exports'
+import * as goals from './goals'
 import { createHevyImporter } from './hevyImport'
+import * as planning from './planning'
+import { parseInput } from './repo'
+import * as routines from './routines'
 import * as workouts from './workouts'
 
 /** Entreno no tiene datos del usuario (ninguna sesión). */
@@ -59,6 +76,45 @@ export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider)
     'kindRules.delete': (id: number) => write('kindRules.delete', () => catalog.deleteKindRule(ctx.db, id)),
     'kindRules.reorder': (ids: number[]) => write('kindRules.reorder', () => catalog.reorderKindRules(ctx.db, ids)),
     'kindRules.reapply': () => write('kindRules.reapply', () => catalog.reapplyKindRules(ctx.db)),
+
+    // Tipos de entreno
+    'routines.list': () => routines.listRoutines(ctx.db),
+    'routines.save': (input: RoutineInput) => write('routines.save', () => routines.saveRoutine(ctx.db, input)),
+    'routines.delete': (id: number) => write('routines.delete', () => routines.deleteRoutine(ctx.db, id)),
+    'routines.reorder': (ids: number[]) => write('routines.reorder', () => routines.reorderRoutines(ctx.db, ids)),
+
+    // Semana base (boceto)
+    'baseWeek.get': () => planning.getBaseWeek(ctx.db),
+    'baseWeek.save': (slots: BaseWeekSlotInput[]) => write('baseWeek.save', () => planning.saveBaseWeek(ctx.db, slots, ctx.today())),
+
+    // Semana concreta. `get` no escribe: si la semana ya ha empezado y está sin guardar, antes
+    // encola el guardado automático (copia del boceto) y después la lee.
+    'weekPlan.get': async (weekStart: ISODate): Promise<WeekPlan> => {
+      const today = ctx.today()
+      const ws = parseInput(WeekStartSchema, weekStart)
+      if (planning.weeksPendingAutosave(ctx.db, today, ws).includes(ws))
+        await write('weekPlan.autosave', () => planning.autosaveWeeks(ctx.db, ctx.today()))
+      return planning.getWeekPlan(ctx.db, ws)
+    },
+    'weekPlan.save': (weekStart: ISODate, slots: WeekPlanSlotInput[]) =>
+      write('weekPlan.save', () => planning.saveWeekPlan(ctx.db, weekStart, slots)),
+    'weekPlan.move': (input: WeekPlanMoveInput) => write('weekPlan.move', () => planning.moveWeekSlot(ctx.db, input)),
+    'weekPlan.remove': (ref: WeekPlanSlotRef) => write('weekPlan.remove', () => planning.removeWeekSlot(ctx.db, ref)),
+    'weekPlan.resetToBase': (weekStart: ISODate) => write('weekPlan.resetToBase', () => planning.resetWeekToBase(ctx.db, weekStart)),
+
+    // Bloques y eventos
+    'blocks.list': () => blocks.listBlocks(ctx.db),
+    'blocks.save': (input: BlockInput) => write('blocks.save', () => blocks.saveBlock(ctx.db, input)),
+    'blocks.delete': (id: number) => write('blocks.delete', () => blocks.deleteBlock(ctx.db, id)),
+    'events.list': () => blocks.listEvents(ctx.db),
+    'events.save': (input: TrainingEventInput) => write('events.save', () => blocks.saveEvent(ctx.db, input)),
+    'events.delete': (id: number) => write('events.delete', () => blocks.deleteEvent(ctx.db, id)),
+
+    // Objetivos
+    'goals.list': () => goals.listGoals(ctx.db),
+    'goals.save': (input: GoalInput) => write('goals.save', () => goals.saveGoal(ctx.db, input)),
+    'goals.setStatus': (id: number, status: GoalStatus) => write('goals.setStatus', () => goals.setGoalStatus(ctx.db, id, status)),
+    'goals.delete': (id: number) => write('goals.delete', () => goals.deleteGoal(ctx.db, id)),
 
     // Ajustes e importaciones
     'settings.get': () => catalog.getSettings(ctx.db),

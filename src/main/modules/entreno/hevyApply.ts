@@ -15,7 +15,9 @@ import type {
 } from '@shared/modules/entreno/types'
 import type { Db } from '../../core/db'
 import { UserError } from '../../core/errors'
+import { recalcBlockIds } from './blocks'
 import { insertExercise } from './exercises'
+import { routineMatcher } from './routines'
 import { findExerciseByName, friendly, kindFor, kindRules, lastId, nowIso, parseInput, type SetRow, type WorkoutRow } from './repo'
 
 /**
@@ -104,10 +106,13 @@ function insertSets(db: Db, workoutId: number, sets: readonly HevySetInput[], ex
  * - Crea los ejercicios que no existan (por título o alias, sin distinguir mayúsculas) con la
  *   categoría vacía y el tipo de medida deducido de sus series.
  * - Inserta las sesiones nuevas (`source = 'HEVY'`), con el tipo de `kinds[hevyKey]` o, si no,
- *   el de las reglas.
+ *   el de las reglas, y con el tipo de entreno cuyo nombre o alias coincide con el título (igual
+ *   tras normalizar; si ninguno coincide, sin tipo de entreno).
  * - En las cambiadas actualiza fin y descripción y sustituye todas sus series. Conserva
- *   perceived_effort, notes, block_id, routine_id y el tipo si se corrigió a mano (si no, lo
- *   recalcula con las reglas).
+ *   perceived_effort, notes, routine_id y el tipo si se corrigió a mano (si no, lo recalcula con
+ *   las reglas).
+ * - El bloque de las nuevas y cambiadas sale de su fecha (`recalcBlockIds`).
+ * - Los ejercicios nuevos llevan la estación HYROX que propone el diccionario.
  * - Apunta la importación en `trn_imports` y enlaza las sesiones nuevas y cambiadas con ella.
  * No escribe en `audit_log`: de eso se encarga el importador (hevyImport.ts), dentro de la misma operación.
  */
@@ -159,17 +164,21 @@ export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResul
         const importId = lastId(db)
 
         let setsWritten = 0
+        const touched: number[] = []
+        const routineFor = routineMatcher(db)
         for (const w of d.newWorkouts) {
           if (db.get('SELECT 1 AS x FROM trn_workouts WHERE hevy_key = ?', [w.hevyKey]))
             throw new UserError(`La sesión del ${w.startTime.replace('T', ' ')} ya estaba importada.`)
           const kind = d.kinds?.[w.hevyKey] ?? kindFor(rules, w.title, w.sets.map((s) => s.exerciseTitle))
           db.run(
-            `INSERT INTO trn_workouts (title, start_time, end_time, description, kind, kind_manual, source, import_id, hevy_key,
+            `INSERT INTO trn_workouts (title, start_time, end_time, description, kind, kind_manual, routine_id, source, import_id, hevy_key,
                created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, 0, 'HEVY', ?, ?, ?, ?)`,
-            [w.title, w.startTime, w.endTime, w.description, kind, importId, w.hevyKey, now, now]
+             VALUES (?, ?, ?, ?, ?, 0, ?, 'HEVY', ?, ?, ?, ?)`,
+            [w.title, w.startTime, w.endTime, w.description, kind, routineFor(w.title), importId, w.hevyKey, now, now]
           )
-          setsWritten += insertSets(db, lastId(db), w.sets, exerciseId)
+          const id = lastId(db)
+          touched.push(id)
+          setsWritten += insertSets(db, id, w.sets, exerciseId)
         }
 
         for (const w of d.changedWorkouts) {
@@ -181,8 +190,12 @@ export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResul
             'UPDATE trn_workouts SET title = ?, start_time = ?, end_time = ?, description = ?, kind = ?, import_id = ?, updated_at = ? WHERE id = ?',
             [w.title, w.startTime, w.endTime, w.description, kind, importId, now, old.id]
           )
+          touched.push(old.id)
           setsWritten += insertSets(db, old.id, w.sets, exerciseId)
         }
+
+        // El bloque sale de la fecha (en las cambiadas no cambia, salvo que estuviera mal).
+        recalcBlockIds(db, touched)
 
         return {
           importId,
