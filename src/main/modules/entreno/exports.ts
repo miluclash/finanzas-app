@@ -10,6 +10,7 @@ import type { CoreContext } from '../../core/context'
 import type { Db } from '../../core/db'
 import { UserError } from '../../core/errors'
 import { MIGRATION_RANGES, schemaVersion } from '../../core/migrations'
+import { proposeHyroxStations } from './migrations'
 import { audit } from './repo'
 
 /** Marca del JSON de Entreno (el de finanzas lleva `finanzas-app`). */
@@ -23,16 +24,35 @@ export const TRN_TABLES = [
   'trn_exercises',
   'trn_exercise_muscles',
   'trn_exercise_aliases',
+  'trn_events',
   'trn_blocks',
   'trn_routines',
   'trn_routine_items',
-  'trn_events',
+  'trn_routine_aliases',
   'trn_goals',
   'trn_workouts',
   'trn_sets',
   'trn_settings',
-  'trn_kind_rules'
+  'trn_kind_rules',
+  'trn_base_week',
+  'trn_base_week_meta',
+  'trn_week_plan_weeks',
+  'trn_week_plan'
 ] as const
+
+type TrnTable = (typeof TRN_TABLES)[number]
+
+/**
+ * Tablas que llegaron con la migración 2006 (F4). Un JSON exportado antes no las trae: al
+ * restaurarlo quedan vacías.
+ */
+const TABLES_SINCE_2006: ReadonlySet<TrnTable> = new Set([
+  'trn_routine_aliases',
+  'trn_base_week',
+  'trn_base_week_meta',
+  'trn_week_plan_weeks',
+  'trn_week_plan'
+])
 
 type Cell = string | number | null
 
@@ -102,7 +122,12 @@ const RestoreSchema = z.object({
   format: z.literal(ENTRENO_JSON_FORMAT),
   schemaVersion: z.number().int().nonnegative(),
   exportedAt: z.string().optional(),
-  tables: z.object(Object.fromEntries(TRN_TABLES.map((t) => [t, z.array(RowSchema)])) as Record<(typeof TRN_TABLES)[number], z.ZodArray<typeof RowSchema>>)
+  tables: z.object(
+    Object.fromEntries(TRN_TABLES.map((t) => [t, TABLES_SINCE_2006.has(t) ? z.array(RowSchema).default([]) : z.array(RowSchema)])) as Record<
+      TrnTable,
+      z.ZodArray<typeof RowSchema>
+    >
+  )
 })
 
 type RestoreData = z.infer<typeof RestoreSchema>
@@ -134,6 +159,8 @@ function writeEntrenoData(db: Db, o: RestoreData): void {
           if (cols.length === 0) continue
           db.run(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => r[c]))
         }
+      // Un JSON de antes de la 2006 no trae la estación HYROX: se propone como hizo la migración.
+      if (o.schemaVersion < 2006) proposeHyroxStations(db)
       const counts = Object.fromEntries(TRN_TABLES.map((t) => [t, o.tables[t].length]))
       audit(db, 'entreno', 'all', 'restore', 'Entreno restaurado desde un JSON', null, counts)
     })

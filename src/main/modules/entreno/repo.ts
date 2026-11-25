@@ -5,6 +5,7 @@ import { deduceKind } from '@shared/modules/entreno/hevy/kind'
 import { firstError } from '@shared/modules/entreno/schemas'
 import type {
   ExerciseCategory,
+  HyroxStation,
   KindRule,
   KindRuleField,
   LocalDateTime,
@@ -65,6 +66,7 @@ export interface ExerciseRow {
   is_bodyweight: number
   active: number
   notes: string | null
+  hyrox_station: HyroxStation | null
   created_at: string
   updated_at: string
 }
@@ -202,5 +204,5 @@ export function checkPlanRefs(db: Db, blockId: number | null | undefined, routin
   if (blockId != null && !db.get('SELECT 1 AS x FROM trn_blocks WHERE id = ?', [blockId]))
     throw new UserError('Ese bloque de entrenamiento no existe.')
   if (routineId != null && !db.get('SELECT 1 AS x FROM trn_routines WHERE id = ?', [routineId]))
-    throw new UserError('Esa rutina no existe.')
+    throw new UserError('Ese tipo de entreno no existe.')
 }

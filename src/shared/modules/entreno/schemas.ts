@@ -2,9 +2,13 @@
 // Las mismas reglas están también en SQL (CHECK, UNIQUE, FOREIGN KEY).
 import { z } from 'zod'
 import { isISODate } from '../../dates'
+import { isHyroxStation, type HyroxStation } from './hyrox'
+import { isMonday } from './plan'
 import {
   E1RM_FORMULAS,
   EXERCISE_CATEGORIES,
+  GOAL_STATUSES,
+  GOAL_TYPES,
   IMPORT_FORMATS,
   KIND_RULE_FIELDS,
   MEASURE_TYPES,
@@ -36,6 +40,7 @@ const optNonNegInt = nonNegInt.nullable().optional().transform((v) => v ?? null)
 const optNonNeg = z.number().min(0, 'No puede ser negativo').nullable().optional().transform((v) => v ?? null)
 const optNumber = z.number().nullable().optional().transform((v) => v ?? null)
 const rpe = z.number().min(1, 'El RPE va de 1 a 10').max(10, 'El RPE va de 1 a 10')
+export const HyroxStationSchema = z.custom<HyroxStation>(isHyroxStation, 'Estación HYROX no válida')
 const effort = z.number().int().min(1, 'El esfuerzo va de 1 a 10').max(10, 'El esfuerzo va de 1 a 10')
 
 export const WorkoutFilterInput = z
@@ -108,7 +113,9 @@ export const ExerciseSchema = z
     active: z.boolean().default(true),
     notes: optText,
     primaryGroupId: optId,
-    secondaryGroupIds: z.array(id).default([])
+    secondaryGroupIds: z.array(id).default([]),
+    // Sin `.transform`: sin poner (undefined) y null significan cosas distintas al editar.
+    hyroxStation: HyroxStationSchema.nullable().optional()
   })
   .refine((e) => e.primaryGroupId === null || !e.secondaryGroupIds.includes(e.primaryGroupId), {
     message: 'Un grupo muscular no puede ser principal y secundario a la vez',
@@ -121,7 +128,12 @@ export const MuscleGroupSchema = z.object({
   id: optId,
   name: z.string().trim().min(1, 'Ponle un nombre al grupo muscular').max(100),
   sortOrder: z.number().int().optional(),
-  active: z.boolean().default(true)
+  active: z.boolean().default(true),
+  weeklySetsMin: z.number().int('Las series son un número entero').min(0, 'No puede ser negativo').max(200).optional(),
+  weeklySetsMax: z.number().int('Las series son un número entero').min(0, 'No puede ser negativo').max(200).optional()
+}).refine((g) => g.weeklySetsMin === undefined || g.weeklySetsMax === undefined || g.weeklySetsMin <= g.weeklySetsMax, {
+  message: 'El mínimo de series semanales no puede ser mayor que el máximo',
+  path: ['weeklySetsMin']
 })
 
 export const KindRuleSchema = z.object({
@@ -139,7 +151,8 @@ export const SettingsSchema = z
     e1rmMinReps: z.number().int().min(1).max(100),
     e1rmMaxReps: z.number().int().min(1).max(100),
     countedSetTypes: z.array(z.enum(SET_TYPES)).min(1, 'Tiene que contar al menos un tipo de serie'),
-    weekStartsOn: z.number().int().min(1).max(7),
+    // Fijo: las semanas van siempre de lunes a domingo (decisión de Michael, F4).
+    weekStartsOn: z.number().refine((v) => v === 1, 'La semana empieza siempre en lunes: no se puede cambiar.'),
     secondaryMuscleFactor: z.number().min(0).max(1),
     trendWeeks: z.number().int().min(1).max(104),
     timeZone: z.string().trim().min(1)
@@ -184,6 +197,141 @@ export const ApplyHevySchema = z.object({
   changedWorkouts: z.array(HevyWorkoutSchema),
   kinds: z.record(z.string(), z.enum(WORKOUT_KINDS)).optional()
 })
+
+// ---------- Planificación, bloques, eventos y objetivos (F4) ----------
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+const isoDate = z.string().refine(isISODate, 'Fecha no válida')
+const optTime = z
+  .string()
+  .regex(TIME_RE, 'La hora tiene que ser HH:mm (de 00:00 a 23:59)')
+  .nullable()
+  .optional()
+  .transform((v) => v ?? null)
+const posNumber = z.number().positive('Tiene que ser mayor que cero')
+
+/** Lunes de una semana (las semanas del plan van de lunes a domingo). */
+export const WeekStartSchema = z.string().refine(isMonday, 'La semana tiene que empezar en lunes (fecha YYYY-MM-DD)')
+
+const RoutineItemSchema = z
+  .object({
+    exerciseId: id,
+    targetSets: z.number().int().positive().nullable().optional().transform((v) => v ?? null),
+    repsMin: z.number().int().positive().nullable().optional().transform((v) => v ?? null),
+    repsMax: z.number().int().positive().nullable().optional().transform((v) => v ?? null),
+    targetRpe: rpe.nullable().optional().transform((v) => v ?? null),
+    notes: optText
+  })
+  .refine((i) => i.repsMin === null || i.repsMax === null || i.repsMin <= i.repsMax, {
+    message: 'El mínimo de repeticiones no puede ser mayor que el máximo',
+    path: ['repsMin']
+  })
+
+export const RoutineSchema = z.object({
+  id: optId,
+  name: z.string().trim().min(1, 'Ponle un nombre al tipo de entreno').max(100),
+  kind: z.enum(WORKOUT_KINDS),
+  description: optText,
+  active: z.boolean().default(true),
+  aliases: z.array(z.string().trim().min(1, 'El alias no puede estar vacío').max(200)).optional(),
+  items: z.array(RoutineItemSchema).optional()
+})
+
+export const BaseWeekSlotsSchema = z
+  .array(
+    z.object({
+      weekday: z.number().int().min(1, 'El día va de 1 (lunes) a 7 (domingo)').max(7, 'El día va de 1 (lunes) a 7 (domingo)'),
+      routineId: id,
+      time: optTime
+    })
+  )
+  .max(70, 'Demasiadas sesiones en la semana')
+
+export const WeekPlanSlotsSchema = z
+  .array(z.object({ date: isoDate, routineId: id, time: optTime, note: optText }))
+  .max(70, 'Demasiadas sesiones en la semana')
+
+export const WeekPlanSlotRefSchema = z.object({ date: isoDate, order: nonNegInt })
+
+export const WeekPlanMoveSchema = z.object({
+  from: WeekPlanSlotRefSchema,
+  to: z.object({ date: isoDate, order: nonNegInt.nullable().optional().transform((v) => v ?? null) })
+})
+
+const plannedCount = z.number().int('Tiene que ser un número entero').min(0, 'No puede ser negativo').max(50)
+
+export const BlockSchema = z
+  .object({
+    id: optId,
+    name: z.string().trim().min(1, 'Ponle un nombre al bloque').max(200),
+    startDate: isoDate,
+    endDate: isoDate.nullable().optional().transform((v) => v ?? null),
+    mainGoal: optText,
+    plannedGym: plannedCount.default(4),
+    plannedSwim: plannedCount.default(2),
+    plannedHyrox: plannedCount.default(0),
+    plannedRun: plannedCount.default(0),
+    plannedOther: plannedCount.default(0),
+    notes: optText,
+    eventId: optId,
+    isDeload: z.boolean().default(false)
+  })
+  .refine((b) => b.endDate === null || b.endDate >= b.startDate, {
+    message: 'La fecha de fin no puede ser anterior a la de inicio',
+    path: ['endDate']
+  })
+
+export const TrainingEventSchema = z.object({
+  id: optId,
+  name: z.string().trim().min(1, 'Ponle un nombre al evento').max(200),
+  date: isoDate,
+  notes: optText
+})
+
+export const GoalStatusSchema = z.enum(GOAL_STATUSES)
+
+export const GoalSchema = z
+  .object({
+    id: optId,
+    name: z.string().trim().min(1, 'Ponle un nombre al objetivo').max(200),
+    type: z.enum(GOAL_TYPES),
+    targetValue: posNumber.nullable().optional().transform((v) => v ?? null),
+    targetReps: z.number().int('Las repeticiones son un número entero').positive('Tiene que ser mayor que cero').nullable().optional().transform((v) => v ?? null),
+    deadline: isoDate.nullable().optional().transform((v) => v ?? null),
+    exerciseId: optId,
+    groupId: optId,
+    eventId: optId,
+    kind: z.enum(WORKOUT_KINDS).nullable().optional().transform((v) => v ?? null),
+    status: GoalStatusSchema.default('ACTIVE'),
+    notes: optText
+  })
+  .superRefine((g, ctx) => {
+    const need = (ok: boolean, message: string, path: string) => {
+      if (!ok) ctx.addIssue({ code: 'custom', message, path: [path] })
+    }
+    switch (g.type) {
+      case 'E1RM':
+        need(g.exerciseId !== null, 'Elige el ejercicio del objetivo de e1RM', 'exerciseId')
+        need(g.targetValue !== null, 'Pon el e1RM que quieres alcanzar (kg)', 'targetValue')
+        break
+      case 'WEIGHT_REPS':
+        need(g.exerciseId !== null, 'Elige el ejercicio del objetivo de peso × repeticiones', 'exerciseId')
+        need(g.targetValue !== null, 'Pon el peso que quieres mover (kg)', 'targetValue')
+        need(g.targetReps !== null, 'Pon las repeticiones que quieres hacer con ese peso', 'targetReps')
+        break
+      case 'WEEKLY_VOLUME':
+        need((g.groupId !== null) !== (g.exerciseId !== null), 'Elige un grupo muscular o un ejercicio (uno de los dos)', 'groupId')
+        need(g.targetValue !== null, 'Pon el volumen semanal que quieres alcanzar', 'targetValue')
+        break
+      case 'FREQUENCY':
+        need((g.kind !== null) !== (g.groupId !== null), 'Elige un tipo de sesión o un grupo muscular (uno de los dos)', 'kind')
+        need(g.targetValue !== null, 'Pon cuántas veces por semana', 'targetValue')
+        break
+      case 'EVENT':
+        need(g.eventId !== null, 'Elige el evento del objetivo', 'eventId')
+        break
+    }
+  })
 
 /** Primer mensaje de error de una validación, en español. */
 export function firstError(e: unknown): string {

@@ -105,7 +105,7 @@ export function SettingsPage() {
           <Bloque id="categorias" titulo="Categorías" texto="Los grupos y categorías con los que clasificas. Puedes cambiarlos cuando quieras.">
             <CategoriesSettings />
           </Bloque>
-          <Bloque id="entreno" titulo="Entreno" texto="Grupos musculares, reglas para decidir el tipo de sesión, importaciones de Hevy y los datos de entreno.">
+          <Bloque id="entreno" titulo="Entreno" texto="Grupos musculares, métricas, reglas para decidir el tipo de sesión, importaciones de Hevy y los datos de entreno.">
             <AjustesEntreno />
           </Bloque>
           <Bloque id="datos" titulo="Datos y copias" texto="Importar, exportar, copiar y restaurar son cuatro cosas distintas. Antes de importar, restaurar o actualizar, la app hace una copia sola.">

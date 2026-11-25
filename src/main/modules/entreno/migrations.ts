@@ -2,12 +2,15 @@
 // orden, dentro de una transacción (ver `core/migrations.ts`). Nunca se edita una migración
 // publicada: cualquier cambio va en una migración nueva.
 //
-// Solo CREATE (e INSERT de datos iniciales): no se puede reconstruir una tabla porque la migración
-// corre dentro de la transacción de la cola y ahí no se puede apagar `foreign_keys`.
+// Solo CREATE, ALTER TABLE … ADD COLUMN e INSERT de datos iniciales: no se puede reconstruir una
+// tabla porque la migración corre dentro de la transacción de la cola y ahí no se puede apagar
+// `foreign_keys`. Lo que no se puede escribir en SQL va en el paso `data` de la migración.
 //
 // SQLite exige que la tabla padre de una FOREIGN KEY exista al escribir en la hija (aunque el valor
 // sea NULL), así que el orden de las migraciones sigue las referencias: catálogo → planificación →
 // sesiones → ajustes → datos iniciales.
+import { matchHyroxStation } from '@shared/modules/entreno/hyrox'
+import type { Db } from '../../core/db'
 import type { Migration } from '../../core/migrations'
 
 const BOOL = (col: string, def: 0 | 1) => `${col} INTEGER NOT NULL DEFAULT ${def} CHECK (${col} IN (0,1))`
@@ -17,7 +20,8 @@ const NOT_BLANK = (col: string) => `CHECK (length(trim(${col})) > 0)`
 const DATE_CHECK = (col: string) => `CHECK (${col} GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]')`
 const NULLABLE_DATE_CHECK = (col: string) =>
   `CHECK (${col} IS NULL OR ${col} GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]')`
-const LOCAL_DT = `'[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]'`
+const TIME_CHECK = (col: string) => `CHECK (${col} IS NULL OR ${col} GLOB '[0-2][0-9]:[0-5][0-9]')`
+const LOCAL_DT =`'[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]'`
 const KINDS = `('GYM','SWIM','HYROX','RUN','OTHER')`
 
 /** ISO local `YYYY-MM-DDTHH:mm` → formato Hevy `5 Nov 2026, 07:05` (NULL si es NULL). */
@@ -277,5 +281,90 @@ INSERT INTO trn_kind_rules (field, contains, kind, priority) VALUES
   ('exercise', 'farmer', 'HYROX', 50),
   ('exercise', 'burpee broad jump', 'HYROX', 50);
 `
+  },
+  {
+    // F4: planificación de la semana y columnas nuevas. Solo ALTER TABLE … ADD COLUMN y CREATE (sin
+    // reconstruir tablas). Las 8 estaciones van escritas aquí (y no generadas desde hyrox.ts) para
+    // que el texto de esta migración no cambie nunca; un test comprueba que coinciden.
+    version: 2006,
+    name: 'entreno: semana base, plan semanal, alias de tipos de entreno y columnas de F4',
+    up: `
+ALTER TABLE trn_blocks ADD COLUMN event_id INTEGER REFERENCES trn_events(id) ON DELETE SET NULL;
+ALTER TABLE trn_blocks ADD COLUMN ${BOOL('is_deload', 0)};
+CREATE INDEX trn_blocks_event ON trn_blocks(event_id);
+
+ALTER TABLE trn_muscle_groups ADD COLUMN weekly_sets_min INTEGER NOT NULL DEFAULT 10
+  CHECK (typeof(weekly_sets_min) = 'integer' AND weekly_sets_min >= 0);
+ALTER TABLE trn_muscle_groups ADD COLUMN weekly_sets_max INTEGER NOT NULL DEFAULT 20
+  CHECK (typeof(weekly_sets_max) = 'integer' AND weekly_sets_max >= weekly_sets_min);
+
+ALTER TABLE trn_exercises ADD COLUMN hyrox_station TEXT CHECK (hyrox_station IS NULL OR hyrox_station IN
+  ('SkiErg','Sled Push','Sled Pull','Burpee Broad Jumps','Rowing','Farmers Carry','Sandbag Lunges','Wall Balls'));
+
+ALTER TABLE trn_goals ADD COLUMN kind TEXT CHECK (kind IS NULL OR kind IN ${KINDS});
+
+CREATE TABLE trn_routine_aliases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alias TEXT NOT NULL UNIQUE COLLATE NOCASE ${NOT_BLANK('alias')},
+  routine_id INTEGER NOT NULL REFERENCES trn_routines(id) ON DELETE CASCADE
+);
+CREATE INDEX trn_routine_aliases_routine ON trn_routine_aliases(routine_id);
+
+CREATE TABLE trn_base_week (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  weekday INTEGER NOT NULL CHECK (typeof(weekday) = 'integer' AND weekday BETWEEN 1 AND 7),
+  slot_order INTEGER NOT NULL CHECK (typeof(slot_order) = 'integer' AND slot_order >= 0),
+  routine_id INTEGER NOT NULL REFERENCES trn_routines(id) ON DELETE CASCADE,
+  time TEXT ${TIME_CHECK('time')},
+  UNIQUE (weekday, slot_order)
+);
+CREATE INDEX trn_base_week_routine ON trn_base_week(routine_id);
+
+CREATE TABLE trn_base_week_meta (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  first_saved_on TEXT NOT NULL ${DATE_CHECK('first_saved_on')},
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE trn_week_plan_weeks (
+  week_start TEXT PRIMARY KEY ${DATE_CHECK('week_start')}
+    CHECK (date(week_start) IS week_start AND strftime('%w', week_start) IS '1'),
+  origin TEXT NOT NULL DEFAULT 'BASE' CHECK (origin IN ('BASE','EDITED')),
+  saved_at TEXT NOT NULL
+);
+
+CREATE TABLE trn_week_plan (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  week_start TEXT NOT NULL REFERENCES trn_week_plan_weeks(week_start) ON DELETE CASCADE,
+  date TEXT NOT NULL ${DATE_CHECK('date')} CHECK (date(date) IS date),
+  slot_order INTEGER NOT NULL CHECK (typeof(slot_order) = 'integer' AND slot_order >= 0),
+  routine_id INTEGER NOT NULL REFERENCES trn_routines(id) ON DELETE CASCADE,
+  time TEXT ${TIME_CHECK('time')},
+  note TEXT,
+  UNIQUE (date, slot_order),
+  CHECK (date >= week_start AND date <= date(week_start, '+6 days'))
+);
+CREATE INDEX trn_week_plan_week ON trn_week_plan(week_start);
+CREATE INDEX trn_week_plan_routine ON trn_week_plan(routine_id);
+`,
+    // Propuesta de estación HYROX para los ejercicios que ya existían. Se aplica una sola vez: si
+    // el diccionario de hyrox.ts cambia después, solo afecta a los ejercicios nuevos.
+    data: (db) => proposeHyroxStations(db)
   }
 ]
+
+/**
+ * Pone la estación HYROX que propone el diccionario a los ejercicios que no tienen ninguna. La
+ * usan la migración 2006 y la restauración de un JSON de antes de la 2006 (que no la trae).
+ * Dentro de una operación de la cola.
+ */
+export function proposeHyroxStations(db: Db): number {
+  let n = 0
+  for (const e of db.all<{ id: number; title: string }>('SELECT id, title FROM trn_exercises WHERE hyrox_station IS NULL')) {
+    const station = matchHyroxStation(e.title)
+    if (!station) continue
+    db.run('UPDATE trn_exercises SET hyrox_station = ? WHERE id = ?', [station, e.id])
+    n++
+  }
+  return n
+}

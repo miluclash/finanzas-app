@@ -1,5 +1,6 @@
 // Catálogo de ejercicios: listado, alta/edición con grupos musculares, alias y unión de dos
 // ejercicios. Las funciones que escriben se llaman dentro de una operación de la cola.
+import { matchHyroxStation } from '@shared/modules/entreno/hyrox'
 import { AliasSchema, ExerciseSchema } from '@shared/modules/entreno/schemas'
 import type { Exercise, ExerciseInput, MeasureType } from '@shared/modules/entreno/types'
 import type { Db } from '../../core/db'
@@ -37,6 +38,7 @@ export function listExercises(db: Db): Exercise[] {
     primaryGroupId: muscles.find((m) => m.exercise_id === r.id && m.role === 'primary')?.group_id ?? null,
     secondaryGroupIds: muscles.filter((m) => m.exercise_id === r.id && m.role === 'secondary').map((m) => m.group_id),
     aliases: aliases.filter((a) => a.exercise_id === r.id).map((a) => ({ id: a.id, alias: a.alias })),
+    hyroxStation: r.hyrox_station,
     setCount: r.set_count,
     lastUsed: r.last_used
   }))
@@ -58,11 +60,18 @@ function checkNameFree(db: Db, name: string, ownId: number | null, what: string)
 
 /**
  * Crea un ejercicio nuevo con lo mínimo (lo usa el importador para los ejercicios que no conoce).
- * La categoría queda vacía hasta que Michael la ponga. Devuelve su id.
+ * La categoría queda vacía hasta que Michael la ponga; la estación HYROX se propone con el
+ * diccionario (`matchHyroxStation`). Devuelve su id.
  */
 export function insertExercise(db: Db, title: string, measure: MeasureType = 'WEIGHT_REPS'): number {
   const now = nowIso()
-  db.run('INSERT INTO trn_exercises (title, measure, created_at, updated_at) VALUES (?, ?, ?, ?)', [title, measure, now, now])
+  db.run('INSERT INTO trn_exercises (title, measure, hyrox_station, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [
+    title,
+    measure,
+    matchHyroxStation(title),
+    now,
+    now
+  ])
   return lastId(db)
 }
 
@@ -93,10 +102,13 @@ export function saveExercise(db: Db, input: ExerciseInput): Exercise {
           const before = requireExercise(db, d.id)
           checkNameFree(db, d.title, d.id, 'Si es el mismo, únelos.')
           const beforeDto = getExercise(db, d.id)
+          // Estación: sin poner = la que tenga; null = ninguna.
+          const station = d.hyroxStation === undefined ? before.hyrox_station : d.hyroxStation
           db.run(
-            `UPDATE trn_exercises SET title = ?, category = ?, measure = ?, is_bodyweight = ?, active = ?, notes = ?, updated_at = ?
+            `UPDATE trn_exercises SET title = ?, category = ?, measure = ?, is_bodyweight = ?, active = ?, notes = ?, hyrox_station = ?,
+               updated_at = ?
              WHERE id = ?`,
-            [d.title, d.category, d.measure, d.isBodyweight ? 1 : 0, d.active ? 1 : 0, d.notes, now, d.id]
+            [d.title, d.category, d.measure, d.isBodyweight ? 1 : 0, d.active ? 1 : 0, d.notes, station, now, d.id]
           )
           // Renombrar a uno de sus propios alias: el alias sobra.
           db.run('DELETE FROM trn_exercise_aliases WHERE exercise_id = ? AND alias = ? COLLATE NOCASE', [d.id, d.title])
@@ -109,10 +121,12 @@ export function saveExercise(db: Db, input: ExerciseInput): Exercise {
           audit(db, 'trn_exercises', id, 'update', d.title, beforeDto, getExercise(db, id))
         } else {
           checkNameFree(db, d.title, null, '')
+          // Estación vacía al crear: se propone con el diccionario.
+          const station = d.hyroxStation ?? matchHyroxStation(d.title)
           db.run(
-            `INSERT INTO trn_exercises (title, category, measure, is_bodyweight, active, notes, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [d.title, d.category, d.measure, d.isBodyweight ? 1 : 0, d.active ? 1 : 0, d.notes, now, now]
+            `INSERT INTO trn_exercises (title, category, measure, is_bodyweight, active, notes, hyrox_station, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [d.title, d.category, d.measure, d.isBodyweight ? 1 : 0, d.active ? 1 : 0, d.notes, station, now, now]
           )
           id = lastId(db)
           writeMuscles(db, id, d.primaryGroupId, d.secondaryGroupIds)
@@ -153,7 +167,9 @@ export function removeAlias(db: Db, aliasId: number): Exercise {
 /**
  * Une el ejercicio `fromId` (B) en `intoId` (A): las series, los elementos de rutina y los
  * objetivos de B pasan a A, los alias de B pasan a A, el título de B queda como alias de A y B se
- * borra. Las series conservan su `exercise_title` original (el de Hevy). Todo en una operación.
+ * borra. Las series conservan su `exercise_title` original (el de Hevy). La estación HYROX, la
+ * categoría, el grupo principal y los secundarios que A no tenga y B sí pasan a A (si los dos los
+ * tienen, manda A). Todo en una operación.
  */
 export function mergeExercises(db: Db, fromId: number, intoId: number): Exercise {
   if (fromId === intoId) throw new UserError('Elige dos ejercicios distintos para unirlos.')
@@ -162,7 +178,19 @@ export function mergeExercises(db: Db, fromId: number, intoId: number): Exercise
       const from = requireExercise(db, fromId)
       const into = requireExercise(db, intoId)
       const beforeFrom = getExercise(db, fromId)
+      const beforeInto = getExercise(db, intoId)
       const moved = db.get<{ n: number }>('SELECT COUNT(*) AS n FROM trn_sets WHERE exercise_id = ?', [fromId])!.n
+      // Lo que el que queda no tiene y el que desaparece sí, se conserva; si los dos tienen, manda
+      // el que queda. La medida siempre tiene valor (NOT NULL): se queda la del que queda.
+      db.run('UPDATE trn_exercises SET hyrox_station = COALESCE(hyrox_station, ?), category = COALESCE(category, ?) WHERE id = ?', [
+        from.hyrox_station,
+        from.category,
+        intoId
+      ])
+      const primary = beforeInto.primaryGroupId ?? beforeFrom.primaryGroupId
+      const secondary = beforeInto.secondaryGroupIds.length > 0 ? beforeInto.secondaryGroupIds : beforeFrom.secondaryGroupIds
+      if (primary !== beforeInto.primaryGroupId || secondary !== beforeInto.secondaryGroupIds)
+        writeMuscles(db, intoId, primary, secondary.filter((g) => g !== primary))
       db.run('UPDATE trn_sets SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])
       db.run('UPDATE trn_routine_items SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])
       db.run('UPDATE trn_goals SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])

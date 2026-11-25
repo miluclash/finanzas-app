@@ -9,7 +9,15 @@ import type { Db } from './db'
 export interface Migration {
   version: number
   name: string
+  /** SQL de la migración (CREATE, ALTER TABLE … ADD COLUMN, INSERT…). */
   up: string
+  /**
+   * Paso de datos opcional, síncrono, que corre después de `up` en la misma operación de la cola
+   * (si falla, se deshace también `up` y la migración no queda apuntada). Para lo que no se puede
+   * escribir en SQL, p. ej. rellenar una columna nueva con una función de la app. Ojo: el código
+   * que use queda congelado en la práctica, porque la migración se aplica una sola vez por base.
+   */
+  data?: (db: Db) => void
 }
 
 /** Rango de versiones [mínima, máxima] (ambas incluidas). */
@@ -64,6 +72,7 @@ export function migrate(db: Db, migrations: readonly Migration[], runOp: OpRunne
   for (const m of pending) {
     runOp(MIGRATION_LABEL, () => {
       db.exec(m.up)
+      m.data?.(db)
       db.run('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)', [
         m.version,
         m.name,

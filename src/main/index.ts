@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createAppHandlers, createAppRegistry, type Handlers } from './app'
 import { createBackup } from './core/backup'
-import { createCoreContext, initCore, type CoreContext } from './core/context'
+import { createCoreContext, initCore, runModuleStartups, type CoreContext } from './core/context'
 import { Db, SaveError } from './core/db'
 import { UserError } from './core/errors'
 import type { DialogProvider } from './core/handlers'
@@ -88,13 +88,16 @@ async function initData(): Promise<void> {
   const dbPath = path.join(dir, 'finanzas.sqlite')
   const db = await Db.open(dbPath)
   core = createCoreContext(db, { dbPath, backupsDir: path.join(dir, 'backups') }, createAppRegistry())
-  initCore(core)
+  // Los pasos de arranque de los módulos van después de la copia diaria (que así es de antes de
+  // cualquier escritura de arranque) y, si fallan, no impiden abrir la app.
+  initCore(core, { startup: false })
   handlers = createAppHandlers(core, dialogs, app.getVersion())
   try {
     await handlers['core:backup.auto']()
   } catch (e) {
     console.error('No se pudo hacer la copia automática', e)
   }
+  await runModuleStartups(core)
 }
 
 /**

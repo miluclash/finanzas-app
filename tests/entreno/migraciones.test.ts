@@ -27,6 +27,8 @@ afterEach(() => {
 const sha = (file: string) => createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 
 const TABLAS_TRN = [
+  'trn_base_week',
+  'trn_base_week_meta',
   'trn_blocks',
   'trn_events',
   'trn_exercise_aliases',
@@ -36,10 +38,13 @@ const TABLAS_TRN = [
   'trn_imports',
   'trn_kind_rules',
   'trn_muscle_groups',
+  'trn_routine_aliases',
   'trn_routine_items',
   'trn_routines',
   'trn_sets',
   'trn_settings',
+  'trn_week_plan',
+  'trn_week_plan_weeks',
   'trn_workouts'
 ]
 
@@ -69,12 +74,14 @@ async function baseAnterior(file: string): Promise<void> {
 
 describe('migraciones de entreno', () => {
   it('las versiones están en el rango de entreno, en orden y sin reconstruir tablas', () => {
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([2001, 2002, 2003, 2004, 2005])
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([2001, 2002, 2003, 2004, 2005, 2006])
     for (const m of MIGRATIONS) {
-      expect(m.up).not.toMatch(/\b(DROP|ALTER)\s+TABLE\b/i)
+      expect(m.up).not.toMatch(/\bDROP\s+TABLE\b/i)
+      // ALTER TABLE solo para añadir columnas (nada de RENAME ni DROP COLUMN).
+      for (const alter of m.up.matchAll(/\bALTER\s+TABLE\s+\w+\s+(\w+)/gi)) expect(alter[1].toUpperCase()).toBe('ADD')
       expect(m.up).not.toMatch(/PRAGMA/i)
     }
-    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005])
+    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005, 2006])
   })
 
   it('base vacía: crea las tablas, la vista y los datos iniciales', async () => {
@@ -82,7 +89,7 @@ describe('migraciones de entreno', () => {
     expect(objetos(db, 'table').filter((t) => t.startsWith('trn_'))).toEqual(TABLAS_TRN)
     expect(objetos(db, 'view')).toEqual(['trn_v_hevy'])
     expect(db.all('SELECT version FROM schema_migrations WHERE version >= 2000 ORDER BY version')).toEqual(
-      [2001, 2002, 2003, 2004, 2005].map((version) => ({ version }))
+      [2001, 2002, 2003, 2004, 2005, 2006].map((version) => ({ version }))
     )
     expect(db.all<{ name: string }>('SELECT name FROM trn_muscle_groups ORDER BY sort_order').map((r) => r.name)).toEqual([
       'Pecho',

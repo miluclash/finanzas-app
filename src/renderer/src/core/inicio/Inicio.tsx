@@ -1,9 +1,14 @@
-import { ArrowRight, Barbell, CalendarBlank, ChartLineUp, CheckCircle, Medal, Receipt, Wallet } from '@phosphor-icons/react'
+import { ArrowDown, ArrowRight, ArrowUp, Barbell, CalendarBlank, ChartLineUp, CheckCircle, Medal, Receipt, Wallet } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { formatMonth, monthOf, todayISO } from '@shared/dates'
 import { formatEur, formatPct } from '@shared/money'
 import { useApi } from '../../lib/api'
-import { Button, Card, CifraEur, Count, EmptyState, ErrorState, KpiCard, LoadingState, ProgressBar, Spark, StatusBadge } from '../ui'
+import { Button, Card, CifraEur, CifraUnidad, Count, EmptyState, ErrorState, KpiCard, LoadingState, ProgressBar, Spark, StatusBadge, Tag } from '../ui'
+import type { EntrenoInicio } from '@shared/modules/entreno/metrics/views'
+import { textoComparacionVolumen, sinVolumenPrevio, anteriorRecord, cuando, fechaCorta, formatCambio, formatEntero, KIND_LABEL, marcaRecord } from '../../modules/entreno/format'
+import { KIND_ICON } from '../../modules/entreno/Piezas'
+import { weekLabelNumber } from '@shared/modules/entreno/metrics/weeks'
+import { formatDate } from '@shared/dates'
 
 const LARGA = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -18,6 +23,7 @@ export function Inicio() {
   const dash = useApi('finanzas:dashboard.get', [mes])
   const nw = useApi('finanzas:networth.series', [])
   const rev = useApi('finanzas:tx.reviewQueue', [])
+  const ent = useApi('entreno:metrics.inicio', [])
   const ahora = new Date()
   const fecha = LARGA.format(ahora)
 
@@ -133,9 +139,7 @@ export function Inicio() {
           </Card>
         </div>
         <div className="col-span-12 @5xl:col-span-3">
-          <Card titulo="Próxima sesión" icono={<CalendarBlank size={20} weight="duotone" aria-hidden />} className="h-full">
-            <EmptyState horizontal icono={<Barbell size={20} aria-hidden />} titulo="Sin sesión prevista" texto="Importa tus entrenos de Hevy y aquí verás la siguiente. Llega en la próxima fase." />
-          </Card>
+          <ProximaSesion q={ent} />
         </div>
 
         {/* Resúmenes */}
@@ -186,6 +190,7 @@ export function Inicio() {
         <div className="col-span-12 @5xl:col-span-5">
           <Card
             titulo="Entreno"
+            subtitulo={ent.data ? `Semana ${weekLabelNumber(ent.data.week.weekStart)}` : undefined}
             icono={<Barbell size={20} weight="duotone" aria-hidden />}
             accion={
               <Link to="/entreno" className="btn btn-ghost btn-sm">
@@ -194,7 +199,7 @@ export function Inicio() {
             }
             className="h-full"
           >
-            <EmptyState horizontal icono={<CheckCircle size={20} aria-hidden />} titulo="Importa tus entrenos de Hevy" texto="Aquí verás tus sesiones, tu volumen semanal y el camino a tus objetivos. Llega en la próxima fase." />
+            <ResumenEntreno q={ent} />
           </Card>
         </div>
 
@@ -218,10 +223,124 @@ export function Inicio() {
         </div>
         <div className="col-span-12 @5xl:col-span-5">
           <Card titulo="Récords recientes" subtitulo="Entreno" icono={<Medal size={20} weight="duotone" aria-hidden />} className="h-full">
-            <EmptyState horizontal icono={<Medal size={20} aria-hidden />} titulo="Todavía no hay récords" texto="Tus mejores marcas aparecerán aquí cuando importes tus entrenos." />
+            <RecordsInicio q={ent} />
           </Card>
         </div>
       </div>
     </div>
+  )
+}
+
+/* ======================= Entreno en el Inicio (datos de metrics.inicio) ======================= */
+type ConsultaEntreno = { data?: EntrenoInicio; isLoading: boolean; error: Error | null; refetch: () => unknown }
+
+function EstadoConsulta({ q, etiqueta }: { q: ConsultaEntreno; etiqueta: string }) {
+  if (q.isLoading) return <LoadingState filas={2} etiqueta={etiqueta} />
+  return (
+    <div>
+      <p className="t-label">No se han podido calcular tus datos de entreno{q.error ? `: ${q.error.message}` : '.'}</p>
+      <Button size="sm" className="mt-3" onClick={() => q.refetch()}>
+        Reintentar
+      </Button>
+    </div>
+  )
+}
+
+function ProximaSesion({ q }: { q: ConsultaEntreno }) {
+  const d = q.data
+  const n = d?.next
+  const I = n?.kind ? KIND_ICON[n.kind] : Barbell
+  return (
+    <Card titulo="Próxima sesión" icono={<CalendarBlank size={20} weight="duotone" aria-hidden />} className="h-full">
+      {!d ? (
+        <EstadoConsulta q={q} etiqueta="Calculando tu próxima sesión" />
+      ) : n ? (
+        <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-center @3xl:justify-between @5xl:flex-col @5xl:items-stretch @5xl:justify-start">
+          <div>
+            <div className="t-kpi">{n.routineName || 'Sesión'}</div>
+            <p className="t-label mt-2">{cuando(n.date, d.today, n.time)}</p>
+            <p className="t-meta mt-1 flex items-center gap-1">
+              <I size={14} aria-hidden /> {n.kind ? KIND_LABEL[n.kind] : 'Tipo de entreno borrado'}
+            </p>
+          </div>
+          <Link to="/entreno/plan" className="btn btn-secondary">
+            Ver la semana
+          </Link>
+        </div>
+      ) : (
+        <EmptyState horizontal icono={<Barbell size={20} aria-hidden />} titulo="Sin sesión prevista" texto="Crea tu semana base en Plan y aquí verás la siguiente sesión." accion={<Link to="/entreno/plan?vista=boceto" className="btn btn-secondary btn-sm">Ir a Plan</Link>} />
+      )}
+    </Card>
+  )
+}
+
+function ResumenEntreno({ q }: { q: ConsultaEntreno }) {
+  const d = q.data
+  if (!d) return <EstadoConsulta q={q} etiqueta="Calculando tu resumen de entreno" />
+  const { week, volume, nextEvent } = d
+  const vacio = week.planned === 0 && week.sessions === 0 && volume.loadKg === 0 && d.records.length === 0
+  if (vacio)
+    return (
+      <EmptyState
+        horizontal
+        icono={<CheckCircle size={20} aria-hidden />}
+        titulo="Importa tus entrenos de Hevy"
+        texto="Aquí verás tus sesiones de la semana, tu volumen y la cuenta atrás de tu próximo evento."
+        accion={<Link to="/entreno" className="btn btn-secondary btn-sm">Ir a Entreno</Link>}
+      />
+    )
+  const ch = volume.changePct
+  return (
+    <>
+      <div className="auto-grid">
+        <div>
+          <div className="t-label">Sesiones</div>
+          <div className="t-kpi mt-1">
+            <CifraUnidad valor={week.planned > 0 ? `${week.done} de ${week.planned}` : String(week.sessions)} unidad="esta semana" />
+          </div>
+          {week.planned === 0 && <p className="t-meta mt-1">Sin plan: crea tu semana base en Plan.</p>}
+        </div>
+        <div>
+          <div className="t-label">Volumen semanal</div>
+          <div className="t-kpi mt-1">
+            <CifraUnidad valor={formatEntero(volume.loadKg)} unidad="kg" />
+          </div>
+          <p className="t-meta mt-1">
+            {ch !== null ? (
+              <>
+                {ch >= 0 ? <ArrowUp size={12} weight="bold" aria-hidden className="mr-1 inline" /> : <ArrowDown size={12} weight="bold" aria-hidden className="mr-1 inline" />}
+                {formatCambio(ch)} {textoComparacionVolumen(volume.comparison, volume.previousLoadKg, volume.previousToDate)}
+              </>
+            ) : (
+              sinVolumenPrevio(volume.comparison).replace(/^./, (c) => c.toUpperCase())
+            )}
+          </p>
+        </div>
+      </div>
+      {nextEvent && !nextEvent.isPast && (
+        <p className="t-label mt-4 border-t border-line pt-3">
+          {nextEvent.name}, {formatDate(nextEvent.date)}: <b className="font-semibold text-ink">{nextEvent.daysLeft === 0 ? 'es hoy' : `${nextEvent.daysLeft} ${nextEvent.daysLeft === 1 ? 'día' : 'días'}`}</b>
+        </p>
+      )}
+    </>
+  )
+}
+
+function RecordsInicio({ q }: { q: ConsultaEntreno }) {
+  const d = q.data
+  if (!d) return <EstadoConsulta q={q} etiqueta="Calculando tus récords" />
+  if (d.records.length === 0) return <EmptyState horizontal icono={<Medal size={20} aria-hidden />} titulo="Todavía no hay récords" texto="Tus mejores marcas aparecerán aquí cuando superes una marca anterior. Hacen falta al menos dos sesiones del mismo ejercicio." />
+  return (
+    <ul className="auto-grid">
+      {d.records.map((r) => (
+        <li key={`${r.workoutId}-${r.exerciseId}-${r.type}-${r.weightKg}`}>
+          <div className="t-label">{r.exerciseTitle}</div>
+          <div className="t-body tnum mt-1 font-semibold">{marcaRecord(r.type, r.value, r.weightKg)}</div>
+          <Tag className="mt-2">
+            {anteriorRecord(r.type, r.previous)} · {fechaCorta(r.date)}
+          </Tag>
+        </li>
+      ))}
+    </ul>
   )
 }

@@ -33,7 +33,7 @@ const CAMPOS_MEDIDA: Record<MeasureType, Campo[]> = {
 
 type SerieForm = { key: number; setType: SetType } & Record<Campo, string>
 type EjercicioForm = { key: number; exerciseId: number; titulo: string; measure: MeasureType; supersetId: string | null; notas: string; mas: boolean; series: SerieForm[] }
-type Form = { titulo: string; inicio: string; fin: string; tipo: '' | WorkoutKind; descripcion: string; esfuerzo: string; notas: string; ejercicios: EjercicioForm[] }
+type Form = { titulo: string; inicio: string; fin: string; tipo: '' | WorkoutKind; rutina: string; descripcion: string; esfuerzo: string; notas: string; ejercicios: EjercicioForm[] }
 
 let contador = 1
 const nuevaClave = () => contador++
@@ -52,6 +52,7 @@ function formDesde(w: WorkoutDetail, catalogo: Exercise[]): Form {
     inicio: w.startTime,
     fin: w.endTime ?? '',
     tipo: w.kindManual ? w.kind : '',
+    rutina: w.routineId === null ? '' : String(w.routineId),
     descripcion: w.description ?? '',
     esfuerzo: w.perceivedEffort === null ? '' : String(w.perceivedEffort),
     notas: w.notes ?? '',
@@ -116,7 +117,7 @@ function validar(f: Form, original: WorkoutDetail | null): { problemas: Problema
       perceivedEffort: f.esfuerzo === '' ? null : Number(f.esfuerzo),
       notes: f.notas.trim() || null,
       blockId: original?.blockId ?? null,
-      routineId: original?.routineId ?? null,
+      routineId: f.rutina === '' ? null : Number(f.rutina),
       exercises: ejercicios
     }
   }
@@ -163,10 +164,13 @@ export function SesionEditorPage() {
 
 function Editor({ original, catalogo, atras }: { original: WorkoutDetail | null; catalogo: Exercise[]; atras: React.ReactNode }) {
   const navigate = useNavigate()
-  const [f, setF] = useState<Form>(() => (original ? formDesde(original, catalogo) : { titulo: '', inicio: ahoraLocal(), fin: '', tipo: '', descripcion: '', esfuerzo: '', notas: '', ejercicios: [] }))
+  const [f, setF] = useState<Form>(() => (original ? formDesde(original, catalogo) : { titulo: '', inicio: ahoraLocal(), fin: '', tipo: '', rutina: '', descripcion: '', esfuerzo: '', notas: '', ejercicios: [] }))
   const [intentado, setIntentado] = useState(false)
   const [eligiendo, setEligiendo] = useState(false)
   const resumen = useRef<HTMLDivElement>(null)
+  const rutinas = useApi('entreno:routines.list', [])
+  // Los activos y, si ya lo tiene, ese aunque esté desactivado
+  const opcionesRutina = (rutinas.data ?? []).filter((r) => r.active || String(r.id) === f.rutina)
   const guardar = useApiMutation('entreno:workouts.saveManual', { success: 'Sesión guardada', onSuccess: (w) => navigate(`/entreno/sesiones/${w.id}`, { replace: true }) })
 
   const { problemas, input } = validar(f, original)
@@ -214,6 +218,15 @@ function Editor({ original, catalogo, atras }: { original: WorkoutDetail | null;
             </Select>
             <TextField className="@2xl:col-span-3" label="Inicio" type="datetime-local" value={f.inicio} onChange={(e) => cambia({ inicio: e.target.value })} error={error('inicio')} />
             <TextField className="@2xl:col-span-3" label="Fin (opcional)" type="datetime-local" value={f.fin} min={f.inicio || undefined} onChange={(e) => cambia({ fin: e.target.value })} error={error('fin')} />
+            <Select className="@2xl:col-span-3" label="Tipo de entreno (opcional)" value={f.rutina} onChange={(e) => cambia({ rutina: e.target.value })} ayuda={f.rutina === '' ? 'Sin tipo de entreno, cuenta el tipo de sesión del mismo día.' : 'Así cuenta como hecha en el plan de su semana.'}>
+              <option value="">Ninguno</option>
+              {opcionesRutina.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} · {KIND_LABEL[r.kind]}
+                  {r.active ? '' : ' (desactivado)'}
+                </option>
+              ))}
+            </Select>
             <TextArea className="@2xl:col-span-6" label="Descripción (opcional)" rows={2} value={f.descripcion} onChange={(e) => cambia({ descripcion: e.target.value })} />
           </div>
         </section>

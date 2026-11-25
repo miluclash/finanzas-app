@@ -1045,6 +1045,12 @@
     box-shadow: inset 0 0 0 var(--mark-line) var(--accent-mark);
     color: var(--ink);
   }
+  .week-sin-hacer {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--line-strong);
+    color: var(--ink-2);
+  }
   .week-descanso {
     background: transparent;
     border-color: var(--line);

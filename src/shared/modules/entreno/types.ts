@@ -5,8 +5,9 @@
 // se guarda en `trn_workouts.start_time`. Pesos en kg (REAL), duraciones en segundos enteros,
 // distancias en km (REAL).
 import type { ISODate } from '../../types'
+import type { HyroxStation } from './hyrox'
 
-export type { ISODate }
+export type { HyroxStation, ISODate }
 
 /** ISO local `YYYY-MM-DDTHH:mm`, sin zona horaria. */
 export type LocalDateTime = string
@@ -164,6 +165,7 @@ export interface WorkoutExtrasInput {
   kind?: WorkoutKind | null
   perceivedEffort?: number | null
   notes?: string | null
+  /** Solo se acepta el bloque que le toca por fecha (el bloque sale siempre de la fecha). */
   blockId?: number | null
   routineId?: number | null
 }
@@ -199,6 +201,7 @@ export interface ManualWorkoutInput {
   kind?: WorkoutKind | null
   perceivedEffort?: number | null
   notes?: string | null
+  /** Se ignora: el bloque sale de la fecha de la sesión. */
   blockId?: number | null
   routineId?: number | null
   exercises: ManualExerciseInput[]
@@ -222,6 +225,8 @@ export interface Exercise {
   primaryGroupId: number | null
   secondaryGroupIds: number[]
   aliases: ExerciseAlias[]
+  /** Estación HYROX a la que corresponde (null si no es ninguna). */
+  hyroxStation: HyroxStation | null
   setCount: number
   /** Inicio de la última sesión en la que aparece. */
   lastUsed: LocalDateTime | null
@@ -237,6 +242,11 @@ export interface ExerciseInput {
   notes?: string | null
   primaryGroupId?: number | null
   secondaryGroupIds?: number[]
+  /**
+   * Estación HYROX. Al crear, si viene vacía (null o sin poner) se propone con el diccionario
+   * (`matchHyroxStation`). Al editar: sin poner = se queda la que tenga; null = ninguna.
+   */
+  hyroxStation?: HyroxStation | null
 }
 
 export interface MuscleGroup {
@@ -244,12 +254,18 @@ export interface MuscleGroup {
   name: string
   sortOrder: number
   active: boolean
+  /** Rango recomendado de series efectivas por semana (por defecto 10–20). */
+  weeklySetsMin: number
+  weeklySetsMax: number
   /** Ejercicios que lo usan (principal o secundario). */
   exerciseCount: number
 }
 
 export interface MuscleGroupInput {
   id?: number | null
+  /** Sin poner: al crear, 10 y 20; al editar, se quedan los que tenga. */
+  weeklySetsMin?: number
+  weeklySetsMax?: number
   name: string
   sortOrder?: number
   active?: boolean
@@ -289,7 +305,7 @@ export interface EntrenoSettings {
   e1rmMaxReps: number
   /** Tipos de serie que cuentan en las métricas de rendimiento. */
   countedSetTypes: SetType[]
-  /** Día en que empieza la semana: 1 = lunes … 7 = domingo. */
+  /** Día en que empieza la semana. Siempre 1 (lunes): las semanas van de lunes a domingo y no es editable. */
   weekStartsOn: number
   /** Cuánto cuenta una serie para un grupo muscular secundario. */
   secondaryMuscleFactor: number
@@ -436,4 +452,354 @@ export interface HevyImportResult {
 /** Resultado de `restore.json` (null si se cancela el diálogo). */
 export interface EntrenoRestoreResult {
   safetyBackup: string | null
+}
+
+// ---------- Planificación: tipos de entreno, semana base, semana concreta (F4) ----------
+
+/** Hora `HH:mm` (24 h). */
+export type TimeHM = string
+
+/** Día de la semana: 1 = lunes … 7 = domingo. */
+export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
+export interface RoutineAlias {
+  id: number
+  alias: string
+}
+
+/** Ejercicio previsto de un tipo de entreno (opcional). */
+export interface RoutineItem {
+  id: number
+  exerciseId: number
+  /** Posición en la rutina (desde 0). */
+  order: number
+  targetSets: number | null
+  repsMin: number | null
+  repsMax: number | null
+  targetRpe: number | null
+  notes: string | null
+}
+
+/** Tipo de entreno ("Fuerza A", "Natación"…), en `trn_routines`. */
+export interface Routine {
+  id: number
+  name: string
+  kind: WorkoutKind
+  description: string | null
+  sortOrder: number
+  active: boolean
+  /** Otros títulos de Hevy que cuentan como este tipo de entreno al importar. */
+  aliases: RoutineAlias[]
+  items: RoutineItem[]
+  /** Sesiones que lo tienen asignado. */
+  workoutCount: number
+}
+
+export interface RoutineItemInput {
+  exerciseId: number
+  targetSets?: number | null
+  repsMin?: number | null
+  repsMax?: number | null
+  targetRpe?: number | null
+  notes?: string | null
+}
+
+/**
+ * Alta o edición de un tipo de entreno. `aliases` e `items`: sin poner = se quedan como estén;
+ * con valor = sustituyen a los que hubiera (el orden de `items` es el del array).
+ */
+export interface RoutineInput {
+  id?: number | null
+  name: string
+  kind: WorkoutKind
+  description?: string | null
+  active?: boolean
+  aliases?: string[]
+  items?: RoutineItemInput[]
+}
+
+/** Hueco de la semana base (boceto). */
+export interface BaseWeekSlot {
+  weekday: Weekday
+  /** Orden dentro del día (desde 0). */
+  order: number
+  routineId: number
+  routineName: string
+  routineKind: WorkoutKind
+  time: TimeHM | null
+}
+
+export interface BaseWeek {
+  slots: BaseWeekSlot[]
+  /** Fecha en que se guardó el boceto por primera vez (null si nunca). Límite del guardado automático. */
+  firstSavedOn: ISODate | null
+  updatedAt: string | null
+}
+
+/** Hueco del boceto al guardarlo. El orden dentro de cada día es el del array. */
+export interface BaseWeekSlotInput {
+  weekday: number
+  routineId: number
+  time?: TimeHM | null
+}
+
+/** `BASE` = copia del boceto (guardado automático o "volver al boceto"); `EDITED` = cambiada por Michael. */
+export const WEEK_PLAN_ORIGINS = ['BASE', 'EDITED'] as const
+export type WeekPlanOrigin = (typeof WEEK_PLAN_ORIGINS)[number]
+
+export interface WeekPlanSlot {
+  date: ISODate
+  weekday: Weekday
+  /** Orden dentro del día (desde 0). */
+  order: number
+  routineId: number
+  routineName: string
+  routineKind: WorkoutKind
+  time: TimeHM | null
+  note: string | null
+}
+
+/**
+ * Plan de una semana (de lunes a domingo). Si no está guardada (`saved: false`), los huecos son
+ * el boceto actual proyectado sobre esa semana.
+ */
+export interface WeekPlan {
+  /** Lunes. */
+  weekStart: ISODate
+  /** Domingo. */
+  weekEnd: ISODate
+  saved: boolean
+  origin: WeekPlanOrigin | null
+  savedAt: string | null
+  /**
+   * La semana es anterior a la del primer boceto (o no hay boceto): no hubo plan. Las semanas así
+   * no se guardan solas.
+   */
+  predatesBase: boolean
+  /** Ordenados por fecha y orden. */
+  slots: WeekPlanSlot[]
+}
+
+/** Hueco de una semana concreta al guardarla. El orden dentro de cada día es el del array. */
+export interface WeekPlanSlotInput {
+  date: ISODate
+  routineId: number
+  time?: TimeHM | null
+  note?: string | null
+}
+
+export interface WeekPlanSlotRef {
+  date: ISODate
+  order: number
+}
+
+/** Mover un hueco de día o de orden. Sin `to.order`, va al final del día de destino. */
+export interface WeekPlanMoveInput {
+  from: WeekPlanSlotRef
+  to: { date: ISODate; order?: number | null }
+}
+
+// ---------- Bloques, eventos y objetivos (F4) ----------
+
+export interface Block {
+  id: number
+  name: string
+  startDate: ISODate
+  /** null = sin fecha de fin (sigue abierto). */
+  endDate: ISODate | null
+  mainGoal: string | null
+  plannedGym: number
+  plannedSwim: number
+  plannedHyrox: number
+  plannedRun: number
+  plannedOther: number
+  notes: string | null
+  /** Evento del que este bloque es una fase. */
+  eventId: number | null
+  /** Semana o bloque de descarga. */
+  isDeload: boolean
+  /** Sesiones dentro de sus fechas. */
+  workoutCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BlockInput {
+  id?: number | null
+  name: string
+  startDate: ISODate
+  endDate?: ISODate | null
+  mainGoal?: string | null
+  plannedGym?: number
+  plannedSwim?: number
+  plannedHyrox?: number
+  plannedRun?: number
+  plannedOther?: number
+  notes?: string | null
+  eventId?: number | null
+  isDeload?: boolean
+}
+
+/** Evento con fecha (p. ej. una carrera de HYROX). */
+export interface TrainingEvent {
+  id: number
+  name: string
+  date: ISODate
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TrainingEventInput {
+  id?: number | null
+  name: string
+  date: ISODate
+  notes?: string | null
+}
+
+/**
+ * Objetivo. Qué campos usa cada tipo:
+ * - E1RM: `exerciseId` y `targetValue` (kg de e1RM).
+ * - WEIGHT_REPS: `exerciseId`, `targetValue` (kg) y `targetReps`.
+ * - WEEKLY_VOLUME: `groupId` (series efectivas/semana) o `exerciseId` (kg/semana) y `targetValue`.
+ * - FREQUENCY: `kind` (sesiones/semana) o `groupId` (días/semana) y `targetValue`.
+ * - EVENT: `eventId`.
+ * Los campos que no usa su tipo se guardan vacíos.
+ */
+export interface Goal {
+  id: number
+  name: string
+  type: GoalType
+  targetValue: number | null
+  targetReps: number | null
+  deadline: ISODate | null
+  exerciseId: number | null
+  groupId: number | null
+  eventId: number | null
+  kind: WorkoutKind | null
+  status: GoalStatus
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GoalInput {
+  id?: number | null
+  name: string
+  type: GoalType
+  targetValue?: number | null
+  targetReps?: number | null
+  deadline?: ISODate | null
+  exerciseId?: number | null
+  groupId?: number | null
+  eventId?: number | null
+  kind?: WorkoutKind | null
+  /** Solo al crear (por defecto ACTIVE); para cambiarlo después, `goals.setStatus`. */
+  status?: GoalStatus
+  notes?: string | null
+}
+
+// ---------- Hechos para las métricas (lecturas en bloque, sin N+1) ----------
+
+/** Sesión tal como la necesitan las métricas. */
+export interface WorkoutFact {
+  id: number
+  title: string
+  startTime: LocalDateTime
+  endTime: LocalDateTime | null
+  /** Fecha local de inicio (`YYYY-MM-DD`). */
+  date: ISODate
+  kind: WorkoutKind
+  routineId: number | null
+  blockId: number | null
+  perceivedEffort: number | null
+  source: WorkoutSource
+}
+
+/** Serie con su ejercicio del catálogo (todas, también las de calentamiento: el filtro es de las métricas). */
+export interface SetFact {
+  id: number
+  workoutId: number
+  exerciseId: number
+  exerciseOrder: number
+  setIndex: number
+  setType: SetType
+  weightKg: number | null
+  reps: number | null
+  distanceKm: number | null
+  durationSeconds: number | null
+  rpe: number | null
+}
+
+export interface ExerciseFact {
+  id: number
+  title: string
+  category: ExerciseCategory | null
+  measure: MeasureType
+  isBodyweight: boolean
+  active: boolean
+  primaryGroupId: number | null
+  secondaryGroupIds: number[]
+  hyroxStation: HyroxStation | null
+}
+
+export interface MuscleGroupFact {
+  id: number
+  name: string
+  active: boolean
+  weeklySetsMin: number
+  weeklySetsMax: number
+}
+
+export interface RoutineFact {
+  id: number
+  name: string
+  kind: WorkoutKind
+  active: boolean
+}
+
+export interface BaseWeekSlotFact {
+  weekday: Weekday
+  order: number
+  routineId: number
+  time: TimeHM | null
+}
+
+export interface PlannedSlotFact {
+  date: ISODate
+  order: number
+  routineId: number
+  time: TimeHM | null
+  note: string | null
+}
+
+/** Semana guardada en `trn_week_plan` (puede no tener huecos: toda de descanso). */
+export interface SavedWeekFact {
+  weekStart: ISODate
+  origin: WeekPlanOrigin
+  savedAt: string
+  slots: PlannedSlotFact[]
+}
+
+/** Rango de fechas (ambas incluidas) para limitar sesiones y series; sin poner = todo. */
+export interface FactsRange {
+  from?: ISODate | null
+  to?: ISODate | null
+}
+
+/** Todo lo que necesitan las métricas de Entreno, leído en bloque. */
+export interface EntrenoFacts {
+  settings: EntrenoSettings
+  workouts: WorkoutFact[]
+  sets: SetFact[]
+  exercises: ExerciseFact[]
+  muscleGroups: MuscleGroupFact[]
+  routines: RoutineFact[]
+  blocks: Block[]
+  events: TrainingEvent[]
+  goals: Goal[]
+  baseWeek: BaseWeekSlotFact[]
+  /** Fecha del primer boceto (las semanas anteriores no tuvieron plan). */
+  baseFirstSavedOn: ISODate | null
+  savedWeeks: SavedWeekFact[]
 }

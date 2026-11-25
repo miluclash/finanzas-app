@@ -11,6 +11,7 @@ import type {
 } from '@shared/modules/entreno/types'
 import type { Db } from '../../core/db'
 import { UserError } from '../../core/errors'
+import { blockForDate, recalcBlockIds } from './blocks'
 import {
   audit,
   checkPlanRefs,
@@ -161,7 +162,9 @@ export function updateWorkoutExtras(db: Db, input: WorkoutExtrasInput): WorkoutD
       }
       if (d.perceivedEffort !== undefined) put('perceived_effort', d.perceivedEffort)
       if (d.notes !== undefined) put('notes', d.notes)
-      if (d.blockId !== undefined) put('block_id', d.blockId)
+      // El bloque sale de la fecha (los bloques no se solapan): solo se acepta el que le toca.
+      if (d.blockId !== undefined && d.blockId !== blockForDate(db, before.start_time.slice(0, 10)))
+        throw new UserError('El bloque de una sesión sale de su fecha. Para cambiarlo, cambia las fechas del bloque.')
       if (d.routineId !== undefined) put('routine_id', d.routineId)
       if (sets.length === 0) return getWorkout(db, d.id)
       put('updated_at', nowIso())
@@ -216,6 +219,8 @@ export function saveManualWorkout(db: Db, input: ManualWorkoutInput): WorkoutDet
           )
         })
       })
+      // El bloque sale de la fecha, no de `d.blockId`.
+      recalcBlockIds(db, [id])
       const after = getWorkout(db, id)
       audit(db, 'trn_workouts', id, before ? 'update' : 'create', d.title, before, after)
       return after

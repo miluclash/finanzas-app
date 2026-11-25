@@ -20,12 +20,31 @@ import { DEFAULT_SETTINGS } from './seed'
 
 export function listMuscleGroups(db: Db): MuscleGroup[] {
   return db
-    .all<{ id: number; name: string; sort_order: number; active: number; exercise_count: number }>(
+    .all<{
+      id: number
+      name: string
+      sort_order: number
+      active: number
+      weekly_sets_min: number
+      weekly_sets_max: number
+      exercise_count: number
+    }>(
       `SELECT g.*, (SELECT COUNT(DISTINCT m.exercise_id) FROM trn_exercise_muscles m WHERE m.group_id = g.id) AS exercise_count
        FROM trn_muscle_groups g ORDER BY g.sort_order, g.id`
     )
-    .map((r) => ({ id: r.id, name: r.name, sortOrder: r.sort_order, active: r.active === 1, exerciseCount: r.exercise_count }))
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      sortOrder: r.sort_order,
+      active: r.active === 1,
+      weeklySetsMin: r.weekly_sets_min,
+      weeklySetsMax: r.weekly_sets_max,
+      exerciseCount: r.exercise_count
+    }))
 }
+
+/** Valores por defecto del rango semanal de series de un grupo muscular nuevo. */
+export const DEFAULT_WEEKLY_SETS = { min: 10, max: 20 } as const
 
 export function saveMuscleGroup(db: Db, input: MuscleGroupInput): MuscleGroup {
   const d = parseInput(MuscleGroupSchema, input)
@@ -33,22 +52,39 @@ export function saveMuscleGroup(db: Db, input: MuscleGroupInput): MuscleGroup {
     () =>
       db.tx(() => {
         let id: number
+        const checkRange = (min: number, max: number) => {
+          if (min > max) throw new UserError('El mínimo de series semanales no puede ser mayor que el máximo.')
+        }
         if (d.id) {
           const before = listMuscleGroups(db).find((g) => g.id === d.id)
           if (!before) throw new UserError('Ese grupo muscular ya no existe.')
-          db.run('UPDATE trn_muscle_groups SET name = ?, sort_order = ?, active = ? WHERE id = ?', [
+          const min = d.weeklySetsMin ?? before.weeklySetsMin
+          const max = d.weeklySetsMax ?? before.weeklySetsMax
+          checkRange(min, max)
+          db.run('UPDATE trn_muscle_groups SET name = ?, sort_order = ?, active = ?, weekly_sets_min = ?, weekly_sets_max = ? WHERE id = ?', [
             d.name,
             d.sortOrder ?? before.sortOrder,
             d.active ? 1 : 0,
+            min,
+            max,
             d.id
           ])
           id = d.id
-          audit(db, 'trn_muscle_groups', id, 'update', d.name, before, { ...before, name: d.name, active: d.active })
+          audit(db, 'trn_muscle_groups', id, 'update', d.name, before, listMuscleGroups(db).find((g) => g.id === id))
         } else {
+          const min = d.weeklySetsMin ?? DEFAULT_WEEKLY_SETS.min
+          const max = d.weeklySetsMax ?? Math.max(DEFAULT_WEEKLY_SETS.max, min)
+          checkRange(min, max)
           const next = db.get<{ n: number }>('SELECT COALESCE(MAX(sort_order) + 1, 0) AS n FROM trn_muscle_groups')!.n
-          db.run('INSERT INTO trn_muscle_groups (name, sort_order, active) VALUES (?, ?, ?)', [d.name, d.sortOrder ?? next, d.active ? 1 : 0])
+          db.run('INSERT INTO trn_muscle_groups (name, sort_order, active, weekly_sets_min, weekly_sets_max) VALUES (?, ?, ?, ?, ?)', [
+            d.name,
+            d.sortOrder ?? next,
+            d.active ? 1 : 0,
+            min,
+            max
+          ])
           id = lastId(db)
-          audit(db, 'trn_muscle_groups', id, 'create', d.name, null, { name: d.name })
+          audit(db, 'trn_muscle_groups', id, 'create', d.name, null, { name: d.name, weeklySetsMin: min, weeklySetsMax: max })
         }
         return listMuscleGroups(db).find((g) => g.id === id)!
       }),

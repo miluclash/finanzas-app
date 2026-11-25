@@ -48,8 +48,8 @@ export const SECCIONES: Record<'finanzas' | 'entreno', Seccion[]> = {
     { id: 'resumen', texto: 'Resumen', icono: SquaresFour, ruta: '/entreno' },
     { id: 'sesiones', texto: 'Sesiones', icono: CalendarCheck, ruta: '/entreno/sesiones' },
     { id: 'ejercicios', texto: 'Ejercicios', icono: PersonSimpleRun, ruta: '/entreno/ejercicios' },
-    { id: 'objetivos', texto: 'Objetivos', icono: Target, ruta: '/entreno', proximamente: true },
-    { id: 'plan', texto: 'Plan', icono: CalendarBlank, ruta: '/entreno', proximamente: true }
+    { id: 'plan', texto: 'Plan', icono: CalendarBlank, ruta: '/entreno/plan' },
+    { id: 'objetivos', texto: 'Objetivos', icono: Target, ruta: '/entreno/objetivos' }
   ]
 }
 

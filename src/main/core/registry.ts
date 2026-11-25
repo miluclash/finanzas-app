@@ -68,6 +68,12 @@ export interface AppModule<H extends HandlerMap = HandlerMap, I extends ModuleId
    * cola (`<modulo>:semilla`); tiene que ser idempotente y no escribir nada si no hace falta.
    */
   seed?(db: Db): void
+  /**
+   * Paso de arranque. Se llama al arrancar, después de todas las semillas, dentro de su propia
+   * operación de la cola (`<modulo>:arranque`), con el contexto (fecha de hoy incluida). Tiene que
+   * ser idempotente y no escribir nada si no hace falta (abrir una base al día no toca el archivo).
+   */
+  startup?(ctx: CoreContext): void
   /** El módulo no tiene datos del usuario (para la pantalla de bienvenida). */
   isEmpty?(ctx: CoreContext): boolean
   /** Tablas que debe tener una copia `.sqlite` para aceptarla al restaurar. */
