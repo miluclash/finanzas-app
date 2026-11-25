@@ -7,8 +7,12 @@
 //   entreno cumple un hueco del mismo día cuyo tipo de entreno es del mismo tipo de sesión. Cada
 //   sesión cumple un hueco como mucho y cada hueco se cumple con una sesión como mucho. La sesión
 //   aparece siempre en el día en que se hizo.
-// - Adherencia: cada semana va aparte, por tipo de sesión, `min(hechas, previstas) / previstas`;
-//   lo que sobra de un tipo no compensa a otro ni a otra semana, y nunca pasa del 100 %.
+// - Adherencia: sale del MISMO emparejamiento (`weekResolution`, uno por semana) que la semana
+//   resuelta, la próxima sesión, el Inicio y el Resumen: hechas = huecos cumplidos, previstas =
+//   huecos del plan, por tipo de sesión del hueco y en total. Las sesiones que no cumplen ningún
+//   hueco van a `extra` (no suman ni restan). Cada semana va aparte, nunca pasa del 100 % y lo que
+//   sobra no compensa a otra semana. Solo si la semana no tiene plan (ni guardado ni boceto) se usan
+//   las sesiones previstas por tipo del bloque, contando `min(hechas del tipo, previstas)`.
 import type { WorkoutKind } from '../types'
 import { type MetricsContext, blockAt } from './context'
 import type { ISODate, TimeOfDay, WorkoutFact } from './types'
@@ -95,6 +99,45 @@ export function matchSlots(slots: PlanSlot[], workouts: WorkoutFact[]): (Workout
   return match
 }
 
+export interface ResolvedSlot extends PlanSlot {
+  /** Sesión que cumple el hueco (puede ser de otro día de la semana). */
+  doneWorkoutId: number | null
+  doneDate: ISODate | null
+}
+
+/** Emparejamiento de una semana: el plan, sus huecos con la sesión que los cumple y lo que sobra. */
+export interface WeekResolution {
+  plan: WeekPlan
+  slots: ResolvedSlot[]
+  /** Sesiones de la semana, en orden. */
+  workouts: WorkoutFact[]
+  /** Sesiones de la semana que no cumplen ningún hueco. */
+  unmatched: WorkoutFact[]
+}
+
+const resolutions = new WeakMap<MetricsContext, Map<ISODate, WeekResolution>>()
+
+/** Plan y emparejamiento de la semana que contiene `date` (se calcula una vez por contexto y semana). */
+export function weekResolution(ctx: MetricsContext, date: ISODate): WeekResolution {
+  const ws = weekStartOf(date, ctx.settings.weekStartsOn)
+  let byWeek = resolutions.get(ctx)
+  if (!byWeek) resolutions.set(ctx, (byWeek = new Map()))
+  const hit = byWeek.get(ws)
+  if (hit) return hit
+  const plan = planForWeek(ctx, ws)
+  const workouts = workoutsInWeek(ctx, ws)
+  const match = matchSlots(plan.slots, workouts)
+  const used = new Set(match.filter((w): w is WorkoutFact => w != null).map((w) => w.id))
+  const r: WeekResolution = {
+    plan,
+    slots: plan.slots.map((sl, i) => ({ ...sl, doneWorkoutId: match[i]?.id ?? null, doneDate: match[i] ? dateOf(match[i]!.startTime) : null })),
+    workouts,
+    unmatched: workouts.filter((w) => !used.has(w.id))
+  }
+  byWeek.set(ws, r)
+  return r
+}
+
 // ---------- Adherencia ----------
 
 export type PlannedSource = 'semana' | 'boceto' | 'bloque' | 'ninguno'
@@ -126,9 +169,9 @@ export function plannedForWeek(ctx: MetricsContext, weekStart: ISODate): { sourc
 export interface KindAdherence {
   kind: WorkoutKind
   planned: number
-  /** Sesiones hechas de ese tipo (todas, aunque pasen de lo previsto). */
+  /** Huecos de ese tipo cumplidos (con bloque: min(sesiones del tipo, previstas)). Nunca pasa de `planned`. */
   done: number
-  /** min(hechas, previstas) / previstas, entre 0 y 1. */
+  /** done / planned, entre 0 y 1. */
   pct: number
 }
 
@@ -137,30 +180,42 @@ export interface WeekAdherence {
   source: PlannedSource
   byKind: KindAdherence[]
   planned: number
-  /** Hechas que cuentan: Σ min(hechas, previstas) por tipo. */
+  /** Previstas cumplidas (Σ de `byKind.done`). */
   done: number
   /** done / planned, entre 0 y 1; null si no había nada previsto. */
   pct: number | null
-  /** Sesiones de tipos que no estaban previstos (no suman ni restan). */
+  /** Sesiones que no cumplen ningún hueco (o, con bloque, que pasan de lo previsto o no estaban previstas). */
   extra: number
 }
 
 export function weekAdherence(ctx: MetricsContext, weekStart: ISODate): WeekAdherence {
-  const ws = weekStartOf(weekStart, ctx.settings.weekStartsOn)
+  const r = weekResolution(ctx, weekStart)
+  const ws = r.plan.weekStart
+  const make = (source: PlannedSource, rows: { kind: WorkoutKind; planned: number; done: number }[], extra: number): WeekAdherence => {
+    const byKind = rows.filter((k) => k.planned > 0).map((k) => ({ ...k, pct: k.done / k.planned }))
+    const planned = byKind.reduce((a, k) => a + k.planned, 0)
+    const done = byKind.reduce((a, k) => a + k.done, 0)
+    return { weekStart: ws, source, byKind, planned, done, pct: planned > 0 ? done / planned : null, extra }
+  }
+  if (r.plan.source !== 'ninguno') {
+    // Huecos por tipo de sesión, en orden de aparición. Un hueco de una rutina borrada no tiene tipo: no cuenta.
+    const rows = new Map<WorkoutKind, { kind: WorkoutKind; planned: number; done: number }>()
+    for (const sl of r.slots) {
+      if (!sl.kind) continue
+      const row = rows.get(sl.kind) ?? { kind: sl.kind, planned: 0, done: 0 }
+      row.planned++
+      if (sl.doneWorkoutId != null) row.done++
+      rows.set(sl.kind, row)
+    }
+    return make(r.plan.source, [...rows.values()], r.unmatched.length)
+  }
+  // Sin plan de días: lo previsto del bloque, por tipo de sesión.
   const { source, byKind: planned } = plannedForWeek(ctx, ws)
   const doneBy = new Map<WorkoutKind, number>()
-  for (const w of workoutsInWeek(ctx, ws)) doneBy.set(w.kind, (doneBy.get(w.kind) ?? 0) + 1)
-  const byKind: KindAdherence[] = (Object.entries(planned) as [WorkoutKind, number][])
-    .filter(([, n]) => n > 0)
-    .map(([kind, n]) => {
-      const done = doneBy.get(kind) ?? 0
-      return { kind, planned: n, done, pct: Math.min(done, n) / n }
-    })
-  const total = byKind.reduce((a, k) => a + k.planned, 0)
-  const counted = byKind.reduce((a, k) => a + Math.min(k.done, k.planned), 0)
-  let extra = 0
-  for (const [k, n] of doneBy) if (!planned[k]) extra += n
-  return { weekStart: ws, source, byKind, planned: total, done: counted, pct: total > 0 ? counted / total : null, extra }
+  for (const w of r.workouts) doneBy.set(w.kind, (doneBy.get(w.kind) ?? 0) + 1)
+  const rows = (Object.entries(planned) as [WorkoutKind, number][]).map(([kind, n]) => ({ kind, planned: n, done: Math.min(doneBy.get(kind) ?? 0, n) }))
+  const extra = r.workouts.length - rows.reduce((a, k) => a + k.done, 0)
+  return make(source, rows, extra)
 }
 
 export function adherenceWeekly(ctx: MetricsContext, weekStarts: ISODate[]): WeekAdherence[] {
@@ -207,20 +262,6 @@ export function consistencyMap(ctx: MetricsContext, today: ISODate, weeks = 12):
 
 export type DayStatus = 'hecha' | 'hoy' | 'planificada' | 'descanso' | 'sin-hacer'
 
-export const DAY_STATUS_LABELS: Record<DayStatus, string> = {
-  hecha: 'Hecha',
-  hoy: 'Hoy',
-  planificada: 'Planificada',
-  descanso: 'Descanso',
-  'sin-hacer': 'Sin hacer'
-}
-
-export interface ResolvedSlot extends PlanSlot {
-  /** Sesión que cumple el hueco (puede ser de otro día de la semana). */
-  doneWorkoutId: number | null
-  doneDate: ISODate | null
-}
-
 export interface ResolvedDay {
   date: ISODate
   /** 1 = lunes … 7 = domingo. */
@@ -248,16 +289,9 @@ export interface ResolvedWeek {
   next: NextSession | null
 }
 
-function resolveSlots(ctx: MetricsContext, plan: WeekPlan): ResolvedSlot[] {
-  const match = matchSlots(plan.slots, workoutsInWeek(ctx, plan.weekStart))
-  return plan.slots.map((s, i) => ({ ...s, doneWorkoutId: match[i]?.id ?? null, doneDate: match[i] ? dateOf(match[i]!.startTime) : null }))
-}
-
 /** Semana que contiene `date`, con el estado de cada día respecto a `today`. */
 export function resolveWeek(ctx: MetricsContext, date: ISODate, today: ISODate): ResolvedWeek {
-  const plan = planForWeek(ctx, date)
-  const slots = resolveSlots(ctx, plan)
-  const workouts = workoutsInWeek(ctx, plan.weekStart)
+  const { plan, slots, workouts } = weekResolution(ctx, date)
   const days: ResolvedDay[] = []
   for (let i = 0; i < 7; i++) {
     const d = addDays(plan.weekStart, i)
@@ -295,7 +329,7 @@ const NEXT_SESSION_LOOKAHEAD_WEEKS = 8
 export function nextSession(ctx: MetricsContext, from: ISODate): NextSession | null {
   let ws = weekStartOf(from, ctx.settings.weekStartsOn)
   for (let i = 0; i < NEXT_SESSION_LOOKAHEAD_WEEKS; i++, ws = addDays(ws, 7)) {
-    const slot = resolveSlots(ctx, planForWeek(ctx, ws)).find((s) => s.date >= from && s.doneWorkoutId == null)
+    const slot = weekResolution(ctx, ws).slots.find((s) => s.date >= from && s.doneWorkoutId == null)
     if (slot) {
       const { doneWorkoutId: _a, doneDate: _b, ...rest } = slot
       return { ...rest, isToday: slot.date === from }
@@ -306,5 +340,5 @@ export function nextSession(ctx: MetricsContext, from: ISODate): NextSession | n
 
 /** Lo planificado para una fecha concreta, con si ya está hecho ("¿qué me toca el jueves?"). */
 export function slotsForDate(ctx: MetricsContext, date: ISODate): ResolvedSlot[] {
-  return resolveSlots(ctx, planForWeek(ctx, date)).filter((s) => s.date === date)
+  return weekResolution(ctx, date).slots.filter((s) => s.date === date)
 }

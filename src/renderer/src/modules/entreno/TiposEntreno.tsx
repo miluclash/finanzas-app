@@ -13,6 +13,7 @@ export function TiposEntreno() {
   const [editando, setEditando] = useState<number | 'nuevo' | null>(null)
   const guardar = useApiMutation('entreno:routines.save', {})
   const ordenar = useApiMutation('entreno:routines.reorder', {})
+  const reasignar = useApiMutation('entreno:routines.reapply', { success: (r) => `Asignado a ${r.changed} ${r.changed === 1 ? 'sesión' : 'sesiones'} de ${r.checked}` })
   const lista = q.data
 
   const mover = (i: number, d: -1 | 1) => {
@@ -32,6 +33,14 @@ export function TiposEntreno() {
           Nuevo tipo de entreno
         </Button>
       </div>
+      {lista && lista.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button size="sm" cargando={reasignar.isPending} onClick={() => reasignar.mutate([])}>
+            Asignar a sesiones ya importadas
+          </Button>
+          <span className="t-meta">Solo se rellenan las sesiones sin tipo de entreno cuyo título coincide con el nombre o con un alias.</span>
+        </div>
+      )}
       {q.isLoading && <LoadingState filas={4} etiqueta="Cargando los tipos de entreno" />}
       {q.error && (
         <ErrorState

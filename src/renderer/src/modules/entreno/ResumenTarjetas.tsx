@@ -197,7 +197,15 @@ export function SeriesCard({ s }: { s: EntrenoSummary }) {
 
 /* ======================= HYROX ======================= */
 const marcaEstacion = (st: StationStats): string =>
-  [st.bestWeightKg && formatKg(st.bestWeightKg.value), st.bestDistanceKm && formatDistancia(st.bestDistanceKm.value), st.bestDurationSeconds && formatTiempo(st.bestDurationSeconds.value), st.bestReps && `${formatNum(st.bestReps.value)} reps`].filter(Boolean).join(' · ') || '—'
+  [
+    st.bestWeightKg && formatKg(st.bestWeightKg.value),
+    // La mejor distancia no se repite si la mejor duración ya dice en qué distancia fue («4:33 en 1 km»)
+    st.bestDistanceKm && !st.bestDurationSeconds?.distanceKm && formatDistancia(st.bestDistanceKm.value),
+    st.bestDurationSeconds && `${formatTiempo(st.bestDurationSeconds.value)}${st.bestDurationSeconds.distanceKm ? ` en ${formatDistancia(st.bestDurationSeconds.distanceKm)}` : ''}`,
+    st.bestReps && `${formatNum(st.bestReps.value)} reps`
+  ]
+    .filter(Boolean)
+    .join(' · ') || '—'
 
 export function HyroxCard({ s }: { s: EntrenoSummary }) {
   const h = s.hyrox
@@ -234,7 +242,7 @@ export function HyroxCard({ s }: { s: EntrenoSummary }) {
       <p className="t-label mt-2">{c.daysLeft === 0 ? 'Es hoy' : `Quedan ${c.weeksLeft} ${c.weeksLeft === 1 ? 'semana' : 'semanas'} de entrenamiento`}</p>
       {el ? (
         <div className="mt-4">
-          <ProgressBar value={el.pct} label="Tiempo transcurrido del bloque" valueText={`${el.daysElapsed} de ${el.daysTotal} días, el ${formatPorcentaje(el.pct)}`} />
+          <ProgressBar value={el.pct} label="Tiempo transcurrido desde el inicio del primer bloque" valueText={`${el.daysElapsed} de ${el.daysTotal} días, el ${formatPorcentaje(el.pct)}`} />
           <p className="t-meta mt-2">
             Tiempo transcurrido desde el inicio del primer bloque: {el.daysElapsed} de {el.daysTotal} días ({formatPorcentaje(el.pct)}), desde el {formatDate(el.start)}.
           </p>

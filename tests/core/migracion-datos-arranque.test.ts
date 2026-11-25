@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createCoreContext, initCore } from '../../src/main/core/context'
+import { createCoreContext, initCore, runModuleStartups } from '../../src/main/core/context'
 import { Db } from '../../src/main/core/db'
 import { migrate, pendingMigrations, type Migration, type OpRunner } from '../../src/main/core/migrations'
 import { createRegistry, defineModule, type AppModule } from '../../src/main/core/registry'
@@ -140,14 +140,48 @@ describe('paso de arranque de un módulo', () => {
     expect(fs.statSync(file).mtimeMs).toBe(mtime)
   })
 
-  it('si el arranque falla, se deshace lo que hizo y el error sale', async () => {
+  it('si el arranque falla, se deshace lo suyo, se avisa y la app abre igual (también finanzas)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const mod = moduloConArranque((ctx) => {
       ctx.db.run("INSERT INTO trn_x VALUES ('a medias')")
       throw new Error('arranque roto')
     })
     const ctx = createCoreContext(await Db.open(null), { dbPath: null, backupsDir: null }, createRegistry([finanzasModule, mod]))
-    expect(() => initCore(ctx)).toThrow('arranque roto')
+    expect(() => initCore(ctx)).not.toThrow()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0][0])).toMatch(/arranque de entreno ha fallado/)
     expect(n(ctx.db, 'SELECT COUNT(*) AS n FROM trn_x')).toBe(0)
     expect(ctx.queue.busy).toBe(false)
+    // Finanzas está migrada y sembrada, y se puede escribir.
+    expect(n(ctx.db, 'SELECT COUNT(*) AS n FROM categories')).toBeGreaterThan(0)
+    await ctx.queue.enqueue('test:escribir', () => ctx.db.run("INSERT INTO trn_x VALUES ('después')"))
+    expect(n(ctx.db, 'SELECT COUNT(*) AS n FROM trn_x')).toBe(1)
+  })
+
+  it('como en initData: sin arranque en initCore, la copia diaria y después runModuleStartups, que no lanza si falla', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const orden: string[] = []
+    const bien = moduloConArranque((ctx) => {
+      orden.push('arranque')
+      ctx.db.run("INSERT INTO trn_x VALUES ('ok')")
+    })
+    const ctx = createCoreContext(await Db.open(null), { dbPath: null, backupsDir: null }, createRegistry([finanzasModule, bien]))
+    initCore(ctx, { startup: false })
+    expect(orden).toEqual([])
+    await ctx.queue.enqueueTask('core:backup.auto', async () => void orden.push('copia'))
+    const enqueue = vi.spyOn(ctx.queue, 'enqueue')
+    await runModuleStartups(ctx)
+    expect(orden).toEqual(['copia', 'arranque'])
+    expect(enqueue.mock.calls.map((c) => c[0])).toEqual(['entreno:arranque'])
+    expect(n(ctx.db, 'SELECT COUNT(*) AS n FROM trn_x')).toBe(1)
+
+    const mal = moduloConArranque(() => {
+      throw new Error('roto')
+    })
+    const ctx2 = createCoreContext(await Db.open(null), { dbPath: null, backupsDir: null }, createRegistry([finanzasModule, mal]))
+    initCore(ctx2, { startup: false })
+    await expect(runModuleStartups(ctx2)).resolves.toBeUndefined()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(ctx2.queue.busy).toBe(false)
   })
 })

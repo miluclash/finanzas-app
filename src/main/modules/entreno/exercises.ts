@@ -167,7 +167,9 @@ export function removeAlias(db: Db, aliasId: number): Exercise {
 /**
  * Une el ejercicio `fromId` (B) en `intoId` (A): las series, los elementos de rutina y los
  * objetivos de B pasan a A, los alias de B pasan a A, el título de B queda como alias de A y B se
- * borra. Las series conservan su `exercise_title` original (el de Hevy). Todo en una operación.
+ * borra. Las series conservan su `exercise_title` original (el de Hevy). La estación HYROX, la
+ * categoría, el grupo principal y los secundarios que A no tenga y B sí pasan a A (si los dos los
+ * tienen, manda A). Todo en una operación.
  */
 export function mergeExercises(db: Db, fromId: number, intoId: number): Exercise {
   if (fromId === intoId) throw new UserError('Elige dos ejercicios distintos para unirlos.')
@@ -176,7 +178,19 @@ export function mergeExercises(db: Db, fromId: number, intoId: number): Exercise
       const from = requireExercise(db, fromId)
       const into = requireExercise(db, intoId)
       const beforeFrom = getExercise(db, fromId)
+      const beforeInto = getExercise(db, intoId)
       const moved = db.get<{ n: number }>('SELECT COUNT(*) AS n FROM trn_sets WHERE exercise_id = ?', [fromId])!.n
+      // Lo que el que queda no tiene y el que desaparece sí, se conserva; si los dos tienen, manda
+      // el que queda. La medida siempre tiene valor (NOT NULL): se queda la del que queda.
+      db.run('UPDATE trn_exercises SET hyrox_station = COALESCE(hyrox_station, ?), category = COALESCE(category, ?) WHERE id = ?', [
+        from.hyrox_station,
+        from.category,
+        intoId
+      ])
+      const primary = beforeInto.primaryGroupId ?? beforeFrom.primaryGroupId
+      const secondary = beforeInto.secondaryGroupIds.length > 0 ? beforeInto.secondaryGroupIds : beforeFrom.secondaryGroupIds
+      if (primary !== beforeInto.primaryGroupId || secondary !== beforeInto.secondaryGroupIds)
+        writeMuscles(db, intoId, primary, secondary.filter((g) => g !== primary))
       db.run('UPDATE trn_sets SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])
       db.run('UPDATE trn_routine_items SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])
       db.run('UPDATE trn_goals SET exercise_id = ? WHERE exercise_id = ?', [intoId, fromId])

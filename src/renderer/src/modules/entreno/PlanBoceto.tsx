@@ -69,7 +69,7 @@ export function PlanBoceto({ rutinas, onCrearTipos }: { rutinas: Routine[]; onCr
     <div className="flex flex-col gap-6">
       <p className="t-label flex items-start gap-2">
         <Info size={18} aria-hidden className="mt-px shrink-0 text-info" />
-        <span>El boceto es tu semana tipo. Cambiarlo solo afecta a la semana actual, si aún no la has editado, y a las futuras. Las semanas pasadas no cambian.</span>
+        <span>El boceto es tu semana tipo. Cambiarlo actualiza esta semana si no la has editado, y las siguientes. Las semanas pasadas y las que hayas cambiado a mano no se tocan.</span>
       </p>
       {q.isLoading && <LoadingState filas={5} etiqueta="Cargando el boceto" />}
       {q.error && (

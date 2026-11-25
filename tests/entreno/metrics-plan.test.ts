@@ -5,6 +5,9 @@ import {
   type BaseWeekEntryFact,
   type MetricsFacts,
   adherenceWeekly,
+  buildInicio,
+  buildSummary,
+  computeRecords,
   consistencyMap,
   nextSession,
   planForWeek,
@@ -87,7 +90,8 @@ describe('adherencia', () => {
         wk(1, '2026-11-16T07:00', { routineId: 1 }),
         wk(2, '2026-11-17T19:00', { kind: 'SWIM' }),
         wk(3, '2026-11-21T10:00', { kind: 'SWIM' }),
-        // Semana 23/11: 3 de gimnasio (sobra una), ninguna de natación, y una carrera no prevista.
+        // Semana 23/11: Fuerza A el lunes, Fuerza B el martes (cumple la del jueves), un gimnasio sin
+        // tipo de entreno el jueves (su hueco ya está cumplido: sobra), ninguna natación y una carrera.
         wk(4, '2026-11-23T07:00', { routineId: 1 }),
         wk(5, '2026-11-24T07:00', { routineId: 2 }),
         wk(6, '2026-11-26T07:00'),
@@ -101,14 +105,48 @@ describe('adherencia', () => {
     ])
     expect(a.pct).toBe(0.75)
     expect(b.byKind).toEqual([
-      { kind: 'GYM', planned: 2, done: 3, pct: 1 },
+      { kind: 'GYM', planned: 2, done: 2, pct: 1 },
       { kind: 'SWIM', planned: 2, done: 0, pct: 0 }
     ])
     // El gimnasio de más no tapa la natación que falta, ni la semana anterior.
     expect(b.done).toBe(2)
     expect(b.pct).toBe(0.5)
-    expect(b.extra).toBe(1)
+    expect(b.extra).toBe(2)
     for (const w of [a, b]) expect(w.pct!).toBeLessThanOrEqual(1)
+  })
+
+  it('caso de la revisión: sesiones sin tipo de entreno en días sin hueco de su tipo no cumplen nada', () => {
+    // Plan: Fuerza A el lunes y Fuerza B el jueves (las dos GYM). Dos GYM sin tipo de entreno martes y miércoles.
+    const ctx = ctxOf({
+      routines,
+      savedWeeks: [
+        {
+          weekStart: '2026-11-23',
+          slots: [
+            { date: '2026-11-23', order: 0, routineId: 1, time: null },
+            { date: '2026-11-26', order: 0, routineId: 2, time: null }
+          ]
+        }
+      ],
+      workouts: [wk(1, '2026-11-24T07:00'), wk(2, '2026-11-25T07:00')]
+    })
+    const a = weekAdherence(ctx, '2026-11-23')
+    expect(a).toMatchObject({ planned: 2, done: 0, pct: 0, extra: 2 })
+    expect(a.byKind).toEqual([{ kind: 'GYM', planned: 2, done: 0, pct: 0 }])
+    const w = resolveWeek(ctx, '2026-11-23', '2026-11-25')
+    expect(w.days.map((d) => d.status)).toEqual(['sin-hacer', 'hecha', 'hecha', 'planificada', 'descanso', 'descanso', 'descanso'])
+    expect(w.slots.every((sl) => sl.doneWorkoutId == null)).toBe(true)
+    // Inicio y Resumen dan la misma cifra, y coincide con los huecos cumplidos de la semana resuelta.
+    const r = computeRecords(ctx)
+    const inicio = buildInicio(ctx, r, '2026-11-25')
+    const resumen = buildSummary(ctx, r, '2026-11-25')
+    const ultima = resumen.adherence.weeks[resumen.adherence.weeks.length - 1]
+    expect([inicio.week.done, inicio.week.planned]).toEqual([0, 2])
+    expect([ultima.done, ultima.planned]).toEqual([0, 2])
+    expect(resumen.week.slots.filter((sl) => sl.doneWorkoutId != null)).toHaveLength(0)
+    // El mismo GYM sin tipo hecho el lunes sí cumple la Fuerza A del lunes.
+    const lunes = ctxOf({ routines, savedWeeks: ctx.facts.savedWeeks, workouts: [wk(1, '2026-11-23T07:00')] })
+    expect(weekAdherence(lunes, '2026-11-23')).toMatchObject({ done: 1, extra: 0 })
   })
 
   it('sin plan de semana ni boceto, se usa lo previsto del bloque', () => {

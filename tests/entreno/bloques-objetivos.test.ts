@@ -306,3 +306,57 @@ describe('hechos para las métricas', () => {
     expect(loadEntrenoFacts(app.db, { to: '2026-11-08' }).savedWeeks).toEqual([])
   })
 })
+
+describe('unir ejercicios conserva lo que el que queda no tiene', () => {
+  it('estación, categoría y músculos pasan del que desaparece si el que queda no los tiene; si los dos, manda el que queda', async () => {
+    const { h } = await entrenoApp()
+    const grupos = h['entreno:muscleGroups.list']()
+    const [pecho, espalda, hombros, triceps] = [0, 1, 2, 4].map((i) => grupos[i].id)
+    const a = await h['entreno:exercises.save']({ title: 'Remo A', hyroxStation: null, measure: 'DISTANCE_DURATION' })
+    const b = await h['entreno:exercises.save']({ title: 'Remo B', hyroxStation: 'Rowing', category: 'HYROX', primaryGroupId: espalda, secondaryGroupIds: [hombros] })
+    const unido = await h['entreno:exercises.merge'](b.id, a.id)
+    expect(unido).toMatchObject({ title: 'Remo A', hyroxStation: 'Rowing', category: 'HYROX', measure: 'DISTANCE_DURATION', primaryGroupId: espalda, secondaryGroupIds: [hombros] })
+
+    const c = await h['entreno:exercises.save']({ title: 'Press C', hyroxStation: 'Sled Push', category: 'STRENGTH', primaryGroupId: pecho })
+    const d = await h['entreno:exercises.save']({ title: 'Press D', hyroxStation: 'Wall Balls', category: 'CARDIO', primaryGroupId: triceps, secondaryGroupIds: [pecho, hombros] })
+    const otro = await h['entreno:exercises.merge'](d.id, c.id)
+    // El principal y la estación y categoría son de C; los secundarios (C no tenía) vienen de D, sin el principal de C.
+    expect(otro).toMatchObject({ hyroxStation: 'Sled Push', category: 'STRENGTH', primaryGroupId: pecho, secondaryGroupIds: [hombros] })
+  })
+})
+
+describe('reasignar tipos de entreno a sesiones ya importadas', () => {
+  it('solo a las que no tienen, por nombre o alias de un tipo activo, en una operación con auditoría', async () => {
+    const app = await entrenoApp()
+    const h = app.h
+    importar(app, [
+      sesion('Fuerza A', '2026-11-02T07:00', [serie('Press banca ficticio', 0, 0)]),
+      sesion('upper', '2026-11-03T07:00', [serie('Press banca ficticio', 0, 0)]),
+      sesion('Natación', '2026-11-04T18:00', [serie('Crol ficticio', 0, 0)]),
+      sesion('Pierna', '2026-11-05T07:00', [serie('Press banca ficticio', 0, 0)])
+    ])
+    const fa = await h['entreno:routines.save']({ name: 'Fuerza A', kind: 'GYM', aliases: ['Upper'] })
+    const nat = await h['entreno:routines.save']({ name: 'Natación', kind: 'SWIM', active: false })
+    const otra = await h['entreno:routines.save']({ name: 'Otra', kind: 'OTHER' })
+    const id = (t: string) => h['entreno:workouts.list']({}).find((w) => w.title === t)!.id
+    await h['entreno:workouts.updateExtras']({ id: id('upper'), routineId: otra.id })
+
+    const etiquetas: string[] = []
+    const real = app.ctx.queue.enqueue.bind(app.ctx.queue)
+    app.ctx.queue.enqueue = ((label: string, fn: () => unknown, opts?: never) => {
+      etiquetas.push(label)
+      return real(label, fn, opts)
+    }) as typeof app.ctx.queue.enqueue
+    expect(await h['entreno:routines.reapply']()).toEqual({ checked: 3, changed: 1 })
+    expect(etiquetas).toEqual(['entreno:routines.reapply'])
+    const rutina = () => Object.fromEntries(app.db.all<{ title: string; routine_id: number | null }>('SELECT title, routine_id FROM trn_workouts').map((r) => [r.title, r.routine_id]))
+    expect(rutina()).toEqual({ 'Fuerza A': fa.id, upper: otra.id, 'Natación': null, Pierna: null })
+    expect(app.db.all("SELECT action, summary FROM audit_log WHERE action = 'reapplyRoutine'")).toEqual([
+      { action: 'reapplyRoutine', summary: 'Tipo de entreno asignado a 1 sesión' }
+    ])
+    void nat
+    // Otra vez: nada que cambiar y sin nueva fila de auditoría.
+    expect(await h['entreno:routines.reapply']()).toEqual({ checked: 2, changed: 0 })
+    expect(app.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'reapplyRoutine'")!.n).toBe(1)
+  })
+})

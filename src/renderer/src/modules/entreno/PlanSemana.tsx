@@ -29,7 +29,8 @@ export function PlanSemana({ rutinas, onCrearTipos }: { rutinas: Routine[]; onCr
   const fechas = useMemo(() => weekDates(semana), [semana])
   const plan: WeekPlan | undefined = q.data
   // En una semana anterior al primer boceto sin guardar, el proceso principal devuelve el boceto actual proyectado: no hubo plan, así que no se enseña.
-  const huecos: WeekPlanSlot[] = plan && plan.predatesBase && !plan.saved ? [] : (plan?.slots ?? [])
+  const sinPlan = !!plan && plan.predatesBase && !plan.saved
+  const huecos: WeekPlanSlot[] = sinPlan ? [] : (plan?.slots ?? [])
   const dias: DiaVista[] = useMemo(
     () =>
       fechas.map((f, i) => ({
@@ -106,7 +107,7 @@ export function PlanSemana({ rutinas, onCrearTipos }: { rutinas: Routine[]; onCr
       {plan && (
         <>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Estado del plan de la semana">
-            {plan.predatesBase ? (
+            {sinPlan ? (
               <Tag>Sin plan</Tag>
             ) : plan.saved && plan.origin === 'EDITED' ? (
               <Tag tono="accent">Editada por ti</Tag>
@@ -114,7 +115,7 @@ export function PlanSemana({ rutinas, onCrearTipos }: { rutinas: Routine[]; onCr
               <Tag tono="info">Sale del boceto</Tag>
             )}
             <span className="t-label">
-              {plan.predatesBase
+              {sinPlan
                 ? 'Es anterior a tu primer boceto: entonces no tenías plan.'
                 : plan.saved && plan.origin === 'EDITED'
                   ? 'Has cambiado esta semana: ya no sigue al boceto.'
@@ -125,13 +126,13 @@ export function PlanSemana({ rutinas, onCrearTipos }: { rutinas: Routine[]; onCr
             <span className="t-meta tnum">
               {total === 0 ? 'Ningún entreno' : `${total} ${total === 1 ? 'entreno' : 'entrenos'}`}
             </span>
-            {!plan.predatesBase && (
+            {!sinPlan && (
               <Button size="sm" className="ml-auto" icon={<ArrowCounterClockwise size={16} aria-hidden />} disabled={ocupado || !plan.saved} onClick={() => setConfirmarBoceto(true)}>
                 Volver al boceto
               </Button>
             )}
           </div>
-          {plan.predatesBase && (
+          {sinPlan && (
             <Aviso tono="info">
               <div>Si quieres dejar constancia de lo que tocaba, puedes planificarla igualmente.</div>
             </Aviso>

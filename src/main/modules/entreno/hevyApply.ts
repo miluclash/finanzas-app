@@ -165,7 +165,7 @@ export function applyHevyWorkouts(db: Db, input: ApplyHevyInput): ApplyHevyResul
 
         let setsWritten = 0
         const touched: number[] = []
-        const routineFor = routineMatcher(db)
+        const routineFor = routineMatcher(db, { activeOnly: true })
         for (const w of d.newWorkouts) {
           if (db.get('SELECT 1 AS x FROM trn_workouts WHERE hevy_key = ?', [w.hevyKey]))
             throw new UserError(`La sesión del ${w.startTime.replace('T', ' ')} ya estaba importada.`)

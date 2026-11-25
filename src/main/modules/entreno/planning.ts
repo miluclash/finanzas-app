@@ -5,9 +5,11 @@
 // boceto vigente (`autosaveWeeks`). Corre al arrancar la app (paso de arranque del módulo) y al leer
 // por primera vez una semana empezada sin guardar (el handler lo encola antes de leer). Límite hacia
 // atrás: la semana en que se guardó el boceto por primera vez (`trn_base_week_meta`); las semanas
-// anteriores no tuvieron plan y no se rellenan. Así, editar el boceto después nunca cambia semanas
-// ya guardadas, y antes de sustituirlo se guardan con el boceto anterior las semanas ya terminadas
-// que se hubieran quedado sin guardar (app abierta de una semana a otra).
+// anteriores no tuvieron plan, no se rellenan y se leen sin huecos. Editar el boceto después solo
+// cambia la semana actual si salió del boceto (origen BASE) y las futuras sin guardar, nunca las
+// pasadas ni una semana cambiada por Michael (EDITED). Antes de sustituirlo se guardan con el boceto
+// anterior las semanas ya terminadas que se hubieran quedado sin guardar (app abierta de una
+// semana a otra).
 //
 // Las lecturas no escriben. Las funciones que escriben se llaman dentro de una operación de la cola.
 import { addDays, formatDate } from '@shared/dates'
@@ -107,7 +109,9 @@ function checkWeekStart(weekStart: unknown): ISODate {
 /** Huecos de una semana: los guardados o, si no está guardada, el boceto proyectado. */
 function weekSlots(db: Db, weekStart: ISODate): { saved: SavedWeekFact | null; slots: PlannedSlotFact[] } {
   const saved = savedWeeks(db, weekStart, weekStart)[0] ?? null
-  return { saved, slots: saved ? saved.slots : projectBaseWeek(weekStart, baseWeekSlots(db)) }
+  if (saved) return { saved, slots: saved.slots }
+  // Una semana anterior al primer boceto no tuvo plan: sin huecos (como en las métricas).
+  return { saved: null, slots: predatesBase(db, weekStart) ? [] : projectBaseWeek(weekStart, baseWeekSlots(db)) }
 }
 
 /** La semana es anterior a la del primer boceto (o no hay boceto). */
@@ -225,8 +229,9 @@ export function autosaveWeeks(db: Db, today: ISODate, upTo?: ISODate): number {
 
 /**
  * Sustituye todo el boceto. Antes guarda, con el boceto anterior, las semanas ya terminadas que se
- * hubieran quedado sin guardar; la semana actual sin plan y las futuras usan el boceto nuevo. La
- * primera vez apunta la fecha (`first_saved_on`), que es el límite del guardado automático.
+ * hubieran quedado sin guardar; después rehace con el boceto nuevo la semana actual si su origen es
+ * BASE (si está sin guardar o es futura, ya lo sigue). La primera vez apunta la fecha
+ * (`first_saved_on`), que es el límite del guardado automático.
  */
 export function saveBaseWeek(db: Db, slots: BaseWeekSlotInput[], today: ISODate): BaseWeek {
   const d = parseInput(BaseWeekSlotsSchema, slots)
@@ -248,6 +253,11 @@ export function saveBaseWeek(db: Db, slots: BaseWeekSlotInput[], today: ISODate)
          ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at`,
         [today, now]
       )
+      // La semana actual, si salió del boceto (BASE), sigue al boceto nuevo. Una semana cambiada
+      // por Michael (EDITED) y las pasadas no cambian nunca; las futuras no están guardadas.
+      const current = mondayOf(today)
+      if (db.get("SELECT 1 AS x FROM trn_week_plan_weeks WHERE week_start = ? AND origin = 'BASE'", [current]))
+        writeWeek(db, current, fromFacts(projectBaseWeek(current, baseWeekSlots(db))), 'BASE')
       const after = getBaseWeek(db)
       audit(db, 'trn_base_week', 1, 'update', 'Semana base', before.slots, after.slots)
       return after

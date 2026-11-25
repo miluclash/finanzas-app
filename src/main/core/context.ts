@@ -82,11 +82,13 @@ export function createCoreContext(db: Db, paths: CorePaths, registry: Registry):
  *    `antes-de-migrar` en el paso previo de la primera operación.
  * 2. Migraciones pendientes de todos los módulos, en orden de versión, una operación cada una.
  * 3. La semilla de cada módulo (`<modulo>:semilla`), en el orden del registro.
- * 4. El paso de arranque de cada módulo (`<modulo>:arranque`), en el orden del registro.
+ * 4. El paso de arranque de cada módulo (`<modulo>:arranque`), en el orden del registro, salvo con
+ *    `{ startup: false }` (entonces se llama aparte con `runModuleStartups`). Si un paso de arranque
+ *    falla, se avisa por consola y se sigue (se deshace solo lo suyo).
  *
  * Abrir una base que ya está al día no guarda nada (no toca el archivo).
  */
-export function initCore(ctx: CoreContext): void {
+export function initCore(ctx: CoreContext, opts: { startup?: boolean } = {}): void {
   const db = ctx.db
   const needsBackup =
     !!ctx.paths.backupsDir && pendingMigrations(db, ctx.registry.migrations).length > 0 && hasTables(db)
@@ -100,9 +102,32 @@ export function initCore(ctx: CoreContext): void {
     const seed = m.seed
     if (seed) ctx.queue.runNow(`${m.id}:semilla`, () => seed(ctx.db))
   }
+  if (opts.startup === false) return
   for (const m of ctx.registry.modules) {
     const startup = m.startup
-    if (startup) ctx.queue.runNow(`${m.id}:arranque`, () => startup(ctx))
+    if (!startup) continue
+    try {
+      ctx.queue.runNow(`${m.id}:arranque`, () => startup(ctx))
+    } catch (e) {
+      console.warn(`El paso de arranque de ${m.id} ha fallado; la app sigue sin él.`, e)
+    }
+  }
+}
+
+/**
+ * Pasos de arranque de los módulos por la cola (cada uno en su operación `<modulo>:arranque`), para
+ * llamarlos después de `initCore(ctx, { startup: false })` y de la copia diaria: así la copia es de
+ * antes de cualquier escritura de arranque. Si uno falla, se avisa y se sigue: nunca impide abrir la app.
+ */
+export async function runModuleStartups(ctx: CoreContext): Promise<void> {
+  for (const m of ctx.registry.modules) {
+    const startup = m.startup
+    if (!startup) continue
+    try {
+      await ctx.queue.enqueue(`${m.id}:arranque`, () => startup(ctx))
+    } catch (e) {
+      console.warn(`El paso de arranque de ${m.id} ha fallado; la app sigue sin él.`, e)
+    }
   }
 }
 

@@ -3,7 +3,7 @@
 // ese tipo al importar). Las funciones que escriben se llaman dentro de una operación de la cola.
 import { normalizeKey } from '@shared/modules/entreno/normalize'
 import { RoutineSchema } from '@shared/modules/entreno/schemas'
-import type { Routine, RoutineInput, WorkoutKind } from '@shared/modules/entreno/types'
+import type { ReapplyResult, Routine, RoutineInput, WorkoutKind } from '@shared/modules/entreno/types'
 import type { Db } from '../../core/db'
 import { UserError } from '../../core/errors'
 import { audit, friendly, lastId, nowIso, parseInput } from './repo'
@@ -73,10 +73,14 @@ export function getRoutine(db: Db, id: number): Routine {
  * Nombre normalizado → id del tipo de entreno, con nombres y alias. Lo usa la importación para
  * asignar `routine_id` a las sesiones cuyo título coincide (igual tras normalizar).
  */
-export function routineMatcher(db: Db): (title: string) => number | null {
+export function routineMatcher(db: Db, opts: { activeOnly?: boolean } = {}): (title: string) => number | null {
   const map = new Map<string, number>()
-  for (const r of db.all<{ id: number; name: string }>('SELECT id, name FROM trn_routines ORDER BY id')) map.set(normalizeKey(r.name), r.id)
-  for (const a of db.all<{ routine_id: number; alias: string }>('SELECT routine_id, alias FROM trn_routine_aliases ORDER BY id')) {
+  const only = opts.activeOnly ? 'WHERE r.active = 1' : ''
+  for (const r of db.all<{ id: number; name: string }>(`SELECT r.id, r.name FROM trn_routines r ${only} ORDER BY r.id`))
+    map.set(normalizeKey(r.name), r.id)
+  for (const a of db.all<{ routine_id: number; alias: string }>(
+    `SELECT a.routine_id, a.alias FROM trn_routine_aliases a JOIN trn_routines r ON r.id = a.routine_id ${only} ORDER BY a.id`
+  )) {
     const k = normalizeKey(a.alias)
     if (!map.has(k)) map.set(k, a.routine_id)
   }
@@ -200,6 +204,31 @@ export function deleteRoutine(db: Db, id: number): void {
       throw new UserError('Este tipo de entreno se usa en semanas guardadas o sesiones. Desactívalo en vez de borrarlo.')
     db.run('DELETE FROM trn_routines WHERE id = ?', [id])
     audit(db, 'trn_routines', id, 'delete', before.name, before, null)
+  })
+}
+
+/**
+ * Asigna tipo de entreno a las sesiones que no tienen ninguno y cuyo título coincide (igual tras
+ * normalizar) con el nombre o un alias de un tipo de entreno activo. Nunca cambia una sesión que ya
+ * tenga tipo de entreno. Devuelve cuántas ha revisado y cuántas ha cambiado.
+ */
+export function reapplyRoutines(db: Db): ReapplyResult {
+  return db.tx(() => {
+    const match = routineMatcher(db, { activeOnly: true })
+    const sinTipo = db.all<{ id: number; title: string }>('SELECT id, title FROM trn_workouts WHERE routine_id IS NULL ORDER BY id')
+    let changed = 0
+    for (const w of sinTipo) {
+      const rid = match(w.title)
+      if (rid === null) continue
+      db.run('UPDATE trn_workouts SET routine_id = ?, updated_at = ? WHERE id = ? AND routine_id IS NULL', [rid, nowIso(), w.id])
+      changed++
+    }
+    if (changed > 0)
+      audit(db, 'trn_workouts', '*', 'reapplyRoutine', `Tipo de entreno asignado a ${changed} ${changed === 1 ? 'sesión' : 'sesiones'}`, null, {
+        checked: sinTipo.length,
+        changed
+      })
+    return { checked: sinTipo.length, changed }
   })
 }
 

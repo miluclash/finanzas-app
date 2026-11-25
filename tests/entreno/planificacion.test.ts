@@ -227,18 +227,57 @@ describe('guardado automático de las semanas empezadas', () => {
     expect(sha(file)).toBe(huella)
   })
 
-  it('editar el boceto nunca cambia las semanas guardadas; sí la futura sin guardar', async () => {
+  it('editar el boceto: las pasadas no cambian; la actual sí si salió del boceto; las futuras lo siguen', async () => {
     const dir = tmpDir()
     const file = path.join(dir, 'finanzas.sqlite')
     const uno = await abrir('2026-11-04', file)
     const t = await tipos(uno.h)
     await uno.h['entreno:baseWeek.save']([{ weekday: 1, routineId: t.a }])
     uno.db.close()
-    const { h } = await abrir('2026-11-11', file)
-    const antes = [await h['entreno:weekPlan.get']('2026-11-02'), await h['entreno:weekPlan.get']('2026-11-09')]
+    const { h } = await abrir('2026-11-11', file) // el arranque guarda 02/11 y 09/11 (BASE)
+    const pasada = await h['entreno:weekPlan.get']('2026-11-02')
+    expect((await h['entreno:weekPlan.get']('2026-11-09')).origin).toBe('BASE')
     await h['entreno:baseWeek.save']([{ weekday: 5, routineId: t.b }])
-    expect([await h['entreno:weekPlan.get']('2026-11-02'), await h['entreno:weekPlan.get']('2026-11-09')]).toEqual(antes)
+    expect(await h['entreno:weekPlan.get']('2026-11-02')).toEqual(pasada)
+    const actual = await h['entreno:weekPlan.get']('2026-11-09')
+    expect([actual.saved, actual.origin, huecos(actual)]).toEqual([true, 'BASE', [['2026-11-13', 0, 'Fuerza B', null]]])
     expect(huecos(await h['entreno:weekPlan.get']('2026-11-16'))).toEqual([['2026-11-20', 0, 'Fuerza B', null]])
+  })
+
+  it('editar el boceto no cambia la semana actual si Michael la cambió (EDITED)', async () => {
+    const { h } = await abrir('2026-11-11')
+    const t = await tipos(h)
+    await h['entreno:baseWeek.save']([{ weekday: 1, routineId: t.a }])
+    await h['entreno:weekPlan.move']({ from: { date: '2026-11-09', order: 0 }, to: { date: '2026-11-10' } })
+    const editada = await h['entreno:weekPlan.get']('2026-11-09')
+    await h['entreno:baseWeek.save']([{ weekday: 5, routineId: t.b }])
+    expect(await h['entreno:weekPlan.get']('2026-11-09')).toEqual(editada)
+  })
+
+  it('app abierta desde la semana anterior: la anterior se queda con el boceto viejo y la actual sigue al nuevo', async () => {
+    const app = await abrir('2026-11-13') // viernes: el arranque guarda la semana del 09/11
+    const t = await tipos(app.h)
+    await app.h['entreno:baseWeek.save']([{ weekday: 1, routineId: t.a }])
+    expect((await app.h['entreno:weekPlan.get']('2026-11-09')).saved).toBe(true)
+    app.ctx.todayOverride = '2026-11-17' // martes de la semana siguiente, sin reiniciar
+    await app.h['entreno:baseWeek.save']([{ weekday: 3, routineId: t.nat }])
+    expect(huecos(await app.h['entreno:weekPlan.get']('2026-11-09'))).toEqual([['2026-11-09', 0, 'Fuerza A', null]])
+    const actual = await app.h['entreno:weekPlan.get']('2026-11-16')
+    expect([actual.saved, actual.origin, huecos(actual)]).toEqual([true, 'BASE', [['2026-11-18', 0, 'Natación', null]]])
+  })
+
+  it('una semana anterior al primer boceto sin guardar no tiene huecos; planificada a mano funciona normal', async () => {
+    const { h } = await abrir('2026-11-11')
+    const t = await tipos(h)
+    await h['entreno:baseWeek.save']([{ weekday: 1, routineId: t.a }, { weekday: 3, routineId: t.b }])
+    const vieja = await h['entreno:weekPlan.get']('2026-10-26')
+    expect([vieja.saved, vieja.predatesBase, vieja.slots]).toEqual([false, true, []])
+    await expect(h['entreno:weekPlan.move']({ from: { date: '2026-10-26', order: 0 }, to: { date: '2026-10-27' } })).rejects.toThrow(/ya no está en el plan/)
+    await expect(h['entreno:weekPlan.remove']({ date: '2026-10-28', order: 0 })).rejects.toThrow(/ya no está en el plan/)
+    await h['entreno:weekPlan.save']('2026-10-26', [{ date: '2026-10-26', routineId: t.nat }, { date: '2026-10-26', routineId: t.a }])
+    const p = await h['entreno:weekPlan.move']({ from: { date: '2026-10-26', order: 1 }, to: { date: '2026-10-29' } })
+    expect([p.saved, p.origin, p.predatesBase, huecos(p)]).toEqual([true, 'EDITED', true, [['2026-10-26', 0, 'Natación', null], ['2026-10-29', 0, 'Fuerza A', null]]])
+    expect(huecos(await h['entreno:weekPlan.remove']({ date: '2026-10-26', order: 0 }))).toEqual([['2026-10-29', 0, 'Fuerza A', null]])
   })
 
   it('con la app abierta de una semana a otra: antes de cambiar el boceto, las semanas terminadas se guardan con el anterior', async () => {

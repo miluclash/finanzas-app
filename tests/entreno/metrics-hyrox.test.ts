@@ -85,13 +85,41 @@ describe('HYROX', () => {
     // La sesión del 20/10 (antes del primer bloque) no cuenta.
     expect(ski).toMatchObject({ timesDone: 2, lastDate: '2026-11-12', bestWeightKg: null })
     expect(ski.bestDistanceKm).toEqual({ value: 1, workoutId: 2, date: '2026-11-05' })
-    expect(ski.bestDurationSeconds).toEqual({ value: 110, workoutId: 2, date: '2026-11-05' })
+    // El sprint de 0,5 km (110 s) no gana: se comparan las series de 1 km, la distancia más repetida.
+    expect(ski.bestDurationSeconds).toEqual({ value: 230, workoutId: 3, date: '2026-11-12', distanceKm: 1 })
     // El calentamiento de 140 kg no cuenta.
     expect(push.bestWeightKg).toEqual({ value: 120, workoutId: 3, date: '2026-11-12' })
     expect(push.bestDistanceKm!.value).toBe(0.05)
     expect(pull).toMatchObject({ timesDone: 0, lastDate: null, bestWeightKg: null, bestDistanceKm: null, bestDurationSeconds: null, bestReps: null })
     expect(wall).toMatchObject({ timesDone: 1, bestReps: { value: 20, workoutId: 2, date: '2026-11-05' } })
     expect(row.timesDone).toBe(0)
+  })
+
+  it('mejor duración: sin distancia, la más corta; con empate de distancias, la más larga', () => {
+    const ctx = (sets: ReturnType<typeof st>[]) =>
+      ctxOf({ exercises: [ex(20, { hyroxStation: 'SkiErg' })], workouts: [wk(1, '2026-11-05T07:00'), wk(2, '2026-11-12T07:00')], sets })
+    const sin = hyroxStatus(ctx([st(1, 20, null, null, { durationSeconds: 300 }), st(2, 20, null, null, { durationSeconds: 280 })]), 0, '2026-11-25')
+    expect(sin).toBeNull() // sin evento
+    const ev = (sets: ReturnType<typeof st>[]) => {
+      const c = ctx(sets)
+      c.eventById.set(1, { id: 1, name: 'Ficticio', date: '2027-01-01' })
+      return hyroxStatus(c, 1, '2026-11-25')!.stations[0].bestDurationSeconds
+    }
+    expect(ev([st(1, 20, null, null, { durationSeconds: 300 }), st(2, 20, null, null, { durationSeconds: 280 })])).toEqual({
+      value: 280,
+      workoutId: 2,
+      date: '2026-11-12',
+      distanceKm: null
+    })
+    expect(
+      ev([
+        st(1, 20, null, null, { distanceKm: 0.5, durationSeconds: 100 }),
+        st(1, 20, null, null, { distanceKm: 1, durationSeconds: 240 }),
+        // Una serie con duración pero sin distancia no compite con las que la tienen.
+        st(2, 20, null, null, { durationSeconds: 50 })
+      ])
+    ).toEqual({ value: 240, workoutId: 1, date: '2026-11-05', distanceKm: 1 })
+    expect(ev([st(1, 20, null, 10)])).toBeNull()
   })
 
   it('carrera desde las sesiones RUN: sesiones, distancia y mejor ritmo', () => {

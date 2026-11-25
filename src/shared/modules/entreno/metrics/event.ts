@@ -35,6 +35,11 @@ export interface StationBest {
   date: ISODate
 }
 
+/** Mejor duración: la más corta, entre series de la misma distancia (`distanceKm`, o null si no hay distancia). */
+export interface StationDurationBest extends StationBest {
+  distanceKm: number | null
+}
+
 export interface StationStats {
   station: string
   exerciseIds: number[]
@@ -44,8 +49,12 @@ export interface StationStats {
   /** Mejores marcas según lo que haya: mayor peso, mayor distancia, menor duración y más reps. */
   bestWeightKg: StationBest | null
   bestDistanceKm: StationBest | null
-  /** La duración más corta (las estaciones se cronometran sobre una distancia o reps fijas). */
-  bestDurationSeconds: StationBest | null
+  /**
+   * La duración más corta. Si alguna serie tiene distancia y duración, solo se comparan series de la
+   * misma distancia: la de la distancia más repetida (a igualdad, la más larga). Si ninguna tiene
+   * distancia, la más corta de todas.
+   */
+  bestDurationSeconds: StationDurationBest | null
   bestReps: StationBest | null
 }
 
@@ -82,6 +91,22 @@ function better(prev: StationBest | null, value: number, s: CountedSet, lower = 
   if (!(value > 0)) return prev
   if (prev && (lower ? value >= prev.value : value <= prev.value)) return prev
   return { value, workoutId: s.workoutId, date: s.date }
+}
+
+function bestDuration(sets: CountedSet[]): StationDurationBest | null {
+  const timed = sets.filter((s) => s.durationSeconds != null && s.durationSeconds > 0)
+  const withDist = timed.filter((s) => s.distanceKm != null && s.distanceKm > 0)
+  let pool = timed
+  let distanceKm: number | null = null
+  if (withDist.length) {
+    const count = new Map<number, number>()
+    for (const s of withDist) count.set(s.distanceKm!, (count.get(s.distanceKm!) ?? 0) + 1)
+    distanceKm = [...count.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0]
+    pool = withDist.filter((s) => s.distanceKm === distanceKm)
+  }
+  let best: StationBest | null = null
+  for (const s of pool) best = better(best, s.durationSeconds!, s, true)
+  return best ? { ...best, distanceKm } : null
 }
 
 /**
@@ -126,12 +151,10 @@ export function hyroxStatus(ctx: MetricsContext, eventId: number, today: ISODate
     const own = sets.filter((s) => exerciseIds.includes(s.exerciseId))
     let bestWeightKg: StationBest | null = null
     let bestDistanceKm: StationBest | null = null
-    let bestDurationSeconds: StationBest | null = null
     let bestReps: StationBest | null = null
     for (const s of own) {
       bestWeightKg = better(bestWeightKg, s.weightKg ?? 0, s)
       bestDistanceKm = better(bestDistanceKm, s.distanceKm ?? 0, s)
-      bestDurationSeconds = better(bestDurationSeconds, s.durationSeconds ?? 0, s, true)
       bestReps = better(bestReps, s.reps ?? 0, s)
     }
     return {
@@ -141,7 +164,7 @@ export function hyroxStatus(ctx: MetricsContext, eventId: number, today: ISODate
       lastDate: own.length ? own[own.length - 1].date : null,
       bestWeightKg,
       bestDistanceKm,
-      bestDurationSeconds,
+      bestDurationSeconds: bestDuration(own),
       bestReps
     }
   })

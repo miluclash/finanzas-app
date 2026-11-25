@@ -85,6 +85,7 @@ export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider)
     'routines.save': (input: RoutineInput) => write('routines.save', () => routines.saveRoutine(ctx.db, input)),
     'routines.delete': (id: number) => write('routines.delete', () => routines.deleteRoutine(ctx.db, id)),
     'routines.reorder': (ids: number[]) => write('routines.reorder', () => routines.reorderRoutines(ctx.db, ids)),
+    'routines.reapply': () => write('routines.reapply', () => routines.reapplyRoutines(ctx.db)),
 
     // Semana base (boceto)
     'baseWeek.get': () => planning.getBaseWeek(ctx.db),

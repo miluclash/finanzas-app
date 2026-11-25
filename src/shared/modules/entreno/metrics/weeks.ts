@@ -2,32 +2,22 @@
 // (`Date.UTC`), nunca `Date` con la hora local del sistema: ni la zona ni el cambio de hora
 // mueven una sesión de día o de semana.
 import { addDays, diffDays } from '../../../dates'
+import { weekdayOf, weekEndOf } from '../plan'
 import type { ISODate, LocalDateTime } from './types'
 
-export { addDays, diffDays }
+// Día de la semana (1 = lunes … 7 = domingo) y último día de una semana: los mismos que usa el plan.
+export { addDays, diffDays, weekdayOf as isoWeekday, weekEndOf }
 
 /** Fecha (día local) de un `YYYY-MM-DDTHH:mm` o de un `YYYY-MM-DD`. */
 export function dateOf(dt: LocalDateTime | ISODate): ISODate {
   return dt.slice(0, 10)
 }
 
-/** 1 = lunes … 7 = domingo. */
-export function isoWeekday(date: ISODate): number {
-  const [y, m, d] = date.split('-').map(Number)
-  const js = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 0 = domingo
-  return js === 0 ? 7 : js
-}
-
 /** Primer día de la semana que contiene `date`. `weekStartsOn`: 1 = lunes … 7 = domingo. */
 export function weekStartOf(date: LocalDateTime | ISODate, weekStartsOn = 1): ISODate {
   const day = dateOf(date)
-  const back = (isoWeekday(day) - weekStartsOn + 7) % 7
+  const back = (weekdayOf(day) - weekStartsOn + 7) % 7
   return addDays(day, -back)
-}
-
-/** Último día (incluido) de la semana que empieza en `weekStart`. */
-export function weekEndOf(weekStart: ISODate): ISODate {
-  return addDays(weekStart, 6)
 }
 
 /**
@@ -47,7 +37,7 @@ export function monthKeyOf(date: LocalDateTime | ISODate): string {
 /** Número de semana ISO 8601 (para rótulos) de una fecha. */
 export function isoWeekNumber(date: ISODate): { year: number; week: number } {
   // El jueves de la semana ISO decide el año.
-  const thursday = addDays(date, 4 - isoWeekday(date))
+  const thursday = addDays(date, 4 - weekdayOf(date))
   const year = Number(thursday.slice(0, 4))
   const week = Math.floor(diffDays(thursday, `${year}-01-01`) / 7) + 1
   return { year, week }
