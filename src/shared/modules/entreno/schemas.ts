@@ -151,7 +151,8 @@ export const SettingsSchema = z
     e1rmMinReps: z.number().int().min(1).max(100),
     e1rmMaxReps: z.number().int().min(1).max(100),
     countedSetTypes: z.array(z.enum(SET_TYPES)).min(1, 'Tiene que contar al menos un tipo de serie'),
-    weekStartsOn: z.number().int().min(1).max(7),
+    // Fijo: las semanas van siempre de lunes a domingo (decisión de Michael, F4).
+    weekStartsOn: z.number().refine((v) => v === 1, 'La semana empieza siempre en lunes: no se puede cambiar.'),
     secondaryMuscleFactor: z.number().min(0).max(1),
     trendWeeks: z.number().int().min(1).max(104),
     timeZone: z.string().trim().min(1)

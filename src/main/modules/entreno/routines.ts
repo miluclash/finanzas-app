@@ -185,13 +185,19 @@ export function saveRoutine(db: Db, input: RoutineInput): Routine {
 }
 
 /**
- * Borra un tipo de entreno. Sus ejercicios previstos y alias se van con él, y también sus huecos
- * del boceto y de las semanas guardadas (ON DELETE CASCADE); las sesiones que lo tenían se quedan
- * sin tipo de entreno (ON DELETE SET NULL). Para conservar el historial del plan, mejor desactivarlo.
+ * Borra un tipo de entreno que no se use en ninguna semana guardada ni sesión (si se usa, hay que
+ * desactivarlo: borrar no puede cambiar semanas pasadas). Sus ejercicios previstos, alias y huecos
+ * del boceto se van con él (ON DELETE CASCADE).
  */
 export function deleteRoutine(db: Db, id: number): void {
   db.tx(() => {
     const before = getRoutine(db, id)
+    // Borrarlo cambiaría semanas guardadas o sesiones (la FK CASCADE se llevaría sus huecos).
+    if (
+      db.get('SELECT 1 AS x FROM trn_week_plan WHERE routine_id = ? LIMIT 1', [id]) ||
+      db.get('SELECT 1 AS x FROM trn_workouts WHERE routine_id = ? LIMIT 1', [id])
+    )
+      throw new UserError('Este tipo de entreno se usa en semanas guardadas o sesiones. Desactívalo en vez de borrarlo.')
     db.run('DELETE FROM trn_routines WHERE id = ?', [id])
     audit(db, 'trn_routines', id, 'delete', before.name, before, null)
   })

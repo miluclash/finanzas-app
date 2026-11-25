@@ -288,7 +288,8 @@ describe('cola y lecturas', () => {
       return real(label, fn, opts)
     })
     const r = await h['entreno:routines.save']({ name: 'Fuerza A', kind: 'GYM' })
-    await h['entreno:routines.reorder']([r.id])
+    const temporal = await h['entreno:routines.save']({ name: 'Temporal', kind: 'OTHER' })
+    await h['entreno:routines.reorder']([r.id, temporal.id])
     await h['entreno:baseWeek.save']([{ weekday: 1, routineId: r.id }])
     await h['entreno:weekPlan.save']('2026-11-09', [{ date: '2026-11-09', routineId: r.id }])
     await h['entreno:weekPlan.move']({ from: { date: '2026-11-09', order: 0 }, to: { date: '2026-11-10' } })
@@ -301,8 +302,9 @@ describe('cola y lecturas', () => {
     await h['entreno:goals.delete'](g.id)
     await h['entreno:blocks.delete'](b.id)
     await h['entreno:events.delete'](ev.id)
-    await h['entreno:routines.delete'](r.id)
+    await h['entreno:routines.delete'](temporal.id)
     expect(etiquetas).toEqual([
+      'entreno:routines.save',
       'entreno:routines.save',
       'entreno:routines.reorder',
       'entreno:baseWeek.save',
@@ -328,6 +330,7 @@ describe('cola y lecturas', () => {
     const acciones = ctx.db.all<{ entity: string; action: string }>("SELECT entity, action FROM audit_log WHERE entity LIKE 'trn_%' ORDER BY id")
     expect(acciones.map((a) => `${a.entity}:${a.action}`)).toEqual([
       'trn_routines:create',
+      'trn_routines:create',
       'trn_routines:reorder',
       'trn_base_week:update',
       'trn_week_plan:update',
@@ -343,5 +346,53 @@ describe('cola y lecturas', () => {
       'trn_events:delete',
       'trn_routines:delete'
     ])
+  })
+})
+
+describe('borrar un tipo de entreno no cambia semanas pasadas ni sesiones', () => {
+  const MSG = 'Este tipo de entreno se usa en semanas guardadas o sesiones. Desactívalo en vez de borrarlo.'
+
+  it('si solo está en el boceto se borra y sale del boceto; si está en una semana guardada, no', async () => {
+    const { h, db } = await abrir('2026-11-04')
+    const t = await tipos(h)
+    await h['entreno:baseWeek.save']([{ weekday: 1, routineId: t.a }, { weekday: 2, routineId: t.b }])
+    await h['entreno:routines.delete'](t.b)
+    expect(h['entreno:baseWeek.get']().slots.map((s) => s.routineName)).toEqual(['Fuerza A'])
+
+    const semana = await h['entreno:weekPlan.get']('2026-11-02') // se guarda sola con Fuerza A
+    expect(semana.saved).toBe(true)
+    await expect(h['entreno:routines.delete'](t.a)).rejects.toThrow(MSG)
+    expect(await h['entreno:weekPlan.get']('2026-11-02')).toEqual(semana)
+    // Desactivar sí se puede, y la semana guardada lo sigue mostrando.
+    const inactiva = await h['entreno:routines.save']({ id: t.a, name: 'Fuerza A', kind: 'GYM', active: false })
+    expect(inactiva.active).toBe(false)
+    expect((await h['entreno:weekPlan.get']('2026-11-02')).slots.map((s) => s.routineName)).toEqual(['Fuerza A'])
+    expect(db.get<{ n: number }>('SELECT COUNT(*) AS n FROM trn_routines')!.n).toBe(2)
+  })
+
+  it('si alguna sesión lo tiene asignado, no se borra', async () => {
+    const { h } = await abrir('2026-11-04')
+    const t = await tipos(h)
+    const press = (await h['entreno:exercises.save']({ title: 'Press banca ficticio' })).id
+    await h['entreno:workouts.saveManual']({ title: 'Casa', startTime: '2026-11-03T10:00', routineId: t.nat, exercises: [{ exerciseId: press, sets: [{ reps: 5 }] }] })
+    await expect(h['entreno:routines.delete'](t.nat)).rejects.toThrow(MSG)
+    expect(h['entreno:routines.list']().map((r) => r.name)).toContain('Natación')
+  })
+})
+
+describe('inicio de semana fijo en lunes', () => {
+  it('weekStartsOn vale 1 por defecto y no se puede cambiar', async () => {
+    const { h } = await abrir('2026-11-04')
+    expect(h['entreno:settings.get']().weekStartsOn).toBe(1)
+    await expect(h['entreno:settings.save']({ weekStartsOn: 7 })).rejects.toThrow('La semana empieza siempre en lunes: no se puede cambiar.')
+    await expect(h['entreno:settings.save']({ weekStartsOn: 2 })).rejects.toThrow(/siempre en lunes/)
+    expect((await h['entreno:settings.save']({ weekStartsOn: 1, trendWeeks: 8 })).weekStartsOn).toBe(1)
+    expect(h['entreno:settings.get']()).toMatchObject({ weekStartsOn: 1, trendWeeks: 8 })
+  })
+
+  it('un valor distinto guardado de antes se ignora y se lee 1', async () => {
+    const { h, ctx } = await abrir('2026-11-04')
+    ctx.queue.runNow('test:escribir', () => ctx.db.run("UPDATE trn_settings SET value = '7' WHERE key = 'weekStartsOn'"))
+    expect(h['entreno:settings.get']().weekStartsOn).toBe(1)
   })
 })
