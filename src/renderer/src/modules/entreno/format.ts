@@ -139,6 +139,18 @@ export function cuando(date: string, hoy: string, hora?: string | null): string 
 /** Lunes de la semana siguiente o anterior, por si hace falta navegar. */
 export const semanaMas = (lunes: string, n: number): string => addDays(lunes, 7 * n)
 
+const DIA_CORTO = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+/** «frente a los mismos días de la semana pasada (lun–mié: 1.500 kg)» o «frente a la semana anterior (13.500 kg)» */
+export function textoComparacionVolumen(comparison: 'same-days' | 'full-week', previousLoadKg: number, previousToDate: string): string {
+  if (comparison === 'full-week') return `frente a la semana anterior (${formatEntero(previousLoadKg)} kg)`
+  const hasta = DIA_CORTO[new Date(`${previousToDate}T12:00:00`).getDay()]
+  const rango = hasta === 'lun' ? 'lun' : `lun–${hasta}`
+  return `frente a los mismos días de la semana pasada (${rango}: ${formatEntero(previousLoadKg)} kg)`
+}
+/** Aviso cuando no hay % porque la referencia no tiene volumen */
+export const sinVolumenPrevio = (comparison: 'same-days' | 'full-week'): string =>
+  comparison === 'same-days' ? 'sin volumen en los mismos días de la semana pasada' : 'sin volumen en la semana anterior'
+
 /** Marca de un récord: «85 kg», «12 repeticiones con 60 kg». */
 export function marcaRecord(tipo: RecordType, valor: number, pesoKg: number | null): string {
   if (tipo === 'reps-con-peso') return `${num.format(valor)} reps con ${formatKg(pesoKg)}`

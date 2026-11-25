@@ -6,7 +6,7 @@ import type { EntrenoSummary } from '@shared/modules/entreno/metrics/views'
 import type { StationStats } from '@shared/modules/entreno/metrics/event'
 import { WORKOUT_KINDS, type WorkoutKind } from '@shared/modules/entreno/types'
 import { BarraSegmentada, Card, ChartFrame, CifraUnidad, Columnas, EmptyState, LeyendaMapa, LeyendaSemana, MapaConstancia, MedidoresLista, ProgressBar, Tag, WeekSessionCell, type EstadoSesion, type EstadoFila } from '../../core/ui'
-import { anteriorRecord, cuando, fechaCorta, fechaDe, formatCambio, formatDistancia, formatDuracion, formatEntero, formatKg, formatNum, formatNum1, formatPorcentaje, formatTiempo, HYROX_STATION_LABEL, KIND_LABEL, marcaRecord, nombreRecord } from './format'
+import { textoComparacionVolumen, sinVolumenPrevio, anteriorRecord, cuando, fechaCorta, fechaDe, formatCambio, formatDistancia, formatDuracion, formatEntero, formatKg, formatNum, formatNum1, formatPorcentaje, formatTiempo, HYROX_STATION_LABEL, KIND_LABEL, marcaRecord, nombreRecord } from './format'
 import { ObjetivoDetalle } from './ObjetivoDetalle'
 import { KIND_ICON } from './Piezas'
 
@@ -21,11 +21,13 @@ export function SemanaCard({ s }: { s: EntrenoSummary }) {
   const sesiones = w.days.flatMap((d) => d.workouts)
   const extra = Math.max(0, sesiones.length - hechos)
   const porTipo = WORKOUT_KINDS.map((k) => ({ k, previstas: huecos.filter((x) => x.kind === k).length, hechas: huecos.filter((x) => x.kind === k && x.doneWorkoutId !== null).length })).filter((t) => t.previstas > 0)
-  const { weeks, pct } = s.adherence
-  const etiqueta =
-    pct === null
-      ? 'Sin plan en esas semanas'
-      : `${s.range.period === 'week' ? `Últimas ${weeks.length} semanas` : s.range.period === 'month' ? 'Semanas del mes' : 'Semanas del bloque'}: ${formatPorcentaje(pct)}`
+  // Semana: las 4 semanas completas anteriores a la actual (la última de la lista es la actual); cada una ya viene acotada al 100 %.
+  // Mes o bloque: sus semanas. Las que no tienen nada previsto no cuentan.
+  const esSemana = s.range.period === 'week'
+  const consideradas = (esSemana ? s.adherence.weeks.slice(0, -1) : s.adherence.weeks).filter((x) => x.planned > 0)
+  const previstas = consideradas.reduce((a, x) => a + x.planned, 0)
+  const pct = previstas > 0 ? consideradas.reduce((a, x) => a + x.done, 0) / previstas : null
+  const etiqueta = pct === null ? 'Sin plan en esas semanas' : `${esSemana ? 'Últimas 4 semanas' : s.range.period === 'month' ? 'Semanas del mes' : 'Semanas del bloque'}: ${formatPorcentaje(pct)}`
 
   return (
     <Card
@@ -127,18 +129,16 @@ export function VolumenCard({ s }: { s: EntrenoSummary }) {
           </div>
           {esSemana && (
             <p className="t-label mt-2 flex flex-wrap items-center gap-2" style={{ color: 'var(--hero-ink-2)' }}>
-              {ch !== null && v.previous ? (
+              {ch !== null ? (
                 <>
                   <span className="inline-flex items-center gap-1 r-full px-2 font-semibold" style={{ background: 'var(--hero-ink)', color: 'var(--hero-bg)' }}>
                     {ch >= 0 ? <ArrowUp size={14} weight="bold" aria-hidden /> : <ArrowDown size={14} weight="bold" aria-hidden />}
                     {formatCambio(ch)}
                   </span>
-                  <span>
-                    la semana en curso frente a la anterior ({formatEntero(v.previous.loadKg)} kg)
-                  </span>
+                  <span>{textoComparacionVolumen(v.comparison, v.previousLoadKg, v.previousToDate)}</span>
                 </>
               ) : (
-                <span>Sin una semana anterior con volumen con la que comparar.</span>
+                <span>{v.previous || v.comparison === 'same-days' ? sinVolumenPrevio(v.comparison) : 'Aún no hay una semana anterior con la que comparar.'}</span>
               )}
             </p>
           )}

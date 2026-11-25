@@ -5,7 +5,7 @@ import { formatEur, formatPct } from '@shared/money'
 import { useApi } from '../../lib/api'
 import { Button, Card, CifraEur, CifraUnidad, Count, EmptyState, ErrorState, KpiCard, LoadingState, ProgressBar, Spark, StatusBadge, Tag } from '../ui'
 import type { EntrenoInicio } from '@shared/modules/entreno/metrics/views'
-import { anteriorRecord, cuando, fechaCorta, formatCambio, formatEntero, KIND_LABEL, marcaRecord } from '../../modules/entreno/format'
+import { textoComparacionVolumen, sinVolumenPrevio, anteriorRecord, cuando, fechaCorta, formatCambio, formatEntero, KIND_LABEL, marcaRecord } from '../../modules/entreno/format'
 import { KIND_ICON } from '../../modules/entreno/Piezas'
 import { weekLabelNumber } from '@shared/modules/entreno/metrics/weeks'
 import { formatDate } from '@shared/dates'
@@ -305,12 +305,16 @@ function ResumenEntreno({ q }: { q: ConsultaEntreno }) {
           <div className="t-kpi mt-1">
             <CifraUnidad valor={formatEntero(volume.loadKg)} unidad="kg" />
           </div>
-          {ch !== null && (
-            <p className="t-meta mt-1 flex items-center gap-1">
-              {ch >= 0 ? <ArrowUp size={12} weight="bold" aria-hidden /> : <ArrowDown size={12} weight="bold" aria-hidden />}
-              {formatCambio(ch)} sobre la semana anterior
-            </p>
-          )}
+          <p className="t-meta mt-1">
+            {ch !== null ? (
+              <>
+                {ch >= 0 ? <ArrowUp size={12} weight="bold" aria-hidden className="mr-1 inline" /> : <ArrowDown size={12} weight="bold" aria-hidden className="mr-1 inline" />}
+                {formatCambio(ch)} {textoComparacionVolumen(volume.comparison, volume.previousLoadKg, volume.previousToDate)}
+              </>
+            ) : (
+              sinVolumenPrevio(volume.comparison).replace(/^./, (c) => c.toUpperCase())
+            )}
+          </p>
         </div>
       </div>
       {nextEvent && !nextEvent.isPast && (
