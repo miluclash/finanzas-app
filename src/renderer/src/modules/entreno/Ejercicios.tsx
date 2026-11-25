@@ -1,10 +1,11 @@
 import { ArrowsMerge, MagnifyingGlass, PersonSimpleRun, Plus, Warning, X } from '@phosphor-icons/react'
 import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { EXERCISE_CATEGORIES, MEASURE_TYPES, type Exercise, type ExerciseCategory, type MeasureType, type MuscleGroup } from '@shared/modules/entreno/types'
+import { HYROX_STATION_KEYS } from '@shared/modules/entreno/hyrox'
+import { EXERCISE_CATEGORIES, MEASURE_TYPES, type Exercise, type ExerciseCategory, type HyroxStation, type MeasureType, type MuscleGroup } from '@shared/modules/entreno/types'
 import { Aviso, Button, Checkbox, ConfirmDialog, ErrorState, IconButton, LoadingState, Modal, PageHeader, Select, Tag, TextArea, TextField } from '../../core/ui'
 import { useApi, useApiMutation } from '../../lib/api'
-import { CATEGORY_LABEL, fechaDe, MEASURE_LABEL, normalizar, SIN_CLASIFICAR } from './format'
+import { CATEGORY_LABEL, fechaDe, HYROX_STATION_LABEL, MEASURE_LABEL, normalizar, SIN_CLASIFICAR } from './format'
 import { useRetraso } from './Piezas'
 
 type FiltroCat = '' | 'sin-clasificar' | 'sin-grupo' | ExerciseCategory
@@ -143,6 +144,11 @@ export function EjerciciosPage() {
                             {e.title}
                           </span>
                           {!e.active && <Tag>Desactivado</Tag>}
+                          {e.hyroxStation && (
+                            <Tag tono="accent" title={`Estación de HYROX: ${HYROX_STATION_LABEL[e.hyroxStation]}`}>
+                              {e.hyroxStation}
+                            </Tag>
+                          )}
                         </button>
                       </td>
                       <td>{e.category ? <span className="text-ink-2">{CATEGORY_LABEL[e.category]}</span> : <Tag tono="warning" icono={<Warning size={14} weight="fill" aria-hidden />}>{SIN_CLASIFICAR}</Tag>}</td>
@@ -176,6 +182,7 @@ function EjercicioModal({ id, ejercicios, grupos, onCerrar }: { id: number | 'nu
   const [principal, setPrincipal] = useState<number | ''>(actual?.primaryGroupId ?? '')
   const [secundarios, setSecundarios] = useState<number[]>(actual?.secondaryGroupIds ?? [])
   const [notas, setNotas] = useState(actual?.notes ?? '')
+  const [estacion, setEstacion] = useState<HyroxStation | ''>(actual?.hyroxStation ?? '')
   const [alias, setAlias] = useState('')
   const [unirCon, setUnirCon] = useState('')
   const [confirmarUnir, setConfirmarUnir] = useState(false)
@@ -205,7 +212,9 @@ function EjercicioModal({ id, ejercicios, grupos, onCerrar }: { id: number | 'nu
         active: activo,
         notes: notas.trim() || null,
         primaryGroupId: principal === '' ? null : principal,
-        secondaryGroupIds: secundarios.filter((g) => g !== principal)
+        secondaryGroupIds: secundarios.filter((g) => g !== principal),
+        // Al crear, null deja que se proponga por el nombre; al editar, null la quita.
+        hyroxStation: estacion === '' ? null : estacion
       }
     ])
   }
@@ -285,6 +294,20 @@ function EjercicioModal({ id, ejercicios, grupos, onCerrar }: { id: number | 'nu
               </div>
             </div>
           </fieldset>
+
+          <Select
+            label="Estación de HYROX"
+            value={estacion}
+            onChange={(e) => setEstacion(e.target.value as HyroxStation | '')}
+            ayuda={actual ? 'Así el Resumen de HYROX sabe qué estación es. Déjala en «Ninguna» si no lo es.' : 'Si la dejas en «Ninguna», se propone sola según el nombre.'}
+          >
+            <option value="">Ninguna</option>
+            {HYROX_STATION_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {k} · {HYROX_STATION_LABEL[k]}
+              </option>
+            ))}
+          </Select>
 
           <TextArea label="Notas (opcional)" rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
 

@@ -11,6 +11,8 @@ import { useApi } from './lib/api'
 import { EjerciciosPage } from './modules/entreno/Ejercicios'
 import { EntrenoPage } from './modules/entreno/Entreno'
 import { ImportarHevyProvider, useImportarHevy } from './modules/entreno/ImportarHevy'
+import { ObjetivosPage } from './modules/entreno/Objetivos'
+import { PlanPage } from './modules/entreno/Plan'
 import { SesionDetallePage } from './modules/entreno/SesionDetalle'
 import { SesionEditorPage } from './modules/entreno/SesionEditor'
 import { SesionesPage } from './modules/entreno/Sesiones'
@@ -62,6 +64,8 @@ function ShellConectado({ version }: { version: string }) {
         <Route path="/entreno/sesiones/:id" element={<SesionDetallePage />} />
         <Route path="/entreno/sesiones/:id/editar" element={<SesionEditorPage />} />
         <Route path="/entreno/ejercicios" element={<EjerciciosPage />} />
+        <Route path="/entreno/plan" element={<PlanPage />} />
+        <Route path="/entreno/objetivos" element={<ObjetivosPage />} />
         <Route path="/ajustes" element={<SettingsPage />} />
         {RUTAS_ANTIGUAS.map((r) => (
           <Route key={r} path={`/${r}`} element={<RedirigirAntigua />} />

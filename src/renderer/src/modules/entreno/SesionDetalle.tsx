@@ -174,13 +174,19 @@ function ValoracionCard({ w }: { w: WorkoutDetail }) {
   const [tipo, setTipo] = useState<'' | WorkoutKind>(w.kindManual ? w.kind : '')
   const [esfuerzo, setEsfuerzo] = useState(w.perceivedEffort === null ? '' : String(w.perceivedEffort))
   const [notas, setNotas] = useState(w.notes ?? '')
+  const rutinaInicial = w.routineId === null ? '' : String(w.routineId)
+  const [rutina, setRutina] = useState(rutinaInicial)
+  const rutinas = useApi('entreno:routines.list', [])
   const guardar = useApiMutation('entreno:workouts.updateExtras', { success: 'Cambios guardados' })
+  // Los activos y, si ya lo tiene asignado, ese aunque esté desactivado
+  const opcionesRutina = (rutinas.data ?? []).filter((r) => r.active || String(r.id) === rutinaInicial)
 
   const tipoInicial = w.kindManual ? w.kind : ''
   const esfuerzoInicial = w.perceivedEffort === null ? '' : String(w.perceivedEffort)
   const notasIniciales = w.notes ?? ''
   const cambios: Omit<WorkoutExtrasInput, 'id'> = {}
   if (tipo !== tipoInicial) cambios.kind = tipo === '' ? null : tipo
+  if (rutina !== rutinaInicial) cambios.routineId = rutina === '' ? null : Number(rutina)
   if (esfuerzo !== esfuerzoInicial) cambios.perceivedEffort = esfuerzo === '' ? null : Number(esfuerzo)
   if (notas !== notasIniciales) cambios.notes = notas.trim() === '' ? null : notas.trim()
   const sucio = Object.keys(cambios).length > 0
@@ -188,7 +194,7 @@ function ValoracionCard({ w }: { w: WorkoutDetail }) {
   return (
     <form
       className="card flex flex-col gap-4"
-      aria-label="Tipo, esfuerzo y notas"
+      aria-label="Tu valoración de la sesión"
       onSubmit={(ev) => {
         ev.preventDefault()
         if (sucio) guardar.mutate([{ id: w.id, ...cambios }])
@@ -205,6 +211,20 @@ function ValoracionCard({ w }: { w: WorkoutDetail }) {
         {WORKOUT_KINDS.map((k) => (
           <option key={k} value={k}>
             {KIND_LABEL[k]}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="Tipo de entreno"
+        value={rutina}
+        onChange={(ev) => setRutina(ev.target.value)}
+        ayuda={rutina === '' ? 'Sin tipo de entreno, cuenta el tipo de sesión del mismo día.' : 'Así cuenta como hecha esta sesión en el plan de su semana.'}
+      >
+        <option value="">Ninguno</option>
+        {opcionesRutina.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name} · {KIND_LABEL[r.kind]}
+            {r.active ? '' : ' (desactivado)'}
           </option>
         ))}
       </Select>

@@ -1,7 +1,7 @@
 // Formato y etiquetas de Entreno en la interfaz: kg con coma decimal, duraciones legibles, distancias en
 // km o m según el tamaño y los nombres en español de cada tipo. Solo presentación: no calcula nada.
 import { formatDate } from '@shared/dates'
-import type { ExerciseCategory, LocalDateTime, MeasureType, SetType, WorkoutKind } from '@shared/modules/entreno/types'
+import type { ExerciseCategory, GoalStatus, GoalType, HyroxStation, LocalDateTime, MeasureType, SetType, WorkoutKind } from '@shared/modules/entreno/types'
 
 export const KIND_LABEL: Record<WorkoutKind, string> = {
   GYM: 'Gimnasio',
@@ -35,6 +35,30 @@ export const MEASURE_LABEL: Record<MeasureType, string> = {
   DISTANCE_DURATION: 'Distancia y duración',
   WEIGHT_DISTANCE: 'Peso y distancia'
 }
+
+export const GOAL_TYPE_LABEL: Record<GoalType, string> = {
+  E1RM: 'E1RM de un ejercicio',
+  WEIGHT_REPS: 'Peso × repeticiones',
+  WEEKLY_VOLUME: 'Volumen semanal',
+  FREQUENCY: 'Frecuencia semanal',
+  EVENT: 'Evento'
+}
+export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = { ACTIVE: 'Activo', ACHIEVED: 'Conseguido', ABANDONED: 'Abandonado' }
+
+/** Estaciones de HYROX: la clave es el nombre oficial (en inglés); el valor, una ayuda en español. */
+export const HYROX_STATION_LABEL: Record<HyroxStation, string> = {
+  SkiErg: 'Esquí ergómetro',
+  'Sled Push': 'Empuje de trineo',
+  'Sled Pull': 'Arrastre de trineo',
+  'Burpee Broad Jumps': 'Burpees con salto largo',
+  Rowing: 'Remo ergómetro',
+  'Farmers Carry': 'Paseo del granjero',
+  'Sandbag Lunges': 'Zancadas con saco',
+  'Wall Balls': 'Lanzamientos a la pared'
+}
+
+/** Días de la semana, de lunes (índice 0) a domingo. */
+export const WEEKDAY_LABEL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as const
 
 const num = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 })
 const num1 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 })
@@ -76,6 +100,11 @@ export const fechaDe = (t: LocalDateTime): string => formatDate(t.slice(0, 10))
 /** `2026-11-05T07:05` -> `07:05` */
 export const horaDe = (t: LocalDateTime): string => t.slice(11, 16)
 export const fechaHora = (t: LocalDateTime): string => `${fechaDe(t)} · ${horaDe(t)}`
+
+/** `2026-11-23` -> `23 nov` */
+export const fechaCorta = (d: string): string => new Date(`${d}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace('.', '')
+/** Lunes y domingo de una semana -> `23 nov – 29 nov 2026` */
+export const rangoSemana = (lunes: string, domingo: string): string => `${fechaCorta(lunes)} – ${fechaCorta(domingo)} ${domingo.slice(0, 4)}`
 
 /** Sin mayúsculas ni tildes, para buscar. */
 export const normalizar = (s: string): string => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')

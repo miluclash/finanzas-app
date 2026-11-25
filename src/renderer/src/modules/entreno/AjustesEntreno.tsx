@@ -1,10 +1,10 @@
-// Ajustes › Entreno: grupos musculares, reglas de tipo de sesión, historial de importaciones y datos (exportar y restaurar).
+// Ajustes › Entreno: grupos musculares, métricas, reglas de tipo de sesión, historial de importaciones y datos (exportar y restaurar).
 import { ArrowDown, ArrowUp, DownloadSimple, FileArrowUp, Plus, Trash } from '@phosphor-icons/react'
 import { useState, type ReactNode } from 'react'
-import { KIND_RULE_FIELDS, WORKOUT_KINDS, type KindRule, type KindRuleField, type MuscleGroup, type WorkoutKind } from '@shared/modules/entreno/types'
-import { Aviso, Button, ConfirmDialog, ErrorState, IconButton, LoadingState, Select, StatusBadge, Switch, TextField, Tooltip } from '../../core/ui'
+import { E1RM_FORMULAS, KIND_RULE_FIELDS, SET_TYPES, WORKOUT_KINDS, type E1rmFormula, type EntrenoSettings, type KindRule, type KindRuleField, type MuscleGroup, type SetType, type WorkoutKind } from '@shared/modules/entreno/types'
+import { Aviso, Button, Checkbox, ConfirmDialog, ErrorState, IconButton, LoadingState, Select, StatusBadge, Switch, TextField, Tooltip } from '../../core/ui'
 import { useApi, useApiMutation } from '../../lib/api'
-import { fechaHoraLocal, KIND_LABEL } from './format'
+import { fechaHoraLocal, KIND_LABEL, leerEntero, leerNumero, SET_TYPE_LABEL } from './format'
 
 const CAMPO_LABEL: Record<KindRuleField, string> = { title: 'Título de la sesión', exercise: 'Algún ejercicio' }
 /** En la fila de una regla, más corto para que quepa en una línea */
@@ -24,6 +24,7 @@ export function AjustesEntreno() {
   return (
     <div className="flex flex-col gap-8">
       <GruposMusculares />
+      <Metricas />
       <ReglasDeTipo />
       <Importaciones />
       <DatosDeEntreno />
@@ -40,8 +41,25 @@ function GruposMusculares() {
   const guardar = useApiMutation('entreno:muscleGroups.save', {})
   const añadir = useApiMutation('entreno:muscleGroups.save', { success: 'Grupo añadido', onSuccess: () => setNuevo('') })
   const eliminar = useApiMutation('entreno:muscleGroups.delete', { success: 'Grupo borrado' })
+  const [errorRango, setErrorRango] = useState<string | null>(null)
+
+  /** Cambia el mínimo o el máximo de series por semana. Si no es válido, vuelve al valor anterior y lo explica. */
+  const cambiarRango = (g: MuscleGroup, campo: 'weeklySetsMin' | 'weeklySetsMax', el: HTMLInputElement) => {
+    const v = leerEntero(el.value)
+    const nuevo = { weeklySetsMin: g.weeklySetsMin, weeklySetsMax: g.weeklySetsMax, [campo]: v }
+    if (v === null || Number.isNaN(v) || v > 200) {
+      el.value = String(g[campo])
+      setErrorRango(`${g.name}: las series por semana son un número entero de 0 a 200.`)
+    } else if (nuevo.weeklySetsMin > nuevo.weeklySetsMax) {
+      el.value = String(g[campo])
+      setErrorRango(`${g.name}: el mínimo de series no puede ser mayor que el máximo.`)
+    } else if (v !== g[campo]) {
+      setErrorRango(null)
+      guardar.mutate([{ id: g.id, name: g.name, active: g.active, weeklySetsMin: nuevo.weeklySetsMin, weeklySetsMax: nuevo.weeklySetsMax }])
+    } else setErrorRango(null)
+  }
   return (
-    <Sub titulo="Grupos musculares" texto="Los músculos que usas para clasificar ejercicios. Puedes renombrarlos, desactivarlos o crear los tuyos.">
+    <Sub titulo="Grupos musculares" texto="Los músculos que usas para clasificar ejercicios. Puedes renombrarlos, desactivarlos o crear los tuyos. El rango de series por semana es el que quieres alcanzar en cada uno (por defecto, de 10 a 20 series efectivas).">
       {q.isLoading && <LoadingState filas={3} etiqueta="Cargando los grupos musculares" />}
       {q.error && <ErrorState titulo="No se han podido cargar los grupos" texto={q.error.message} />}
       {q.data && (
@@ -65,6 +83,14 @@ function GruposMusculares() {
                 <span className="t-meta w-28 shrink-0">
                   {g.exerciseCount} {g.exerciseCount === 1 ? 'ejercicio' : 'ejercicios'}
                 </span>
+                <span className="flex items-center gap-2" role="group" aria-label={`Series por semana de ${g.name}`}>
+                  <span className="t-meta">Series/semana</span>
+                  <TextField key={`min-${g.id}-${g.weeklySetsMin}`} className="w-16 [&_input]:text-right [&_input]:tabular-nums" label={`Mínimo de series por semana de ${g.name}`} ocultarEtiqueta tamano="sm" inputMode="numeric" defaultValue={g.weeklySetsMin} onBlur={(e) => cambiarRango(g, 'weeklySetsMin', e.target)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+                  <span aria-hidden className="t-meta">
+                    –
+                  </span>
+                  <TextField key={`max-${g.id}-${g.weeklySetsMax}`} label={`Máximo de series por semana de ${g.name}`} ocultarEtiqueta tamano="sm" inputMode="numeric" defaultValue={g.weeklySetsMax} onBlur={(e) => cambiarRango(g, 'weeklySetsMax', e.target)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="w-16 [&_input]:text-right [&_input]:tabular-nums" />
+                </span>
                 <span className="flex items-center gap-2">
                   <Switch checked={g.active} label={`Grupo ${g.name} activo`} onChange={(v) => guardar.mutate([{ id: g.id, name: g.name, active: v }])} />
                   <span className="t-meta w-16">{g.active ? 'Activo' : 'Desactivado'}</span>
@@ -75,6 +101,11 @@ function GruposMusculares() {
               </li>
             ))}
           </ul>
+          {errorRango && (
+            <Aviso tono="error" className="mt-3">
+              {errorRango}
+            </Aviso>
+          )}
           {errorBorrado && (
             <Aviso tono="error" className="mt-3">
               {errorBorrado}
@@ -108,6 +139,138 @@ function GruposMusculares() {
         />
       )}
     </Sub>
+  )
+}
+
+/* ======================= Métricas ======================= */
+const FORMULA_LABEL: Record<E1rmFormula, string> = { EPLEY: 'Epley', BRZYCKI: 'Brzycki' }
+const FORMULA_AYUDA: Record<E1rmFormula, string> = {
+  EPLEY: 'Epley: peso × (1 + repeticiones ÷ 30). La más extendida.',
+  BRZYCKI: 'Brzycki: peso × 36 ÷ (37 − repeticiones). Más prudente con muchas repeticiones.'
+}
+const AYUDA_SERIE: Record<SetType, string> = {
+  normal: 'Las series de trabajo.',
+  warmup: 'Normalmente no cuentan: no son series de trabajo.',
+  dropset: 'Series con peso reducido a continuación de otra.',
+  failure: 'Series llevadas al fallo.'
+}
+
+function Metricas() {
+  const q = useApi('entreno:settings.get', [])
+  return (
+    <Sub titulo="Métricas" texto="Cómo se calculan el e1RM (fuerza máxima estimada), el volumen y las tendencias. Si cambias algo, los números se recalculan con tus sesiones de siempre.">
+      {q.isLoading && <LoadingState filas={3} etiqueta="Cargando las métricas" />}
+      {q.error && (
+        <ErrorState
+          titulo="No se han podido cargar las métricas"
+          texto={q.error.message}
+          accion={
+            <Button size="sm" onClick={() => q.refetch()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
+      {q.data && <MetricasForm key={JSON.stringify(q.data)} s={q.data} />}
+    </Sub>
+  )
+}
+
+function MetricasForm({ s }: { s: EntrenoSettings }) {
+  const [formula, setFormula] = useState<E1rmFormula>(s.e1rmFormula)
+  const [minReps, setMinReps] = useState(String(s.e1rmMinReps))
+  const [maxReps, setMaxReps] = useState(String(s.e1rmMaxReps))
+  const [tipos, setTipos] = useState<SetType[]>(s.countedSetTypes)
+  const [factor, setFactor] = useState(String(s.secondaryMuscleFactor).replace('.', ','))
+  const [semanas, setSemanas] = useState(String(s.trendWeeks))
+  const [guardado, setGuardado] = useState(false)
+  const guardar = useApiMutation('entreno:settings.save', { success: 'Métricas guardadas' })
+
+  const nMin = leerEntero(minReps)
+  const nMax = leerEntero(maxReps)
+  const nFactor = leerNumero(factor)
+  const nSemanas = leerEntero(semanas)
+  const entero = (n: number | null, min: number, max: number) => n !== null && !Number.isNaN(n) && n >= min && n <= max
+  const errores = {
+    minReps: entero(nMin, 1, 100) ? undefined : 'Un número entero entre 1 y 100.',
+    maxReps: !entero(nMax, 1, 100) ? 'Un número entero entre 1 y 100.' : entero(nMin, 1, 100) && nMin! > nMax! ? 'No puede ser menor que el mínimo.' : undefined,
+    factor: nFactor !== null && !Number.isNaN(nFactor) && nFactor >= 0 && nFactor <= 1 ? undefined : 'Un número entre 0 y 1.',
+    semanas: entero(nSemanas, 1, 104) ? undefined : 'Un número entero entre 1 y 104.',
+    tipos: tipos.length > 0 ? undefined : 'Tiene que contar al menos un tipo de serie.'
+  }
+  const hayError = Object.values(errores).some(Boolean)
+
+  const patch: Partial<EntrenoSettings> = {}
+  if (formula !== s.e1rmFormula) patch.e1rmFormula = formula
+  if (nMin !== null && nMin !== s.e1rmMinReps) patch.e1rmMinReps = nMin
+  if (nMax !== null && nMax !== s.e1rmMaxReps) patch.e1rmMaxReps = nMax
+  const ordenados = SET_TYPES.filter((t) => tipos.includes(t))
+  if (ordenados.join() !== [...s.countedSetTypes].sort((a, b) => SET_TYPES.indexOf(a) - SET_TYPES.indexOf(b)).join()) patch.countedSetTypes = ordenados
+  if (nFactor !== null && nFactor !== s.secondaryMuscleFactor) patch.secondaryMuscleFactor = nFactor
+  if (nSemanas !== null && nSemanas !== s.trendWeeks) patch.trendWeeks = nSemanas
+  const sucio = Object.keys(patch).length > 0
+
+  const descartar = () => {
+    setFormula(s.e1rmFormula)
+    setMinReps(String(s.e1rmMinReps))
+    setMaxReps(String(s.e1rmMaxReps))
+    setTipos(s.countedSetTypes)
+    setFactor(String(s.secondaryMuscleFactor).replace('.', ','))
+    setSemanas(String(s.trendWeeks))
+    setGuardado(false)
+  }
+  const cambia = <T,>(set: (v: T) => void) => (v: T) => (set(v), setGuardado(false))
+
+  return (
+    <form
+      className="flex flex-col gap-6"
+      aria-label="Parámetros de métricas"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (sucio && !hayError) guardar.mutate([patch], { onSuccess: () => setGuardado(true) })
+      }}
+    >
+      <div className="auto-grid-wide">
+        <Select label="Fórmula del e1RM" value={formula} onChange={(e) => cambia(setFormula)(e.target.value as E1rmFormula)} ayuda={FORMULA_AYUDA[formula]}>
+          {E1RM_FORMULAS.map((f) => (
+            <option key={f} value={f}>
+              {FORMULA_LABEL[f]}
+            </option>
+          ))}
+        </Select>
+        <TextField label="Repeticiones mínimas del e1RM" unidad="reps" inputMode="numeric" value={minReps} onChange={(e) => cambia(setMinReps)(e.target.value)} error={errores.minReps} ayuda="Con menos repeticiones, la serie no cuenta." className="[&_input]:text-right [&_input]:tabular-nums" />
+        <TextField label="Repeticiones máximas del e1RM" unidad="reps" inputMode="numeric" value={maxReps} onChange={(e) => cambia(setMaxReps)(e.target.value)} error={errores.maxReps} ayuda="Con más, la estimación pierde precisión." className="[&_input]:text-right [&_input]:tabular-nums" />
+        <TextField label="Músculos secundarios" inputMode="decimal" value={factor} onChange={(e) => cambia(setFactor)(e.target.value)} error={errores.factor} ayuda="Cuánto cuenta una serie para ellos: 0,5 es la mitad, 0 no cuenta." className="[&_input]:text-right [&_input]:tabular-nums" />
+        <TextField label="Semanas para la tendencia" unidad="semanas" inputMode="numeric" value={semanas} onChange={(e) => cambia(setSemanas)(e.target.value)} error={errores.semanas} ayuda="Últimas semanas con datos que usa la proyección." className="[&_input]:text-right [&_input]:tabular-nums" />
+        <TextField label="La semana empieza el" value="Lunes" disabled readOnly ayuda="Fijo: las semanas van siempre de lunes a domingo." />
+      </div>
+
+      <fieldset>
+        <legend className="field-label">Tipos de serie que cuentan</legend>
+        <div className="mt-1 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          {SET_TYPES.map((t) => (
+            <Checkbox key={t} checked={tipos.includes(t)} onChange={(v) => cambia(setTipos)(v ? [...tipos, t] : tipos.filter((x) => x !== t))} label={SET_TYPE_LABEL[t]} ayuda={AYUDA_SERIE[t]} />
+          ))}
+        </div>
+        {errores.tipos && (
+          <p className="field-error mt-2" role="alert">
+            {errores.tipos}
+          </p>
+        )}
+      </fieldset>
+
+      <div className="flex flex-wrap items-center gap-3" role="group" aria-label="Guardado de métricas">
+        <Button type="submit" variant="primary" disabled={!sucio || hayError} cargando={guardar.isPending}>
+          Guardar métricas
+        </Button>
+        <Button variant="ghost" disabled={!sucio} onClick={descartar}>
+          Descartar
+        </Button>
+        <div role="status" aria-live="polite">
+          {hayError ? <StatusBadge tono="error">Hay campos con errores: corrígelos para guardar</StatusBadge> : sucio ? <StatusBadge tono="warning">Tienes cambios sin guardar</StatusBadge> : guardado ? <StatusBadge tono="success">Cambios guardados</StatusBadge> : <span className="t-meta">Sin cambios</span>}
+        </div>
+      </div>
+    </form>
   )
 }
 
