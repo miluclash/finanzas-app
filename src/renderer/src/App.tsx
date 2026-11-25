@@ -8,7 +8,12 @@ import { leerRuta, moduloDe, RUTAS_ANTIGUAS, rutaFinanzas } from './core/shell/n
 import { useCambiarTema, useThemeSync } from './core/shell/theme'
 import { UpdateFooter } from './core/shell/UpdateFooter'
 import { useApi } from './lib/api'
+import { EjerciciosPage } from './modules/entreno/Ejercicios'
 import { EntrenoPage } from './modules/entreno/Entreno'
+import { ImportarHevyProvider, useImportarHevy } from './modules/entreno/ImportarHevy'
+import { SesionDetallePage } from './modules/entreno/SesionDetalle'
+import { SesionEditorPage } from './modules/entreno/SesionEditor'
+import { SesionesPage } from './modules/entreno/Sesiones'
 import { AccountsPage } from './modules/finanzas/Accounts'
 import { BudgetsPage } from './modules/finanzas/Budgets'
 import { TxEditorProvider, useTxEditor } from './modules/finanzas/components/TxEditor'
@@ -30,12 +35,13 @@ function RedirigirAntigua() {
 /** Une el shell (core) con lo que viene de Finanzas: contador de revisión, editor de movimientos, actualizador y tema. */
 function ShellConectado({ version }: { version: string }) {
   const { openNew, openTransfer } = useTxEditor()
+  const importarHevy = useImportarHevy().abrir
   const review = useApi('finanzas:tx.reviewQueue', [])
   const porRevisar = (review.data?.pending.length ?? 0) + (review.data?.issues.length ?? 0) + (review.data?.duplicates.length ?? 0)
   const cambiarTema = useCambiarTema()
   const { pathname } = useLocation()
   const ruta = leerRuta(pathname)
-  const acciones = { nuevoMovimiento: () => openNew(), transferencia: () => openTransfer(), cambiarTema }
+  const acciones = { nuevoMovimiento: () => openNew(), transferencia: () => openTransfer(), cambiarTema, importarHevy }
   const pie = useCallback((plegada: boolean) => <UpdateFooter plegada={plegada} version={version} />, [version])
   return (
     <AppShell ruta={ruta} porRevisar={porRevisar} acciones={acciones} pie={pie}>
@@ -51,6 +57,11 @@ function ShellConectado({ version }: { version: string }) {
         <Route path="/finanzas/prevision" element={<ForecastPage />} />
         <Route path="/finanzas/inversiones" element={<InvestmentsPage />} />
         <Route path="/entreno" element={<EntrenoPage />} />
+        <Route path="/entreno/sesiones" element={<SesionesPage />} />
+        <Route path="/entreno/sesiones/nueva" element={<SesionEditorPage />} />
+        <Route path="/entreno/sesiones/:id" element={<SesionDetallePage />} />
+        <Route path="/entreno/sesiones/:id/editar" element={<SesionEditorPage />} />
+        <Route path="/entreno/ejercicios" element={<EjerciciosPage />} />
         <Route path="/ajustes" element={<SettingsPage />} />
         {RUTAS_ANTIGUAS.map((r) => (
           <Route key={r} path={`/${r}`} element={<RedirigirAntigua />} />
@@ -89,10 +100,12 @@ export function App() {
     )
   return (
     <TxEditorProvider>
-      {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
-      <ModuloActual>
-        <Toaster />
-      </ModuloActual>
+      <ImportarHevyProvider>
+        {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
+        <ModuloActual>
+          <Toaster />
+        </ModuloActual>
+      </ImportarHevyProvider>
     </TxEditorProvider>
   )
 }

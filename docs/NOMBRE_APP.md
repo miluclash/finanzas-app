@@ -4,7 +4,7 @@ Inventario de todos los sitios donde aparece "Finanzas" / "finanzas" como **nomb
 
 Lo mantiene el agente `registro-nombre`. Regla: si una tarea añade un sitio nuevo con el nombre de la app, se apunta aquí en el mismo PR.
 
-Última revisión: v0.5.0 (22/11/2026), commit `083e050` (rama `evolucion/f2-diseno`).
+Última revisión: v0.5.0 (23/11/2026), commit `074dbe3` (rama `evolucion/f3-datos-entreno`).
 
 ## Cómo regenerar el inventario
 
@@ -40,6 +40,7 @@ Después hay que separar a mano lo que es nombre de la app de lo que es el módu
 | `FINANZAS_DB` | `src/mcp/server.ts` (28), `src/main/modules/finanzas/handlers.ts` (124, lo fija al configurar el MCP) |
 | `FINANZAS_GOLDEN_DIR` | `tests/golden-finanzas.local.test.ts` (5 y 17), `scripts/golden-capture.mjs` (6, 24 y 100), `CLAUDE.md` (24), `docs/CHANGELOG.md` (11) |
 | `FINANZAS_GOLDEN_UPDATE` | `tests/golden-finanzas.local.test.ts` (22), `scripts/golden-capture.mjs` (100) (variable interna: `1` = modo captura) |
+| `FINANZAS_HEVY_FILE` | `tests/hevy-real.local.test.ts` (1-2 comentarios, 13). Nueva en F3. Solo para la prueba con el CSV real de Hevy, que nunca va al repo |
 
 ### Visibles para el usuario
 
@@ -77,6 +78,10 @@ Después hay que separar a mano lo que es nombre de la app de lo que es el módu
 | `.gitignore` | Patrón `Finanzas-golden/` (línea 22; carpeta de la línea base del test dorado, fuera del repo) |
 | `tests/persistence.test.ts`, `tests/core/registro.test.ts`, `tests/core/restaurar.test.ts`, `tests/core/arranque.test.ts`, `tests/core/writeQueue*.test.ts` | Nombres de carpetas temporales `finanzas-*` y del archivo `finanzas.sqlite` en tests |
 | `tests/golden/sintetico.golden.json` | `"app": "finanzas-app"` en la instantánea sintética (línea 7138). Si cambia el identificador, regenerar con `npm run golden:update` y explicarlo en el PR |
+| `src/main/modules/entreno/exports.ts` | `ENTRENO_JSON_APP = 'finanzas-entreno'` (línea 16; comentario en 15). Marca de las exportaciones JSON de Entreno, que se valida al restaurar. Nuevo en F3. Cambiarlo impide restaurar exportaciones antiguas, salvo que se acepten los dos valores. Su comentario menciona `finanzas-app` (el de Finanzas) |
+| `tests/entreno/importacion.test.ts` | `app: 'finanzas-entreno'` y `app: 'finanzas-app'` en JSON de prueba (líneas 260-262 y 285), y carpeta temporal `finanzas-hevy-test-` (14). Nuevo en F3 |
+| `tests/entreno/cola-copias-borrado.test.ts`, `tests/entreno/migraciones.test.ts` | Carpetas temporales `finanzas-f3-huecos-` (14) y `finanzas-entreno-` (19), y archivo `finanzas.sqlite` en tests. Nuevo en F3 |
+| `tests/hevy-real.local.test.ts` | Carpeta por defecto `%USERPROFILE%\Finanzas-hevy\` con los CSV de Hevy (línea 15), fuera del repo. Es una carpeta del usuario, no de la app: cambiar el nombre de la app no la afecta. Nuevo en F3 |
 
 ## Del módulo Finanzas (no se renombra)
 

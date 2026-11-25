@@ -173,4 +173,4 @@ Normaliza estos componentes en la hoja del sistema de diseño, con variantes, ta
 - Revisa tildes y ortografía en todos los textos (por ejemplo, "Triceps" → "Tríceps").
 - El pie de la barra lateral muestra la versión real de package.json, sin cambiarla.
 - Se mantienen las mayúsculas en los títulos de tarjeta de Entreno y la minúscula en Finanzas.
-- Hay que hacer capturas nuevas de todas las pantallas en oscuro y claro, más Inicio y Entreno a 1024×768.
+- Las capturas de `design/capturas/` son solo a 1440×900, en oscuro y claro (más la página completa si es más alta). Los 1024×768 y el escalado al 125 % y 150 % se comprueban, pero no se guardan capturas.

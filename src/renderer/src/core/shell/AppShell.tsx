@@ -22,7 +22,7 @@ export function AppShell({
   ruta: Ruta
   children: ReactNode
   porRevisar: number
-  acciones: Pick<AccionesShell, 'nuevoMovimiento' | 'transferencia' | 'cambiarTema'>
+  acciones: Pick<AccionesShell, 'nuevoMovimiento' | 'transferencia' | 'cambiarTema' | 'importarHevy'>
   pie: (plegada: boolean) => ReactNode
 }) {
   const ancho = useViewportWidth()

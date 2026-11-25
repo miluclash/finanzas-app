@@ -1,0 +1,2 @@
+# Muestras inventadas de Hevy: se guardan byte a byte (CRLF incluido) para que la ida y vuelta exacta valga también en CI.
+tests/fixtures/hevy-ficticio-* -text

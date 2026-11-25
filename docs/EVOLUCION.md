@@ -77,11 +77,24 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
 - **Cierre y actualización**: esperan a la cola; si el último guardado falla, copia `sin-guardar` y aviso; si tampoco se puede, se pregunta antes de cerrar y no se instala la actualización.
 - **Pendiente para F3**: las migraciones corren dentro de la transacción de la operación, así que una migración no puede hacer `PRAGMA foreign_keys = OFF` (necesario para reconstruir una tabla en SQLite). Si F3 lo necesita, hay que añadir a la cola un modo de migración fuera de transacción. Mover `ISODate`/`MonthKey` de `shared/modules/finanzas/types` a `src/shared/` antes de que entreno los use.
 
+### 3.5 Cómo quedó tras F3 (decisiones de implementación)
+
+- **Dónde está cada cosa**: módulo en `src/main/modules/entreno/` (`migrations`, `seed`, `repo`, servicios `workouts`/`exercises`/`catalog`, `hevyApply`, `hevyImport`, `exports`, `hevyXlsx`, `handlers`, `index`); tipos, contrato IPC y Zod en `src/shared/modules/entreno/`; lectura pura de Hevy en `src/shared/modules/entreno/hevy/`; lector y escritor CSV genérico en `src/shared/csv.ts`; `ISODate`/`MonthKey` en `src/shared/types.ts` (finanzas los reexporta).
+- **Migraciones 2001–2005**: catálogo → planificación → sesiones y `trn_v_hevy` → ajustes → datos iniciales (12 grupos musculares y reglas de tipo). Van en ese orden porque SQLite no deja escribir en una tabla hija si la madre aún no existe. Los datos iniciales están en una migración (no en `seed`) para que también lleguen al restaurar una copia de antes de F3. `seed` solo añade los ajustes que falten.
+- **Tablas que no estaban en §4**: `trn_muscle_groups` y `trn_exercise_muscles` (grupos musculares como catálogo editable, un principal como mucho) y `trn_kind_rules` (reglas de tipo de sesión editables; gana la de mayor prioridad, sin distinguir mayúsculas ni tildes). `trn_workouts.kind_manual = 1` cuando Michael corrige el tipo: las reglas ya no lo pisan.
+- **Clave de serie**: `hevy_key` (título + inicio) + `exercise_order` + `set_index`. En Hevy `set_index` empieza en 0 y es por ejercicio. `exercise_order` sube cada vez que cambia el ejercicio (si el mismo ejercicio vuelve a salir más tarde, es otro bloque).
+- **Reimportar**: misma `hevy_key` y misma firma de series → duplicada. Firma distinta → cambiada: se sustituyen sus series y se conservan el tipo puesto a mano, el esfuerzo, las notas, el bloque y la rutina. Misma hora con otro título → aviso. Borrar una sesión de Hevy y reimportar la vuelve a crear. Las series de Hevy son de solo lectura en la app; las sesiones manuales se editan enteras.
+- **Aplicar una importación**: una sola operación de la cola. En `before` se vuelve a leer el archivo, se comprueba que su hash es el de la vista previa y se hace la copia `antes-de-importar`. Solo hay una vista previa pendiente a la vez (caduca a los 30 minutos).
+- **Renombrar un ejercicio con series** guarda el nombre anterior como alias, para que Hevy no lo vuelva a crear.
+- **Exportar**: CSV desde `trn_v_hevy` con el estilo exacto de Hevy (comillas solo en columnas de texto, números sin comillas, CRLF, sin salto final; incluye las sesiones manuales). Excel con una hoja por tabla `trn_` más "Hevy". JSON restaurable (`app: 'finanzas-entreno'`); restaurarlo solo toca tablas `trn_`, con copia previa.
+- **Auditoría**: los servicios de entreno escriben su propia fila en `audit_log` dentro de la operación (como finanzas), porque la entrada `audit` de la cola se fija al encolar y no tiene el id nuevo. Nunca con contenido de celdas.
+- **Pendiente para F4**: `entreno:settings.get/save` existen, pero los parámetros de métricas (e1RM, tipos de serie que cuentan, inicio de semana…) aún no tienen pantalla (regla 9).
+
 ## 4. Modelo de datos de Entreno
 
 La exportación de Hevy tiene una fila por serie con estas columnas: `title`, `start_time`, `end_time`, `description`, `exercise_title`, `superset_id`, `exercise_notes`, `set_index`, `set_type`, `weight_kg`, `reps`, `distance_km`, `duration_seconds`, `rpe`.
 
-**Antes de escribir el importador hay que confirmar las columnas y el formato de fechas con un archivo real de Michael** (las fechas de Hevy vienen en texto y el formato puede variar con el idioma del móvil).
+**Confirmado con el archivo real de Michael (23/11/2026)**: esas 14 columnas, todas con cabecera entre comillas; separador coma y CRLF; fechas `d MMM yyyy, HH:mm` con meses en inglés (`5 Nov 2026, 07:05`), en hora local; `set_type` visto: `normal`, `failure`, `dropset` (también se acepta `warmup`); `set_index` empieza en 0 y es por ejercicio; filas de la sesión más nueva a la más antigua; números con punto decimal y vacíos cuando no hay dato. El importador acepta también meses en español y `dd/MM/yyyy` por si cambia el idioma del móvil.
 
 Las columnas de Hevy se guardan con **el mismo nombre** en dos tablas: lo que es de la sesión en `trn_workouts` y lo que es de la serie en `trn_sets`. La vista `trn_v_hevy` las vuelve a juntar con la forma exacta del CSV, para exportar y para comprobar que la importación no pierde nada.
 
@@ -227,6 +240,5 @@ La sesión principal (orquestador) va con **Opus 5.5** (desde F2; en F0 y F1 fue
 
 ## 12. Pendiente de Michael
 
-- Un archivo real de exportación de Hevy (para fijar columnas, formato de fechas y valores de `set_type`). Se queda en local, nunca en el repo.
 - RAM y GPU del portátil, para elegir el modelo de Ollama.
 - Instalar Ollama antes de la fase F6.

@@ -1,5 +1,5 @@
 // Fechas como texto ISO 'YYYY-MM-DD' (sin horas ni zonas horarias) para evitar desfases.
-import type { ISODate, MonthKey } from './modules/finanzas/types'
+import type { ISODate, MonthKey } from './types'
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 

@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowsLeftRight, GearSix, House, MagnifyingGlass, Moon, Plus, Sparkle, type Icon } from '@phosphor-icons/react'
+import { ArrowRight, ArrowsLeftRight, Barbell, GearSix, House, MagnifyingGlass, Moon, Plus, Sparkle, UploadSimple, type Icon } from '@phosphor-icons/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cx, useFocusScope } from '../ui'
@@ -11,6 +11,7 @@ export type AccionesShell = {
   nuevoMovimiento: () => void
   transferencia: () => void
   cambiarTema: () => void
+  importarHevy: () => void
   alternarAsistente: () => void
 }
 
@@ -27,11 +28,14 @@ export function CommandPalette({ onCerrar, acciones }: { onCerrar: () => void; a
     const lista: Item[] = [
       { id: 'nuevo', grupo: 'Acciones', texto: 'Nuevo movimiento', icono: Plus, atajo: 'N', accion: acciones.nuevoMovimiento },
       { id: 'transf', grupo: 'Acciones', texto: 'Nueva transferencia', icono: ArrowsLeftRight, atajo: 'T', accion: acciones.transferencia },
+      { id: 'importar-hevy', grupo: 'Acciones', texto: 'Importar de Hevy', detalle: 'Entreno', icono: UploadSimple, accion: acciones.importarHevy },
+      { id: 'nueva-sesion', grupo: 'Acciones', texto: 'Nueva sesión', detalle: 'Entreno', icono: Barbell, accion: ir('/entreno/sesiones/nueva') },
       { id: 'tema', grupo: 'Acciones', texto: 'Cambiar entre tema oscuro y claro', icono: Moon, accion: acciones.cambiarTema },
       { id: 'ia', grupo: 'Acciones', texto: 'Abrir o cerrar el asistente', icono: Sparkle, accion: acciones.alternarAsistente },
       { id: 'inicio', grupo: 'Pantallas', texto: 'Inicio', detalle: 'Hoy', icono: House, accion: ir('/') },
       ...SECCIONES.finanzas.map((s) => ({ id: `finanzas-${s.id}`, grupo: 'Pantallas' as const, texto: s.texto, detalle: 'Finanzas', icono: s.icono, accion: ir(s.ruta) })),
       { id: 'entreno', grupo: 'Pantallas', texto: 'Entreno', detalle: 'Resumen', icono: MODULOS[2].icono, accion: ir('/entreno') },
+      ...SECCIONES.entreno.filter((s) => s.id !== 'resumen' && !s.proximamente).map((s) => ({ id: `entreno-${s.id}`, grupo: 'Pantallas' as const, texto: s.texto, detalle: 'Entreno', icono: s.icono, accion: ir(s.ruta) })),
       { id: 'ajustes', grupo: 'Pantallas', texto: 'Ajustes', detalle: 'Tema, datos y copias', icono: GearSix, accion: ir('/ajustes') }
     ]
     return lista
