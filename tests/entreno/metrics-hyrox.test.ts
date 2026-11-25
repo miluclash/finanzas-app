@@ -130,6 +130,29 @@ describe('volumen semanal con tendencia', () => {
     expect(t.changePct).toBeCloseTo(0.2, 10)
   })
 
+  it('a mano: un miércoles se compara con el lunes–miércoles de la semana anterior', () => {
+    const ctx = ctxOf({
+      exercises: [ex(10)],
+      workouts: [wk(1, '2026-11-16T07:00'), wk(2, '2026-11-18T23:30'), wk(3, '2026-11-19T07:00'), wk(4, '2026-11-20T07:00'), wk(5, '2026-11-24T07:00')],
+      sets: [st(1, 10, 100, 10), st(2, 10, 50, 10), st(3, 10, 80, 10), st(4, 10, 50, 10), st(5, 10, 60, 10)]
+    })
+    // Hoy miércoles 25/11: 600 kg frente a lunes 16 (1000) + miércoles 18 (500) = 1500; jueves y viernes no.
+    const t = weeklyVolumeTrend(ctx, '2026-11-25', 4)
+    expect(t).toMatchObject({ comparison: 'same-days', previousToDate: '2026-11-18', previousLoadKg: 1500 })
+    expect(t.changePct).toBeCloseTo(600 / 1500 - 1, 10)
+    // La columna de la semana anterior sigue siendo la semana entera.
+    expect(t.previous!.loadKg).toBe(2800)
+    expect(t.current.isCurrent).toBe(true)
+    // El domingo ya es semana entera frente a semana entera (todos los días).
+    expect(weeklyVolumeTrend(ctx, '2026-11-29', 4)).toMatchObject({ comparison: 'same-days', previousToDate: '2026-11-22', previousLoadKg: 2800 })
+    // Periodo pasado (la última semana ya terminó): semana entera.
+    const past = weeklyVolumeTrend(ctx, '2026-11-23', 2, '2026-12-10')
+    expect(past).toMatchObject({ comparison: 'full-week', previousToDate: '2026-11-22', previousLoadKg: 2800 })
+    expect(past.current.isCurrent).toBe(false)
+    // Con una sola semana en la serie también se compara.
+    expect(weeklyVolumeTrend(ctx, '2026-11-25', 1)).toMatchObject({ previous: null, previousLoadKg: 1500 })
+  })
+
   it('si la semana anterior no tiene volumen no hay % de cambio', () => {
     const t = weeklyVolumeTrend(ctxOf(), '2026-11-25', 2)
     expect(t.weeks.map((w) => w.loadKg)).toEqual([0, 0])

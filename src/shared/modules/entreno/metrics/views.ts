@@ -16,7 +16,7 @@ import {
   weekAdherence
 } from './plan'
 import { type RecordHit, type RecordMark, type RecordsResult, recentRecords, workoutRecordHits } from './records'
-import { type VolumeTrend, weeklyVolumeTrend } from './trend'
+import { type VolumeComparison, type VolumeTrend, weeklyVolumeTrend } from './trend'
 import type { GoalFact, ISODate, LocalDateTime } from './types'
 import { type GroupWeekSets, activeGroups, effectiveSetsMap, filterSets, setsStatus } from './volume'
 import { addDays, dateOf, minutesBetween, weekEndOf, weekKeysBetween, weekStartOf } from './weeks'
@@ -131,7 +131,11 @@ export interface EntrenoSummary {
 export interface EntrenoInicio {
   today: ISODate
   week: { weekStart: ISODate; planned: number; done: number; sessions: number; pct: number | null }
-  volume: { weekKey: ISODate; loadKg: number; previousLoadKg: number | null; changePct: number | null }
+  /**
+   * Volumen de la semana de hoy frente a los mismos días de la anterior (`comparison: 'same-days'`,
+   * de su lunes a `previousToDate`). Ver `VolumeTrend`.
+   */
+  volume: { weekKey: ISODate; loadKg: number; comparison: VolumeComparison; previousLoadKg: number; previousToDate: ISODate; changePct: number | null }
   nextEvent: ({ id: number; name: string } & EventCountdown) | null
   next: NextSession | null
   records: RecordHitView[]
@@ -285,7 +289,9 @@ export function buildSummary(ctx: MetricsContext, records: RecordsResult, today:
   const planned = adh.reduce((a, w) => a + w.planned, 0)
   const done = adh.reduce((a, w) => a + w.done, 0)
   const volume =
-    range.period === 'week' ? weeklyVolumeTrend(ctx, range.weeks[range.weeks.length - 1], 8) : weeklyVolumeTrend(ctx, range.weeks[range.weeks.length - 1], range.weeks.length)
+    range.period === 'week'
+      ? weeklyVolumeTrend(ctx, range.weeks[range.weeks.length - 1], 8, today)
+      : weeklyVolumeTrend(ctx, range.weeks[range.weeks.length - 1], range.weeks.length, today)
   const event = nearestEvent(ctx, today, true)
   return {
     today,
@@ -307,7 +313,7 @@ export function buildSummary(ctx: MetricsContext, records: RecordsResult, today:
 export function buildInicio(ctx: MetricsContext, records: RecordsResult, today: ISODate): EntrenoInicio {
   const ws = weekStartOf(today, ctx.settings.weekStartsOn)
   const adh = weekAdherence(ctx, ws)
-  const trend = weeklyVolumeTrend(ctx, today, 2)
+  const trend = weeklyVolumeTrend(ctx, today, 2, today)
   const event = nearestEvent(ctx, today)
   const end = weekEndOf(ws)
   return {
@@ -319,7 +325,14 @@ export function buildInicio(ctx: MetricsContext, records: RecordsResult, today: 
       sessions: ctx.workouts.filter((w) => dateOf(w.startTime) >= ws && dateOf(w.startTime) <= end).length,
       pct: adh.pct
     },
-    volume: { weekKey: trend.current.weekKey, loadKg: trend.current.loadKg, previousLoadKg: trend.previous?.loadKg ?? null, changePct: trend.changePct },
+    volume: {
+      weekKey: trend.current.weekKey,
+      loadKg: trend.current.loadKg,
+      comparison: trend.comparison,
+      previousLoadKg: trend.previousLoadKg,
+      previousToDate: trend.previousToDate,
+      changePct: trend.changePct
+    },
     nextEvent: event ? { id: event.id, name: event.name, ...eventCountdown(event.date, today) } : null,
     next: nextSession(ctx, today),
     records: recentRecords(records, 3).map((h) => hitView(ctx, h))

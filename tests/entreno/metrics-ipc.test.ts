@@ -109,8 +109,9 @@ describe('entreno:metrics.*', async () => {
     expect(s.volume.weeks).toHaveLength(8)
     expect(s.volume.weeks.filter((w) => w.isDeload).map((w) => w.weekKey)).toEqual(['2026-11-16'])
     expect(s.volume.current).toMatchObject({ weekKey: '2026-11-23', loadKg: 742.5 })
+    // La semana anterior entera tiene 120 kg (sábado), pero se compara con su lunes–miércoles: 0 kg.
     expect(s.volume.previous!.loadKg).toBe(120)
-    expect(s.volume.changePct).toBeCloseTo((742.5 - 120) / 120, 10)
+    expect(s.volume).toMatchObject({ comparison: 'same-days', previousToDate: '2026-11-18', previousLoadKg: 0, changePct: null })
     expect(s.totals).toMatchObject({ loadKg: 742.5, sessions: 1, sets: 1, minutes: 70 })
     expect(s.muscleSets.weeks).toBe(1)
     expect(s.muscleSets.groups.length).toBeGreaterThan(0)
@@ -143,12 +144,17 @@ describe('entreno:metrics.*', async () => {
     expect(m.range.weeks).toEqual(['2026-10-26', '2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'])
     expect(m.totals.sessions).toBe(5)
     expect(m.volume.weeks).toHaveLength(5)
+    // El mes llega hasta la semana de hoy: mismos días.
+    expect(m.volume.comparison).toBe('same-days')
     expect(m.muscleSets.weeks).toBe(5)
     // La semana resuelta y la próxima sesión siguen siendo las de hoy.
     expect(m.week.weekStart).toBe('2026-11-23')
     const b = h['entreno:metrics.summary']({ period: 'block', date: '2026-11-10' })
     expect(b.range).toMatchObject({ period: 'block', blockName: 'Base', from: '2026-11-02', to: '2026-11-15', weeks: ['2026-11-02', '2026-11-09'] })
     expect(b.adherence).toMatchObject({ planned: 6, done: 2 })
+    // Periodo pasado: semana entera (9/11: 85 × 11 = 935 kg) frente a semana entera (2/11: press 1155 + remo 600 + curl 267).
+    expect(b.volume).toMatchObject({ comparison: 'full-week', previousToDate: '2026-11-08', previousLoadKg: 2022 })
+    expect(b.volume.current).toMatchObject({ weekKey: '2026-11-09', loadKg: 935, isCurrent: false })
     const sin = h['entreno:metrics.summary']({ period: 'block', date: '2026-10-01' })
     expect(sin.range).toMatchObject({ requested: 'block', period: 'week', blockId: null })
   })
@@ -223,7 +229,12 @@ describe('entreno:metrics.*', async () => {
   it('inicio: lo justo para las tres tarjetas', () => {
     const i = h['entreno:metrics.inicio']()
     expect(i.week).toMatchObject({ weekStart: '2026-11-23', planned: 3, done: 1, sessions: 1 })
-    expect(i.volume).toMatchObject({ weekKey: '2026-11-23', loadKg: 742.5, previousLoadKg: 120 })
+    expect(i.volume).toEqual({ weekKey: '2026-11-23', loadKg: 742.5, comparison: 'same-days', previousLoadKg: 0, previousToDate: '2026-11-18', changePct: null })
+    // El sábado ya entran los 120 kg del sábado anterior.
+    app.ctx.todayOverride = '2026-11-28'
+    expect(h['entreno:metrics.inicio']().volume).toMatchObject({ previousLoadKg: 120, previousToDate: '2026-11-21' })
+    expect(h['entreno:metrics.inicio']().volume.changePct).toBeCloseTo((742.5 - 120) / 120, 10)
+    app.ctx.todayOverride = HOY
     expect(i.nextEvent).toMatchObject({ name: 'Carrera ficticia', daysLeft: 115 })
     expect(i.next).toMatchObject({ date: '2026-11-26', time: '18:00' })
     expect(i.records).toHaveLength(3)
