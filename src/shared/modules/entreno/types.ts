@@ -305,7 +305,7 @@ export interface EntrenoSettings {
   e1rmMaxReps: number
   /** Tipos de serie que cuentan en las métricas de rendimiento. */
   countedSetTypes: SetType[]
-  /** Día en que empieza la semana: 1 = lunes … 7 = domingo. */
+  /** Día en que empieza la semana. Siempre 1 (lunes): las semanas van de lunes a domingo y no es editable. */
   weekStartsOn: number
   /** Cuánto cuenta una serie para un grupo muscular secundario. */
   secondaryMuscleFactor: number

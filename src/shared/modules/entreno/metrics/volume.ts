@@ -2,7 +2,7 @@
 // duración y densidad, RPE y carga interna, sesiones por semana y natación. Solo series que cuentan.
 import type { WorkoutKind } from '../types'
 import { type CountedSet, type MetricsContext, setBodyweightReps, setLoadKg } from './context'
-import type { ISODate } from './types'
+import type { ISODate, MuscleGroupFact } from './types'
 import { inRange, minutesBetween, weekKeyOf } from './weeks'
 
 /** Por qué se agrupa una métrica. Las claves de id van como texto (`'12'`). */
@@ -132,6 +132,11 @@ export function effectiveSetsMap(ctx: MetricsContext, sets: CountedSet[]): Map<n
   return acc
 }
 
+/** Grupos activos del catálogo, en su orden (los desactivados no salen en las listas por grupo). */
+export function activeGroups(ctx: MetricsContext): MuscleGroupFact[] {
+  return ctx.facts.groups.filter((g) => g.active !== false)
+}
+
 export function setsStatus(sets: number, min: number, max: number): SetsStatus {
   return sets < min ? 'bajo' : sets > max ? 'por-encima' : 'dentro'
 }
@@ -142,7 +147,7 @@ export function effectiveSetsByGroup(ctx: MetricsContext, weekKey: ISODate): Gro
     ctx,
     ctx.counted.filter((s) => s.weekKey === weekKey)
   )
-  return ctx.facts.groups.map((g) => {
+  return activeGroups(ctx).map((g) => {
     const sets = map.get(g.id) ?? 0
     return { groupId: g.id, name: g.name, sets, min: g.weeklySetsMin, max: g.weeklySetsMax, status: setsStatus(sets, g.weeklySetsMin, g.weeklySetsMax) }
   })
@@ -171,7 +176,7 @@ export function groupDays(sets: CountedSet[], groupId: number): number {
 
 export function groupFrequency(ctx: MetricsContext, weekKey: ISODate): { groupId: number; name: string; days: number }[] {
   const week = ctx.counted.filter((s) => s.weekKey === weekKey)
-  return ctx.facts.groups.map((g) => ({ groupId: g.id, name: g.name, days: groupDays(week, g.id) }))
+  return activeGroups(ctx).map((g) => ({ groupId: g.id, name: g.name, days: groupDays(week, g.id) }))
 }
 
 export function groupDaysWeekly(ctx: MetricsContext, groupId: number, weekKeys: ISODate[]): Bucket[] {

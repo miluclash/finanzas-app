@@ -2,6 +2,7 @@
 // leen de la base en memoria; los que escriben llaman al servicio dentro de una operación de la
 // cola de escritura (`entreno:<nombre>`) y devuelven su promesa. Los servicios apuntan sus cambios
 // en `audit_log` dentro de esa misma operación.
+import type { MetricQuery, SummaryQuery } from '@shared/modules/entreno/metrics'
 import { WeekStartSchema } from '@shared/modules/entreno/schemas'
 import type {
   BaseWeekSlotInput,
@@ -31,6 +32,7 @@ import * as catalog from './catalog'
 import * as exercises from './exercises'
 import { exportEntrenoJson, restoreEntrenoFile, exportEntrenoXlsx, exportHevyCsv } from './exports'
 import * as goals from './goals'
+import { createMetricsService } from './metrics'
 import { createHevyImporter } from './hevyImport'
 import * as planning from './planning'
 import { parseInput } from './repo'
@@ -46,6 +48,7 @@ export function isEmpty(ctx: CoreContext): boolean {
 
 export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider) {
   const importer = createHevyImporter(ctx, dialogs)
+  const metrics = createMetricsService(ctx)
   const write = <T>(name: string, fn: () => T): Promise<T> => ctx.queue.enqueue(`entreno:${name}`, fn)
   return {
     // Sesiones
@@ -115,6 +118,18 @@ export function createEntrenoHandlers(ctx: CoreContext, dialogs: DialogProvider)
     'goals.save': (input: GoalInput) => write('goals.save', () => goals.saveGoal(ctx.db, input)),
     'goals.setStatus': (id: number, status: GoalStatus) => write('goals.setStatus', () => goals.setGoalStatus(ctx.db, id, status)),
     'goals.delete': (id: number) => write('goals.delete', () => goals.deleteGoal(ctx.db, id)),
+
+    // Métricas (solo leen; ver metrics.ts)
+    'metrics.summary': (q?: SummaryQuery) => metrics.summary(q),
+    'metrics.week': (date: ISODate) => metrics.week(date),
+    'metrics.next': (date?: ISODate | null) => metrics.next(date),
+    'metrics.records': (exerciseId?: number | null) => metrics.records(exerciseId),
+    'metrics.workoutRecords': (workoutId: number) => metrics.workoutRecords(workoutId),
+    'metrics.goals': () => metrics.goals(),
+    'metrics.goal': (goalId: number) => metrics.goal(goalId),
+    'metrics.hyrox': (eventId: number) => metrics.hyrox(eventId),
+    'metrics.compute': (metricId: string, query: MetricQuery) => metrics.compute(metricId, query),
+    'metrics.inicio': () => metrics.inicio(),
 
     // Ajustes e importaciones
     'settings.get': () => catalog.getSettings(ctx.db),

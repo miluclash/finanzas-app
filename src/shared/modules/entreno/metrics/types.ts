@@ -25,6 +25,8 @@ export type TimeOfDay = string
 
 export interface WorkoutFact {
   id: number
+  /** Título (de Hevy o puesto a mano); opcional porque las métricas no lo usan. */
+  title?: string
   startTime: LocalDateTime
   endTime: LocalDateTime | null
   kind: WorkoutKind
@@ -64,6 +66,8 @@ export interface ExerciseFact {
 export interface MuscleGroupFact {
   id: number
   name: string
+  /** false = grupo desactivado: no sale en las listas por grupo (sus series siguen contando). */
+  active?: boolean
   weeklySetsMin: number
   weeklySetsMax: number
 }
@@ -97,6 +101,8 @@ export interface EventFact {
 
 export interface GoalFact {
   id: number
+  /** Nombre visible (opcional: las métricas no lo usan). */
+  name?: string
   type: GoalType
   /** kg (E1RM, WEIGHT_REPS), series o kg (WEEKLY_VOLUME), sesiones o días (FREQUENCY). */
   targetValue: number | null
