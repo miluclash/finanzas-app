@@ -1,11 +1,12 @@
 // Entreno · Objetivos: lista por estado, formulario por tipo y gestión de eventos. El progreso y los gráficos llegan con el Resumen.
-import { CalendarStar, ChartLineUp, CheckCircle, PencilSimple, Plus, Target, Trash } from '@phosphor-icons/react'
+import { CalendarStar, CheckCircle, PencilSimple, Plus, Target, Trash } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
 import { GOAL_STATUSES, GOAL_TYPES, WORKOUT_KINDS, type Exercise, type Goal, type GoalInput, type GoalStatus, type GoalType, type MuscleGroup, type TrainingEvent, type WorkoutKind } from '@shared/modules/entreno/types'
 import { Aviso, Button, Card, ConfirmDialog, EmptyState, ErrorState, IconButton, LoadingState, Modal, PageHeader, SegmentedControl, Select, Seccion, StatusBadge, Tag, TextArea, TextField, Tooltip } from '../../core/ui'
 import { useApi, useApiMutation } from '../../lib/api'
+import { ObjetivoDetalle, useObjetivosVista } from './ObjetivoDetalle'
 import { ErrorDeServidor } from './PlanPiezas'
 import { formatKg, formatNum, GOAL_STATUS_LABEL, GOAL_TYPE_LABEL, KIND_LABEL, leerEntero, leerNumero } from './format'
 
@@ -30,14 +31,16 @@ function describir(g: Goal, ejercicios: Map<number, string>, grupos: Map<number,
 }
 
 /**
- * Hueco del progreso de un objetivo. Aquí irán el valor observado, el e1RM, la proyección y el gráfico (Resumen, 2C).
- * Hoy solo avisa: no hay ninguna cifra inventada.
+ * Progreso de un objetivo activo: lo observado, la proyección y el gráfico, que devuelve `metrics.goals()`.
  */
 export function ProgresoObjetivo({ goal }: { goal: Goal }) {
+  const q = useObjetivosVista()
+  const g = q.data?.find((x) => x.goalId === goal.id)
   return (
-    <div data-hueco="progreso-objetivo" data-goal-id={goal.id} className="mt-4 flex items-start gap-3 r-control border border-dashed border-line-strong px-4 py-3">
-      <ChartLineUp size={20} className="mt-px shrink-0 text-ink-3" aria-hidden />
-      <p className="t-label">El progreso y la proyección de este objetivo aparecerán aquí.</p>
+    <div data-hueco="progreso-objetivo" data-goal-id={goal.id} className="mt-4 border-t border-line pt-4">
+      {q.isLoading && <LoadingState filas={1} etiqueta="Calculando el progreso" />}
+      {q.error && <p className="t-label">No se ha podido calcular el progreso: {q.error.message}</p>}
+      {g && <ObjetivoDetalle g={g} modo="tarjeta" ocultarNombre />}
     </div>
   )
 }

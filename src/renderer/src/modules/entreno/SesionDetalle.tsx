@@ -1,10 +1,11 @@
-import { ArrowLeft, Info, PencilSimple, Trash } from '@phosphor-icons/react'
+import { ArrowLeft, Info, PencilSimple, Trash, Trophy } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { RecordHitView } from '@shared/modules/entreno/metrics/views'
 import { WORKOUT_KINDS, type WorkoutDetail, type WorkoutExercise, type WorkoutExtrasInput, type WorkoutKind } from '@shared/modules/entreno/types'
 import { Button, ConfirmDialog, ErrorState, LoadingState, PageHeader, Select, Tag, TextArea } from '../../core/ui'
 import { useApi, useApiMutation } from '../../lib/api'
-import { fechaDe, formatDistancia, formatDuracion, formatKg, formatNum, formatTiempo, horaDe, KIND_LABEL, SET_TYPE_LABEL } from './format'
+import { anteriorRecord, fechaDe, formatDistancia, formatDuracion, formatKg, formatNum, formatTiempo, horaDe, KIND_LABEL, marcaRecord, nombreRecord, SET_TYPE_LABEL } from './format'
 import { KindTag, OrigenTag, resumenContenido } from './Piezas'
 
 /** Entreno · detalle de una sesión: ejercicios con sus series y los campos propios (tipo, esfuerzo, notas). */
@@ -16,6 +17,8 @@ export function SesionDetallePage() {
   const [confirmar, setConfirmar] = useState(false)
   const [borrando, setBorrando] = useState(false)
   const borrar = useApiMutation('entreno:workouts.delete', { success: 'Sesión borrada' })
+  // Récords que se baten en esta sesión (se calculan, no se guardan). Si falla, la sesión se ve igual, sin marcas.
+  const records = useApi('entreno:metrics.workoutRecords', [wid], { enabled: Number.isInteger(wid) && wid > 0, retry: false })
 
   const atras = (
     <Link to="/entreno/sesiones" className="t-label mb-4 inline-flex items-center gap-1 font-semibold text-accent-text hover:underline">
@@ -82,7 +85,7 @@ export function SesionDetallePage() {
           )}
           {w.exercises.length === 0 && <p className="t-label">Esta sesión no tiene ejercicios.</p>}
           {w.exercises.map((e) => (
-            <EjercicioSesion key={e.exerciseOrder} e={e} />
+            <EjercicioSesion key={e.exerciseOrder} e={e} records={(records.data ?? []).filter((h) => h.exerciseId === e.exerciseId)} />
           ))}
         </div>
         <div className="col-span-12 @4xl:col-span-4">
@@ -111,7 +114,7 @@ export function SesionDetallePage() {
 }
 
 /** Un ejercicio de la sesión con sus series. Solo salen las columnas que tienen algún dato. */
-function EjercicioSesion({ e }: { e: WorkoutExercise }) {
+function EjercicioSesion({ e, records }: { e: WorkoutExercise; records: RecordHitView[] }) {
   const hay = (f: (s: WorkoutExercise['sets'][number]) => unknown) => e.sets.some((s) => f(s) !== null)
   const cols = {
     peso: hay((s) => s.weightKg),
@@ -127,11 +130,28 @@ function EjercicioSesion({ e }: { e: WorkoutExercise }) {
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <h3 className="t-body font-semibold">{e.catalogTitle}</h3>
         {e.supersetId && <Tag>Superserie {e.supersetId}</Tag>}
+        {records.length > 0 && (
+          <Tag tono="accent" icono={<Trophy size={14} weight="fill" aria-hidden />}>
+            Récord
+          </Tag>
+        )}
         {importadoComo && <span className="t-meta">Importado como «{e.exerciseTitle}»</span>}
         <span className="t-meta ml-auto">
           {e.sets.length} {e.sets.length === 1 ? 'serie' : 'series'}
         </span>
       </div>
+      {records.length > 0 && (
+        <ul className="mb-3 flex flex-col gap-1" aria-label={`Récords de ${e.catalogTitle}`}>
+          {records.map((h) => (
+            <li key={`${h.type}-${h.weightKg}`} className="t-label flex flex-wrap items-center gap-x-2">
+              <Trophy size={16} weight="fill" className="shrink-0 text-accent-text" aria-hidden />
+              <span>{nombreRecord(h.type)}:</span>
+              <b className="tnum font-semibold text-ink">{marcaRecord(h.type, h.value, h.weightKg)}</b>
+              <span className="t-meta tnum">({anteriorRecord(h.type, h.previous)})</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {e.exerciseNotes && <p className="t-label mb-3 whitespace-pre-line">{e.exerciseNotes}</p>}
       <div className="-mx-4 -mb-4 overflow-x-auto">
         <table className="table" data-density="compact" aria-label={`Series de ${e.catalogTitle}`}>

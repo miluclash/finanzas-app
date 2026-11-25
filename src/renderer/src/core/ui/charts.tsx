@@ -272,7 +272,7 @@ export function Columnas({
   claveY: string
   nombre: string
   resaltada: number
-  anotada?: { i: number; texto: string }
+  anotada?: { i: number; texto: string } | { i: number; texto: string }[]
   colorResaltada?: string
   colorResto?: string
   alto?: string
@@ -281,6 +281,7 @@ export function Columnas({
   etiquetaUltima?: boolean
 }) {
   const pid = `tr-${nombre.replace(/\W/g, '')}`
+  const notas = anotada ? (Array.isArray(anotada) ? anotada : [anotada]) : []
   return (
     <div style={{ height: alto }} className={cx('w-full', claseGrafico)}>
       <ResponsiveContainer width="100%" height="100%">
@@ -302,18 +303,20 @@ export function Columnas({
             isAnimationActive={false}
             label={(p: EtiquetaProps) => {
               const esUltima = etiquetaUltima && p.index === resaltada
-              const esNota = anotada && p.index === anotada.i
+              const nota = notas.find((x) => x.i === p.index)
+              const esNota = !!nota
               if (!esUltima && !esNota) return <g key={p.index} />
               return (
                 <text key={p.index} x={Number(p.x) + Number(p.width) / 2} y={Number(p.y) - 8} textAnchor="middle" className="tnum" fontWeight={600} fill="var(--lbl, var(--ink))" style={{ fontSize: 'var(--fs-label)' }}>
-                  {esNota ? anotada!.texto : formato(Number(p.value))}
+                  {nota ? nota.texto : formato(Number(p.value))}
                 </text>
               )
             }}
           >
-            {datos.map((_, i) => (
-              <Cell key={i} fill={anotada && i === anotada.i ? `url(#${pid})` : i === resaltada ? colorResaltada : colorResto} stroke={anotada && i === anotada.i ? colorResto : 'none'} />
-            ))}
+            {datos.map((_, i) => {
+              const nota = notas.some((x) => x.i === i)
+              return <Cell key={i} fill={nota ? `url(#${pid})` : i === resaltada ? colorResaltada : colorResto} stroke={nota ? colorResto : 'none'} />
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -429,29 +432,32 @@ export function MedidoresLista({
   maximo,
   estado
 }: {
-  filas: { nombre: string; valor: number }[]
+  /** `rango` propio de la fila (si cada una tiene el suyo); si no, el rango común */
+  filas: { nombre: string; valor: number; rango?: { min: number; max: number }; estado?: EstadoFila }[]
   color?: string
   formato: (v: number) => string
   rango?: { min: number; max: number; etiqueta: string }
   maximo?: number
   estado?: (v: number) => EstadoFila
 }) {
-  const max = maximo ?? Math.max(...filas.map((f) => f.valor))
-  const cols = estado ? 'cols-meter-status' : 'cols-meter'
+  const max = maximo ?? Math.max(1, ...filas.map((f) => f.valor), ...filas.map((f) => f.rango?.max ?? 0))
+  const conEstado = !!estado || filas.some((f) => f.estado)
+  const cols = conEstado ? 'cols-meter-status' : 'cols-meter'
   return (
-    <ul className={cx('flex flex-col', estado ? 'gap-4' : 'gap-3')}>
+    <ul className={cx('flex flex-col', conEstado ? 'gap-4' : 'gap-3')}>
       {filas.map((f) => {
-        const e = estado?.(f.valor)
+        const e = f.estado ?? estado?.(f.valor)
+        const r = f.rango ?? rango
         return (
-          <li key={f.nombre} className={cx('tip grid items-center gap-3 t-label', cols)} tabIndex={0} aria-label={`${f.nombre}: ${formato(f.valor)}${e ? `, ${e.texto}` : ''}`}>
+          <li key={f.nombre} className={cx('tip grid items-center gap-3 t-label', cols)} tabIndex={0} aria-label={`${f.nombre}: ${formato(f.valor)}${f.rango ? ` (rango ${f.rango.min} a ${f.rango.max})` : ''}${e ? `, ${e.texto}` : ''}`}>
             <span className="truncate text-ink-2">{f.nombre}</span>
             <span className="relative block h-2 r-full bg-track">
-              {rango && <span className="absolute inset-y-0 bg-interactive" style={{ left: `${(rango.min / max) * 100}%`, width: `${((rango.max - rango.min) / max) * 100}%`, opacity: 0.7 }} aria-hidden />}
+              {r && <span className="absolute inset-y-0 bg-interactive" style={{ left: `${(r.min / max) * 100}%`, width: `${((r.max - r.min) / max) * 100}%`, opacity: 0.7 }} aria-hidden />}
               <span className="absolute inset-y-0 left-0 block" style={{ width: `${(f.valor / max) * 100}%`, background: color, borderRadius: 'var(--radius-full) var(--radius-mark) var(--radius-mark) var(--radius-full)' }} />
-              {rango && (
+              {r && (
                 <>
-                  <span className="absolute -inset-y-1 w-px bg-ink-3" style={{ left: `${(rango.min / max) * 100}%` }} aria-hidden />
-                  <span className="absolute -inset-y-1 w-px bg-ink-3" style={{ left: `${(rango.max / max) * 100}%` }} aria-hidden />
+                  <span className="absolute -inset-y-1 w-px bg-ink-3" style={{ left: `${(r.min / max) * 100}%` }} aria-hidden />
+                  <span className="absolute -inset-y-1 w-px bg-ink-3" style={{ left: `${(r.max / max) * 100}%` }} aria-hidden />
                 </>
               )}
             </span>
@@ -476,7 +482,7 @@ export function MedidoresLista({
             </span>
           </span>
           <span />
-          {estado && <span />}
+          {conEstado && <span />}
         </li>
       )}
     </ul>
