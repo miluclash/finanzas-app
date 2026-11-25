@@ -4,6 +4,17 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 
 ## Sin publicar
 
+### F4 Lógica y pantallas de entreno (evolución a panel de vida)
+
+- **Métricas de entreno** (§6), como funciones puras con tests: volumen de carga y con peso corporal, series efectivas por grupo con su rango, e1RM (Epley o Brzycki), récords, adherencia semana a semana (sin compensar entre semanas y sin pasar del 100 %), frecuencia, duración y densidad, RPE y carga interna, natación, HYROX, progreso de objetivos con proyección y cuenta atrás.
+- **Plan**: tipos de entreno ("Fuerza A", "Natación"…), semana base (boceto) y semana concreta, en la que puedes mover sesiones de día o cambiarlas de orden. Cada semana se guarda sola copiando el boceto vigente, así que cambiar el boceto no toca las semanas pasadas ni las que hayas editado. Bloques con fases de un evento y semanas de descarga.
+- **Objetivos** de e1RM, peso × repeticiones, volumen semanal, frecuencia y evento, con gráfico de lo observado y proyección rotulada ("Proyección: 104,1 kg el 31 ene"). Al cumplirse, la app propone marcarlo como conseguido. Gestión de eventos.
+- **Resumen de Entreno** como la maqueta aprobada: semana con el estado de cada día, próxima sesión, volumen semanal (comparado con los mismos días de la semana anterior), series por grupo, HYROX, objetivos, récords, últimas sesiones con su marca de récord y constancia de 12 semanas, por semana, mes o bloque.
+- **Inicio**: las tarjetas de Entreno (semana, próxima sesión y récords recientes) muestran datos reales.
+- **Más cosas**: estación HYROX en Ejercicios (propuesta automáticamente por el nombre), tipo de entreno en el detalle y en el alta manual de sesiones, "Asignar a sesiones ya importadas" y parámetros de métricas editables en Ajustes › Entreno.
+- Migración 2006: solo columnas y tablas nuevas. Las migraciones aceptan un paso de datos, y los módulos, un paso de arranque que corre después de la copia diaria y no impide abrir la app si falla.
+- Finanzas no cambia: los dos dorados dan las mismas cifras sin regenerar nada.
+
 ### F3 Datos de entreno (evolución a panel de vida)
 
 - **Entreno ya tiene datos.** Tablas nuevas `trn_` (migraciones 2001–2005, solo tablas nuevas): sesiones y series con las mismas columnas que la exportación de Hevy, catálogo de ejercicios con grupos musculares y alias, reglas de tipo de sesión, ajustes, historial de importaciones y, sin pantallas todavía, bloques, rutinas, objetivos y eventos (llegan en F4). Antes de migrar se hace la copia `antes-de-migrar`, como siempre.

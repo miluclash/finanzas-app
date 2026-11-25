@@ -88,7 +88,21 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
 - **Renombrar un ejercicio con series** guarda el nombre anterior como alias, para que Hevy no lo vuelva a crear.
 - **Exportar**: CSV desde `trn_v_hevy` con el estilo exacto de Hevy (comillas solo en columnas de texto, números sin comillas, CRLF, sin salto final; incluye las sesiones manuales). Excel con una hoja por tabla `trn_` más "Hevy". JSON restaurable (`app: 'finanzas-entreno'`); restaurarlo solo toca tablas `trn_`, con copia previa.
 - **Auditoría**: los servicios de entreno escriben su propia fila en `audit_log` dentro de la operación (como finanzas), porque la entrada `audit` de la cola se fija al encolar y no tiene el id nuevo. Nunca con contenido de celdas.
-- **Pendiente para F4**: `entreno:settings.get/save` existen, pero los parámetros de métricas (e1RM, tipos de serie que cuentan, inicio de semana…) aún no tienen pantalla (regla 9).
+- **Pendiente para F4** (hecho en F4): los parámetros de métricas ya se editan en Ajustes › Entreno › Métricas.
+
+### 3.6 Cómo quedó tras F4 (decisiones de implementación)
+
+- **Dónde está cada cosa**: métricas puras en `src/shared/modules/entreno/metrics/` (`prepareMetrics(hechos, ajustes)` y funciones por métrica; `views.ts` construye lo que ve la interfaz); diccionario de estaciones en `src/shared/modules/entreno/hyrox.ts`; semanas del plan en `src/shared/modules/entreno/plan.ts`. En el proceso principal: `facts.ts` lee la base en bloque, `metrics.ts` expone `entreno:metrics.*` (solo lectura, con caché que se vacía tras cada escritura confirmada o restauración; "hoy" entra en cada llamada), y `planning.ts`, `routines.ts`, `blocks.ts` y `goals.ts` gestionan la planificación.
+- **Núcleo**: una migración puede llevar un paso de datos `data(db)` que corre en la misma operación. Los módulos pueden tener un paso `startup`, que corre después de la copia diaria y no impide abrir la app si falla.
+- **Migración 2006**: boceto semanal (`trn_base_week`, `trn_base_week_meta`), planes por semana (`trn_week_plan_weeks` con origen BASE/EDITED y `trn_week_plan`), alias de tipos de entreno, `event_id` e `is_deload` en bloques, rango de series por semana en grupos (10–20), `hyrox_station` en ejercicios (propuesta una sola vez con el diccionario) y `kind` en objetivos.
+- **Semanas**: siempre de lunes a domingo (`weekStartsOn` solo acepta 1). Una semana que empieza sin plan se guarda copiando el boceto vigente (origen BASE): al arrancar y al leerla. El límite hacia atrás es la semana del primer boceto; las anteriores quedan sin plan. Editar el boceto guarda antes con el boceto anterior las semanas terminadas que falten y rehace la semana actual solo si su origen es BASE. Las semanas EDITED y las pasadas no cambian nunca.
+- **Hecha ↔ planificada**: un único emparejamiento por semana alimenta la semana resuelta, la adherencia, el Inicio y "Últimas 4 semanas". Primero por tipo de entreno (en el día o en un hueco libre de la semana); si la sesión no tiene tipo de entreno, por tipo de sesión del mismo día. Lo que no cumple ningún hueco va a `extra`. Sin plan, se usa lo previsto del bloque por tipo de sesión. Cada semana va aparte y no pasa del 100 %.
+- **Tipos de entreno**: un tipo en uso (semanas guardadas o sesiones) no se borra, se desactiva. La importación y "Asignar a sesiones ya importadas" solo usan tipos activos y nunca cambian una sesión que ya tenga tipo.
+- **Récords**: se calculan, no se guardan. La primera sesión de un ejercicio no se marca como récord (sus marcas sí cuentan) e igualar una marca tampoco es récord. Los ejercicios de peso corporal no suman kg ni tienen e1RM.
+- **Objetivos**: proyección por regresión lineal sobre las últimas N semanas con datos (x en días reales / 7), mínimo 3; en volumen y frecuencia no entra la semana en curso. Texto de estimación, nunca "llegas".
+- **Volumen semanal**: en una semana en curso, el % compara con los mismos días de la semana anterior.
+- **HYROX**: el Resumen muestra el evento futuro más cercano con bloques. La mejor duración de una estación se compara solo entre series de la misma distancia (la más repetida).
+- **Pendiente para F5**: el Inicio importa formateadores de `modules/entreno` desde `core/inicio`; con los paneles editables, las tarjetas deben venir del módulo. La caché de métricas se vacía también con escrituras de finanzas (aceptable hoy).
 
 ## 4. Modelo de datos de Entreno
 
