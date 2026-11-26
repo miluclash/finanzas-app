@@ -1,9 +1,10 @@
 // Tarjetas del Resumen de Entreno. Solo pintan lo que devuelve `entreno:metrics.summary`: no calculan nada.
-import { ArrowDown, ArrowUp, Barbell, CalendarCheck, Flag, Lightning, Medal, Target, Timer, Trophy } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, Barbell, CalendarBlank, CalendarCheck, Flag, Lightning, Medal, Target, Timer, Trophy } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
 import type { EntrenoSummary } from '@shared/modules/entreno/metrics/views'
 import type { StationStats } from '@shared/modules/entreno/metrics/event'
+import type { NextSession } from '@shared/modules/entreno/metrics/plan'
 import { WORKOUT_KINDS, type WorkoutKind } from '@shared/modules/entreno/types'
 import { BarraSegmentada, Card, ChartFrame, CifraUnidad, Columnas, EmptyState, LeyendaMapa, LeyendaSemana, MapaConstancia, MedidoresLista, ProgressBar, Tag, WeekSessionCell, type EstadoSesion, type EstadoFila } from '../../core/ui'
 import { textoComparacionVolumen, sinVolumenPrevio, anteriorRecord, cuando, fechaCorta, fechaDe, formatCambio, formatDistancia, formatDuracion, formatEntero, formatKg, formatNum, formatNum1, formatPorcentaje, formatTiempo, HYROX_STATION_LABEL, KIND_LABEL, marcaRecord, nombreRecord } from './format'
@@ -35,7 +36,7 @@ export function SemanaCard({ s }: { s: EntrenoSummary }) {
       subtitulo="Cumplimiento"
       icono={<CalendarCheck size={20} weight="duotone" aria-hidden />}
       accion={<Tag title="Sesiones hechas frente a las previstas, semana a semana. Una semana no compensa a otra.">{etiqueta}</Tag>}
-      className="col-span-12 flex flex-col @4xl:col-span-8"
+      className="flex h-full flex-col"
     >
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         {huecos.length > 0 ? (
@@ -81,15 +82,36 @@ export function SemanaCard({ s }: { s: EntrenoSummary }) {
 }
 
 /* ======================= Próxima sesión ======================= */
-export function ProximaCard({ s }: { s: EntrenoSummary }) {
-  const n = s.next
-  const I = n ? KIND_ICON[n.kind ?? 'OTHER'] : Timer
+/** La usan el Resumen y el Inicio (sus datos no dependen del periodo), cada uno con su disposición de siempre. */
+export function ProximaCard({ n, today, variante }: { n: NextSession | null; today: string; variante: 'resumen' | 'inicio' }) {
+  const I = n ? KIND_ICON[n.kind ?? 'OTHER'] : variante === 'inicio' ? Barbell : Timer
+  if (variante === 'inicio')
+    return (
+      <Card titulo="Próxima sesión" icono={<CalendarBlank size={20} weight="duotone" aria-hidden />} className="h-full">
+        {n ? (
+          <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-center @3xl:justify-between @5xl:flex-col @5xl:items-stretch @5xl:justify-start">
+            <div>
+              <div className="t-kpi">{n.routineName || 'Sesión'}</div>
+              <p className="t-label mt-2">{cuando(n.date, today, n.time)}</p>
+              <p className="t-meta mt-1 flex items-center gap-1">
+                <I size={14} aria-hidden /> {n.kind ? KIND_LABEL[n.kind] : 'Tipo de entreno borrado'}
+              </p>
+            </div>
+            <Link to="/entreno/plan" className="btn btn-secondary">
+              Ver la semana
+            </Link>
+          </div>
+        ) : (
+          <EmptyState horizontal icono={<Barbell size={20} aria-hidden />} titulo="Sin sesión prevista" texto="Crea tu semana base en Plan y aquí verás la siguiente sesión." accion={<Link to="/entreno/plan?vista=boceto" className="btn btn-secondary btn-sm">Ir a Plan</Link>} />
+        )}
+      </Card>
+    )
   return (
-    <Card titulo="Próxima sesión" icono={<Timer size={20} weight="duotone" aria-hidden />} className="col-span-12 flex flex-col @4xl:col-span-4">
+    <Card titulo="Próxima sesión" icono={<Timer size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
       {n ? (
         <>
           <div className="t-kpi">{n.routineName || 'Sesión'}</div>
-          <p className="t-label mt-2">{cuando(n.date, s.today, n.time)}</p>
+          <p className="t-label mt-2">{cuando(n.date, today, n.time)}</p>
           <p className="t-meta mt-1 flex items-center gap-1">
             <I size={14} aria-hidden /> {n.kind ? KIND_LABEL[n.kind] : 'Tipo de entreno borrado'}
             {n.isToday && ' · es hoy'}
@@ -119,7 +141,7 @@ export function VolumenCard({ s }: { s: EntrenoSummary }) {
   const rotulo = (x: { isoWeek: number }) => `S${x.isoWeek}`
   const ch = v.changePct
   return (
-    <Card hero titulo="Volumen semanal" subtitulo="kg de volumen de entrenamiento" icono={<Barbell size={20} weight="fill" aria-hidden />} className="col-span-12 flex flex-col @4xl:col-span-7">
+    <Card hero titulo="Volumen semanal" subtitulo="kg de volumen de entrenamiento" icono={<Barbell size={20} weight="fill" aria-hidden />} className="flex h-full flex-col">
       {vacio ? (
         <EmptyState compacto icono={<Barbell size={20} aria-hidden />} titulo="Todavía no hay volumen" texto="Aparecerá cuando registres series con peso. Los calentamientos no cuentan." />
       ) : (
@@ -173,7 +195,7 @@ export function SeriesCard({ s }: { s: EntrenoSummary }) {
   const mismoRango = todos.length > 0 && todos.every((g) => g.min === todos[0].min && g.max === todos[0].max)
   const esSemana = s.range.period === 'week'
   return (
-    <Card titulo="Series por grupo" subtitulo={esSemana ? 'esta semana' : 'media por semana'} icono={<Target size={20} weight="duotone" aria-hidden />} className="col-span-12 flex flex-col @4xl:col-span-5">
+    <Card titulo="Series por grupo" subtitulo={esSemana ? 'esta semana' : 'media por semana'} icono={<Target size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
       {con.length === 0 ? (
         <EmptyState compacto icono={<Target size={20} aria-hidden />} titulo="Sin series en este periodo" texto="Si tus ejercicios no tienen grupo muscular, no se pueden repartir. Ponlo en Ejercicios." accion={<Link to="/entreno/ejercicios?cat=sin-grupo" className="btn btn-secondary btn-sm">Ver ejercicios sin grupo</Link>} />
       ) : (
@@ -186,7 +208,6 @@ export function SeriesCard({ s }: { s: EntrenoSummary }) {
           <MedidoresLista
             filas={con.map((g) => ({ nombre: g.name, valor: Math.round(g.sets * 10) / 10, rango: { min: g.min, max: g.max }, estado: ESTADO_GRUPO[g.status] }))}
             formato={(x) => formatNum1(x)}
-            rango={mismoRango ? { min: todos[0].min, max: todos[0].max, etiqueta: 'rango' } : undefined}
           />
         </ChartFrame>
       )}
@@ -211,7 +232,7 @@ export function HyroxCard({ s }: { s: EntrenoSummary }) {
   const h = s.hyrox
   if (!h)
     return (
-      <Card titulo="HYROX" icono={<Flag size={20} weight="duotone" aria-hidden />} className="col-span-12 flex flex-col @4xl:col-span-5">
+      <Card titulo="HYROX" icono={<Flag size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
         <EmptyState
           compacto
           icono={<Flag size={20} aria-hidden />}
@@ -235,7 +256,7 @@ export function HyroxCard({ s }: { s: EntrenoSummary }) {
   const el = h.elapsed
   const colorFase = (p: (typeof h.phases)[number]) => (p.isCurrent ? 'var(--accent-mark)' : p.endDate < s.today ? 'var(--muted-mark)' : 'var(--track)')
   return (
-    <Card titulo="HYROX" subtitulo={`${h.event.name} · ${formatDate(h.event.date)}`} icono={<Flag size={20} weight="duotone" aria-hidden />} className="col-span-12 flex flex-col @4xl:col-span-5">
+    <Card titulo="HYROX" subtitulo={`${h.event.name} · ${formatDate(h.event.date)}`} icono={<Flag size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
       <div className="t-kpi">
         <CifraUnidad valor={String(Math.max(c.daysLeft, 0))} unidad={c.daysLeft === 1 ? 'día' : 'días'} />
       </div>
@@ -321,7 +342,7 @@ export function ObjetivosCard({ s }: { s: EntrenoSummary }) {
           Ver todos
         </Link>
       }
-      className="col-span-12 flex flex-col @4xl:col-span-7"
+      className="flex h-full flex-col"
     >
       {g.length === 0 ? (
         <EmptyState compacto icono={<Trophy size={20} aria-hidden />} titulo="Añade un objetivo" texto="Por ejemplo, llegar a un e1RM, subir tu volumen semanal o entrenar un número de veces por semana. Aquí verás el camino." accion={<Link to="/entreno/objetivos?nuevo=1" className="btn btn-primary btn-sm">Nuevo objetivo</Link>} />
@@ -347,7 +368,7 @@ export function ObjetivosCard({ s }: { s: EntrenoSummary }) {
 /* ======================= Récords ======================= */
 export function RecordsCard({ s }: { s: EntrenoSummary }) {
   return (
-    <Card titulo="Récords" subtitulo="los 5 últimos" icono={<Medal size={20} weight="duotone" aria-hidden />} className="col-span-12 @3xl:col-span-6 @5xl:col-span-4">
+    <Card titulo="Récords" subtitulo="los 5 últimos" icono={<Medal size={20} weight="duotone" aria-hidden />} className="h-full">
       {s.recentRecords.length === 0 ? (
         <EmptyState compacto icono={<Medal size={20} aria-hidden />} titulo="Todavía no hay récords" texto="Se marcan cuando superas una marca anterior de un ejercicio: hacen falta al menos dos sesiones." />
       ) : (
@@ -388,7 +409,7 @@ export function UltimasCard({ s }: { s: EntrenoSummary }) {
           Ver todas
         </Link>
       }
-      className="col-span-12 @3xl:col-span-6 @5xl:col-span-4"
+      className="h-full"
     >
       {s.recentWorkouts.length === 0 ? (
         <EmptyState compacto icono={<Lightning size={20} aria-hidden />} titulo="Aún no hay sesiones" texto="Importa tu historial de Hevy o apunta una sesión a mano." />
@@ -427,7 +448,7 @@ export function ConstanciaCard({ s }: { s: EntrenoSummary }) {
   const c = s.consistency
   const dias = c.days.filter((d) => d !== null && d > 0).length
   return (
-    <Card titulo="Constancia" subtitulo={`${c.weeks} semanas`} icono={<CalendarCheck size={20} weight="duotone" aria-hidden />} className="col-span-12 flex flex-col @5xl:col-span-4">
+    <Card titulo="Constancia" subtitulo={`${c.weeks} semanas`} icono={<CalendarCheck size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
       <MapaConstancia datos={c.days} inicio={c.start} semanas={c.weeks} />
       <div className="mt-4">
         <LeyendaMapa />

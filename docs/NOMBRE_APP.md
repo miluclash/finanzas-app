@@ -4,7 +4,7 @@ Inventario de todos los sitios donde aparece "Finanzas" / "finanzas" como **nomb
 
 Lo mantiene el agente `registro-nombre`. Regla: si una tarea añade un sitio nuevo con el nombre de la app, se apunta aquí en el mismo PR.
 
-Última revisión: v0.5.0 (25/11/2026), commit `eaa9e80` (rama `evolucion/f4-entreno`).
+Última revisión: v0.5.0 (26/11/2026), commit `c97079c` (rama `evolucion/f5-graficos`).
 
 ## Cómo regenerar el inventario
 
@@ -82,6 +82,7 @@ Después hay que separar a mano lo que es nombre de la app de lo que es el módu
 | `tests/entreno/importacion.test.ts` | `app: 'finanzas-entreno'` y `app: 'finanzas-app'` en JSON de prueba (líneas 260-262 y 285), y carpeta temporal `finanzas-hevy-test-` (14). Nuevo en F3 |
 | `tests/entreno/cola-copias-borrado.test.ts`, `tests/entreno/migraciones.test.ts` | Carpetas temporales `finanzas-f3-huecos-` (14) y `finanzas-entreno-` (19), y archivo `finanzas.sqlite` en tests. Nuevo en F3 |
 | `tests/core/migracion-datos-arranque.test.ts`, `tests/entreno/migracion-2006.test.ts`, `tests/entreno/planificacion.test.ts`, `tests/entreno/bloques-objetivos.test.ts` | Carpetas temporales `finanzas-mig-datos-`, `finanzas-2006-`, `finanzas-plan-` y `finanzas-f4-` (en `os.tmpdir()`), y archivo `finanzas.sqlite` en tests. Nuevo en F4 |
+| `tests/core/graficos-integracion.test.ts`, `tests/core/graficos-migraciones.test.ts` | Carpetas temporales `finanzas-f5i-` (línea 27) y `finanzas-f5-` (línea 17, en `os.tmpdir()`), y archivo `finanzas.sqlite` en tests (línea 69 de migraciones). Nuevo en F5 |
 | `tests/hevy-real.local.test.ts` | Carpeta por defecto `%USERPROFILE%\Finanzas-hevy\` con los CSV de Hevy (línea 15), fuera del repo. Es una carpeta del usuario, no de la app: cambiar el nombre de la app no la afecta. Nuevo en F3 |
 
 ## Del módulo Finanzas (no se renombra)

@@ -7,6 +7,7 @@
 // De aquí salen también los tipos de la API que usa la interfaz (Handlers, ApiMethod, ApiResult,
 // ApiArgs), con el tipo exacto de cada método.
 import type { CoreContext } from './core/context'
+import { CORE_MIGRATIONS } from './core/coreMigrations'
 import { createCoreHandlers, type CoreHandlers, type DialogProvider } from './core/handlers'
 import { createRegistry, mergeHandlers, type ModuleDeps, type Registry } from './core/registry'
 import { entrenoModule } from './modules/entreno'
@@ -15,9 +16,9 @@ import { finanzasModule } from './modules/finanzas'
 /** Módulos de la app, en el orden en que se siembran y se juntan sus handlers. */
 export const APP_MODULES = [finanzasModule, entrenoModule] as const
 
-/** Registro validado con los módulos de la app. */
+/** Registro validado con las migraciones del núcleo y los módulos de la app. */
 export function createAppRegistry(): Registry {
-  return createRegistry(APP_MODULES)
+  return createRegistry(APP_MODULES, CORE_MIGRATIONS)
 }
 
 type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void ? I : never

@@ -247,9 +247,9 @@ describe('entreno:metrics.*', async () => {
     expect(() => h['entreno:metrics.compute']('volumen-carga', { groupBy: 'año' } as never)).toThrow()
   })
 
-  it('las métricas están registradas en el módulo como { id, name }', () => {
+  it('las métricas están registradas en el módulo con el contrato del núcleo (entreno.<id>)', () => {
     const mod = app.ctx.registry.modules.find((m) => m.id === 'entreno')!
-    expect(mod.metrics).toEqual(ENTRENO_METRICS.map((m) => ({ id: m.id, name: m.name })))
+    expect(mod.metrics.map((m) => ({ id: m.id, name: m.name, module: m.module }))).toEqual(ENTRENO_METRICS.map((m) => ({ id: `entreno.${m.id}`, name: m.name, module: 'entreno' })))
   })
 
   it('leer no escribe nada', () => {

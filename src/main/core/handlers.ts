@@ -2,9 +2,12 @@
 // Los de cada módulo los construye su `ipc` (ver registry.ts) y se juntan en la raíz de composición.
 // Los de lectura son síncronos y no pasan por la cola; los que escriben (o necesitan turno)
 // devuelven una promesa de la cola de escritura.
+import type { ChartInput, ChartSpec, DashboardCard, DashboardId, MetricOptionKind, MetricQuery } from '@shared/core/metrics-types'
 import { autoBackup, createBackup, listBackups, restoreBackup } from './backup'
+import { createChartsService, createDashboardsService } from './charts'
 import type { CoreContext } from './context'
 import { UserError } from './errors'
+import { createCoreMetrics } from './metrics'
 import { schemaVersion } from './migrations'
 
 /** Diálogos nativos y acciones del sistema (en tests se sustituyen por unos falsos). */
@@ -17,6 +20,9 @@ export interface DialogProvider {
 }
 
 export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, appVersion = '0.0.0') {
+  const metrics = createCoreMetrics(ctx)
+  const charts = createChartsService(ctx, metrics)
+  const dashboards = createDashboardsService(ctx)
   return {
     'app.info': () => ({
       version: appVersion,
@@ -63,7 +69,24 @@ export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, ap
     'data.openFolder': () => {
       if (ctx.paths.dbPath) dialogs.showItem(ctx.paths.dbPath)
       return true
-    }
+    },
+
+    // Métricas del registro (solo leen; las calcula el módulo dueño)
+    'metrics.list': () => metrics.list(),
+    'metrics.compute': (id: string, query: MetricQuery) => metrics.compute(id, query),
+    'metrics.options': (kind: MetricOptionKind) => metrics.options(kind),
+
+    // Gráficos guardados (las escrituras van por la cola, con auditoría)
+    'charts.list': () => charts.list(),
+    'charts.get': (id: number) => charts.get(id),
+    'charts.save': (input: ChartInput) => charts.save(input),
+    'charts.delete': (id: number) => charts.delete(id),
+    'charts.data': (specOrId: ChartSpec | number) => charts.data(specOrId),
+
+    // Paneles editables (la fusión con el diseño por defecto la hace la interfaz)
+    'dashboards.get': (id: DashboardId) => dashboards.get(id),
+    'dashboards.save': (id: DashboardId, cards: DashboardCard[]) => dashboards.save(id, cards),
+    'dashboards.reset': (id: DashboardId) => dashboards.reset(id)
   }
 }
 

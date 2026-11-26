@@ -56,7 +56,8 @@ function objetos(db: Db, type: 'table' | 'view'): string[] {
 function volcadoNoEntreno(db: Db): Record<string, unknown[]> {
   const out: Record<string, unknown[]> = {}
   for (const t of objetos(db, 'table')) {
-    if (t.startsWith('trn_') || t.startsWith('sqlite_') || t === 'schema_migrations') continue
+    // Las core_ (F5) son nuevas y vacías: las comprueban los tests de gráficos.
+    if (t.startsWith('trn_') || t.startsWith('core_') || t.startsWith('sqlite_') || t === 'schema_migrations') continue
     out[t] = db.all(`SELECT * FROM "${t}" ORDER BY rowid`)
   }
   return out
@@ -81,7 +82,7 @@ describe('migraciones de entreno', () => {
       for (const alter of m.up.matchAll(/\bALTER\s+TABLE\s+\w+\s+(\w+)/gi)) expect(alter[1].toUpperCase()).toBe('ADD')
       expect(m.up).not.toMatch(/PRAGMA/i)
     }
-    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 2001, 2002, 2003, 2004, 2005, 2006])
+    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 1001, 1002, 2001, 2002, 2003, 2004, 2005, 2006])
   })
 
   it('base vacía: crea las tablas, la vista y los datos iniciales', async () => {

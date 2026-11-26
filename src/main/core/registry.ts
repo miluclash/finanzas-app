@@ -4,6 +4,17 @@
 import type { CoreContext } from './context'
 import type { Db } from './db'
 import type { DialogProvider } from './handlers'
+import {
+  DIMENSION_GROUPINGS,
+  METRIC_AGGREGATIONS,
+  METRIC_FILTER_KEYS,
+  METRIC_PRESENTATIONS,
+  METRIC_UNITS,
+  TIME_GROUPINGS,
+  type MetricDef as MetricContract,
+  type MetricOption,
+  type MetricOptionKind
+} from '@shared/core/metrics-types'
 import { MIGRATION_RANGES, type Migration, type MigrationOwner, type VersionRange } from './migrations'
 
 /** Identificadores de módulo. Cada uno tiene su rango de migraciones en `MIGRATION_RANGES`. */
@@ -23,13 +34,12 @@ export interface ModuleDeps {
 }
 
 /**
- * Métrica que un módulo expone al constructor de gráficos y a la IA local.
- * Marcador de posición: se define de verdad en la fase de gráficos. En F1 todos van vacíos.
+ * Métrica que un módulo expone al constructor de gráficos y a la IA local: el contrato de
+ * `src/shared/core/metrics-types.ts`, con `compute` recibiendo el contexto del núcleo. El registro
+ * comprueba al crearse que los ids son únicos en toda la app y que unidad, agregación,
+ * agrupaciones, divisiones y filtros son valores del contrato.
  */
-export interface MetricDef {
-  id: string
-  name: string
-}
+export type MetricDef = MetricContract<CoreContext>
 
 /**
  * Herramienta que la IA local puede usar. Marcador de posición: se define en la fase de IA local.
@@ -59,7 +69,13 @@ export interface AppModule<H extends HandlerMap = HandlerMap, I extends ModuleId
   migrations: readonly Migration[]
   /** Construye los handlers IPC del módulo (necesitan el contexto porque guardan estado). */
   ipc: (ctx: CoreContext, deps: ModuleDeps) => H
+  /** Métricas para el constructor de gráficos (cada una con `module` = id de este módulo). */
   metrics: readonly MetricDef[]
+  /**
+   * Listas para los filtros del constructor (ejercicios, categorías, cuentas…). Devuelve null si
+   * este módulo no conoce esa lista; el núcleo junta las respuestas de todos los módulos.
+   */
+  metricOptions?(ctx: CoreContext, kind: MetricOptionKind): MetricOption[] | null
   aiTools: readonly AiToolDef[]
   importers?: readonly ImporterDef[]
   exporters?: readonly ExporterDef[]
@@ -96,7 +112,10 @@ export interface Registry {
   readonly migrations: readonly Migration[]
   /** Tablas que tiene que tener una copia `.sqlite`: `schema_migrations` y las de cada módulo. */
   readonly requiredTables: readonly string[]
+  /** Métricas de todos los módulos, en el orden del registro. */
+  readonly metrics: readonly MetricDef[]
   get(id: ModuleId): AppModule | undefined
+  metric(id: string): MetricDef | undefined
 }
 
 function checkRange(owner: string, range: VersionRange, migrations: readonly Migration[], seen: Map<number, string>): void {
@@ -110,9 +129,40 @@ function checkRange(owner: string, range: VersionRange, migrations: readonly Mig
   }
 }
 
+const GROUPINGS: readonly string[] = [...TIME_GROUPINGS, ...DIMENSION_GROUPINGS]
+
+/** Comprueba las métricas de un módulo contra el contrato (y que sus ids no estén ya usados). */
+function checkMetrics(m: AppModule, seen: Map<string, string>): void {
+  const bad = (id: string, why: string) => new Error(`Métrica «${id}» de ${m.id}: ${why}`)
+  const notIn = (xs: readonly unknown[], allowed: readonly string[]) => xs.find((x) => !allowed.includes(x as string))
+  if (!Array.isArray(m.metrics))
+    throw new Error(`El módulo ${m.id} no tiene lista de métricas (¿un ciclo de importaciones la deja sin definir al registrarlo?).`)
+  for (const d of m.metrics) {
+    if (typeof d.id !== 'string' || !d.id.trim()) throw new Error(`Métrica sin id en ${m.id}.`)
+    const prev = seen.get(d.id)
+    if (prev) throw new Error(`Id de métrica repetido: «${d.id}» (${prev} y ${m.id}).`)
+    seen.set(d.id, m.id)
+    if (d.module !== m.id) throw bad(d.id, `su módulo es «${String(d.module)}» y tiene que ser «${m.id}».`)
+    if (typeof d.name !== 'string' || !d.name.trim()) throw bad(d.id, 'le falta el nombre.')
+    if (!METRIC_UNITS.includes(d.unit)) throw bad(d.id, `unidad no válida «${String(d.unit)}».`)
+    if (!METRIC_AGGREGATIONS.includes(d.aggregation)) throw bad(d.id, `agregación no válida «${String(d.aggregation)}».`)
+    if (!Array.isArray(d.groupings) || d.groupings.length === 0) throw bad(d.id, 'tiene que admitir al menos una agrupación.')
+    const g = notIn(d.groupings, GROUPINGS)
+    if (g !== undefined) throw bad(d.id, `agrupación no válida «${String(g)}».`)
+    if (!Array.isArray(d.splits)) throw bad(d.id, 'le falta la lista de divisiones (vacía si no admite ninguna).')
+    const sp = notIn(d.splits, DIMENSION_GROUPINGS)
+    if (sp !== undefined) throw bad(d.id, `división no válida «${String(sp)}».`)
+    if (!Array.isArray(d.filters)) throw bad(d.id, 'le falta la lista de filtros (vacía si no admite ninguno).')
+    const f = notIn(d.filters, METRIC_FILTER_KEYS)
+    if (f !== undefined) throw bad(d.id, `filtro no válido «${String(f)}».`)
+    if (d.presentation !== undefined && !METRIC_PRESENTATIONS.includes(d.presentation)) throw bad(d.id, `presentación no válida «${String(d.presentation)}».`)
+    if (typeof d.compute !== 'function') throw bad(d.id, 'le falta la función de cálculo.')
+  }
+}
+
 /**
- * Crea el registro y lo valida: ids únicos, migraciones dentro del rango de su dueño y versiones
- * no repetidas. Los nombres de handler se validan al construirlos (`mergeHandlers`), porque solo
+ * Crea el registro y lo valida: ids únicos, migraciones dentro del rango de su dueño, versiones
+ * no repetidas y métricas conformes al contrato (ids únicos en toda la app). Los nombres de handler se validan al construirlos (`mergeHandlers`), porque solo
  * existen cuando hay un contexto.
  */
 export function createRegistry(modules: readonly AppModule[], coreMigrations: readonly Migration[] = []): Registry {
@@ -127,12 +177,18 @@ export function createRegistry(modules: readonly AppModule[], coreMigrations: re
   for (const m of modules) checkRange(m.id, MIGRATION_RANGES[m.id], m.migrations, seen)
   const migrations = [...coreMigrations, ...modules.flatMap((m) => m.migrations)].sort((a, b) => a.version - b.version)
   const requiredTables = ['schema_migrations', ...modules.flatMap((m) => m.requiredTables ?? [])]
+  const metricIds = new Map<string, string>()
+  for (const m of modules) checkMetrics(m, metricIds)
   const list = [...modules]
+  const metrics = list.flatMap((m) => m.metrics)
+  const byId = new Map(metrics.map((d) => [d.id, d]))
   return {
     modules: list,
     migrations,
     requiredTables,
-    get: (id) => list.find((m) => m.id === id)
+    metrics,
+    get: (id) => list.find((m) => m.id === id),
+    metric: (id) => byId.get(id)
   }
 }
 

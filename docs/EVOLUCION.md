@@ -102,7 +102,28 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
 - **Objetivos**: proyección por regresión lineal sobre las últimas N semanas con datos (x en días reales / 7), mínimo 3; en volumen y frecuencia no entra la semana en curso. Texto de estimación, nunca "llegas".
 - **Volumen semanal**: en una semana en curso, el % compara con los mismos días de la semana anterior.
 - **HYROX**: el Resumen muestra el evento futuro más cercano con bloques. La mejor duración de una estación se compara solo entre series de la misma distancia (la más repetida).
-- **Pendiente para F5**: el Inicio importa formateadores de `modules/entreno` desde `core/inicio`; con los paneles editables, las tarjetas deben venir del módulo. La caché de métricas se vacía también con escrituras de finanzas (aceptable hoy).
+- **Pendiente para F5**: el Inicio importaba formateadores de `modules/entreno` desde `core/inicio` (resuelto en F5: las tarjetas vienen del módulo). La caché de métricas se vacía también con escrituras de finanzas (aceptable hoy).
+
+### 3.7 Cómo quedó tras F5 (decisiones de implementación)
+
+- **Contrato** en `src/shared/core/metrics-types.ts`:
+  - `MetricDef` lleva `id` (`<módulo>.<id>`), `module`, `name`, `unit` canónica, `aggregation` (`sum` flujos, `last` saldos, `ratio` tasas con `num`/`den`, `max` mejores marcas), `groupings`, `splits`, `filters`, `presentation?: 'reference'` (series de referencia como el presupuesto, que se dibujan discontinuas) y `compute`.
+  - En `ratio`, un punto con `den = 0` no tiene valor propio (sale vacío) pero cuenta en los totales.
+  - El núcleo junta las métricas de todos los módulos (`core:metrics.list/compute/options`).
+- **Motor puro** en `src/shared/core/charts/`: validación de la especificación v1 (1–6 series; misma agrupación admitida; misma unidad; división solo con una serie; apilar solo con `sum`; dispersión con dos series), rangos relativos con `now` y semanas ISO, periodo anterior de igual duración (con fin de mes alineado), agregación, apilado con «Otros» a partir de 12 valores, dispersión, tabla y `mergeDashboard`.
+- **Métricas mensuales con mes en curso**: Finanzas calcula por meses completos, así que el periodo anterior se alinea a meses completos y el gráfico lo dice.
+- **Finanzas**:
+  - 14 métricas en `modules/finanzas/metrics.ts` que envuelven las funciones de siempre (tests de igualdad). Los gastos salen en positivo para compararlos con el presupuesto. La tasa de ahorro del año es flujo neto / ingresos de todo el año.
+  - `AppState` vive en `appState.ts` (sin ciclo de importaciones); `state.ts` es la entrada.
+- **Tablas del núcleo**: `core_charts` (1001) y `core_dashboards` (1002). Escrituras por la cola con auditoría; borrar un gráfico lo quita de todos los paneles en la misma operación.
+- **Interfaz**:
+  - `core/graficos/` (`PanelEditable`, `GraficoVista`, `ConstructorGrafico`, `TarjetasProvider`). Las tarjetas fijas las registra cada módulo en `modules/<módulo>/tarjetas.tsx` y `App.tsx` las junta: el núcleo no importa módulos y el Inicio ya no importa piezas de Entreno.
+  - Cuadrícula de 12 columnas (pequeña ⅓, mediana ½, ancha ⅔, completa), en dos columnas o a todo el ancho por debajo de unos 56rem.
+  - Editar panel con borrador y Hecho/Cancelar; «Restaurar diseño» también se deshace con Cancelar.
+  - Arrastre con @dnd-kit, ratón y teclado; marca el hueco y reordena al soltar.
+  - Los gráficos solo se editan o borran en modo editar.
+- **Decisiones de Michael en F5**: los paneles por defecto van a mitades y tercios (los antiguos 7/5 y 5/4/3 ya no existen), el arrastre no recoloca en vivo, no hay lápiz fuera del modo editar y el presupuesto siempre se dibuja discontinuo.
+- **Pendiente**: al salir de la página en modo edición se descartan los cambios con un aviso, sin confirmar antes (el `HashRouter` actual no permite `useBlocker`). Exportar o importar paneles queda fuera.
 
 ## 4. Modelo de datos de Entreno
 

@@ -5,8 +5,8 @@ import { type CountedSet, type MetricsContext, setBodyweightReps, setLoadKg } fr
 import type { ISODate, MuscleGroupFact } from './types'
 import { inRange, minutesBetween, weekKeyOf } from './weeks'
 
-/** Por qué se agrupa una métrica. Las claves de id van como texto (`'12'`). */
-export type Grouping = 'workout' | 'exercise' | 'muscleGroup' | 'week' | 'month' | 'day' | 'kind'
+/** Por qué se agrupa una métrica. Las claves de id van como texto (`'12'`). `year` (clave `YYYY`) la usa el constructor de gráficos. */
+export type Grouping = 'workout' | 'exercise' | 'muscleGroup' | 'week' | 'month' | 'year' | 'day' | 'kind'
 
 export interface SetFilter {
   /** Desde esta fecha (incluida), por el día en que empieza la sesión. */
@@ -53,6 +53,8 @@ export function groupKey(s: CountedSet, by: Grouping): string | null {
       return s.weekKey
     case 'month':
       return s.monthKey
+    case 'year':
+      return s.monthKey.slice(0, 4)
     case 'day':
       return s.date
     case 'kind':
