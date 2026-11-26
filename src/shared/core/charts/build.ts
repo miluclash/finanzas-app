@@ -14,9 +14,9 @@
 // - Dispersión: pares x/y por clave común de las dos series. Tabla: los mismos números.
 import type { ISODate } from '../../types'
 import type { ChartSpec, ChartValidationIssue, MetricBucket, MetricMeta, MetricQuery, TimeGrouping } from '../metrics-types'
-import { regroup, seriesTotal } from './aggregate'
+import { pointValue, regroup, seriesTotal } from './aggregate'
 import { isTimeGrouping, timeKeyLabel, timeKeyLongLabel } from './labels'
-import { previousRangeFor, resolveRange, timeKeys, type DateRange } from './range'
+import { monthEndOf, monthStartOf, previousRangeFor, resolveRange, timeKeys, type DateRange } from './range'
 import type { ChartData, ChartDataPoint, ChartDataSeries, ChartScatter } from './types'
 import { nativeGrouping, parseSpec } from './validate'
 
@@ -72,10 +72,25 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
   const axis = time ? 'time' : 'dimension'
   const scatter = spec.type === 'scatter'
   const range = resolveRange(spec.range, now)
-  const prevRange = spec.comparePrevious && !scatter ? previousRangeFor(spec.range, now) : null
+  const notes: string[] = []
+  // Métricas que solo se calculan por meses (ninguna admite días ni semanas): cuentan el mes entero,
+  // así que el periodo anterior se alinea a meses completos y se avisa si el mes actual va a medias.
+  const soloMeses = spec.series.every((s) => {
+    const tg = byId.get(s.metricId)!.groupings.filter(isTimeGrouping)
+    return tg.length > 0 && !tg.includes('day') && !tg.includes('week')
+  })
+  let prevRange = spec.comparePrevious && !scatter ? previousRangeFor(spec.range, now) : null
+  const previousFullMonths = !!prevRange && soloMeses
+  if (prevRange && soloMeses) {
+    prevRange = { from: monthStartOf(prevRange.from), to: monthEndOf(prevRange.to) }
+    if (range.to !== monthEndOf(range.to)) {
+      const mods = [...new Set(spec.series.map((s) => byId.get(s.metricId)!.module))]
+      const quien = mods.length === 1 ? `${mods[0].charAt(0).toUpperCase()}${mods[0].slice(1)} calcula` : 'Estas métricas se calculan'
+      notes.push(`${quien} por meses completos: el mes en curso se compara con el mes anterior entero.`)
+    }
+  }
   const curKeys = time ? timeKeys(range.from, range.to, g) : null
   const prevKeys = time && prevRange ? timeKeys(prevRange.from, prevRange.to, g) : null
-  const notes: string[] = []
 
   const load = (i: number, r: DateRange, keys: string[] | null): MetricBucket[] => {
     const s = spec.series[i]
@@ -109,18 +124,19 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
     const prevBy = bySplit(prev)
     const splitLabel = new Map<string, string>()
     for (const b of [...cur, ...prev]) if (b.splitLabel && !splitLabel.has(b.split ?? '')) splitLabel.set(b.split ?? '', b.splitLabel)
-    let values = [...curBy.keys()]
+    // Los valores que solo salen en el periodo anterior también tienen su serie (vacía en el actual).
+    let values = [...curBy.keys(), ...[...prevBy.keys()].filter((v) => !curBy.has(v))]
     let others: string[] = []
     if (values.length > MAX_SPLITS) {
       if (meta.aggregation === 'sum') {
-        const tot = (v: string) => Math.abs(seriesTotal(curBy.get(v)!, 'sum', axis) ?? 0)
+        const tot = (v: string) => Math.abs(seriesTotal(curBy.get(v) ?? [], 'sum', axis) ?? 0)
         const ranked = [...values].sort((a, b) => tot(b) - tot(a))
         const keep = new Set(ranked.slice(0, MAX_SPLITS - 1))
         others = values.filter((v) => !keep.has(v))
         values = values.filter((v) => keep.has(v))
         notes.push(`Hay ${others.length + values.length} valores; los ${others.length} más pequeños se juntan en «${OTHERS}».`)
       } else {
-        const ranked = [...values].sort((a, b) => curBy.get(b)!.length - curBy.get(a)!.length)
+        const ranked = [...values].sort((a, b) => (curBy.get(b)?.length ?? 0) - (curBy.get(a)?.length ?? 0))
         const keep = new Set(ranked.slice(0, MAX_SPLITS))
         notes.push(`Se muestran los ${MAX_SPLITS} valores con más datos de ${values.length}.`)
         values = values.filter((v) => keep.has(v))
@@ -134,7 +150,7 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
         seriesIndex: i,
         meta,
         split: v,
-        cur: curBy.get(v)!,
+        cur: curBy.get(v) ?? [],
         prev: prevBy.get(v) ?? []
       })
     )
@@ -167,24 +183,28 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
   }
 
   const fill = (l: Line) => (l.meta.aggregation === 'sum' ? 0 : null)
+  // Periodos que empiezan después de hoy (rango con fechas fijas hacia el futuro): sin dato no es 0.
+  const inicioDe = (k: string) => (g === 'year' ? `${k}-01-01` : g === 'month' ? `${k}-01` : k)
+  const futuro = (k: string) => time && inicioDe(k) > now
   const series: ChartDataSeries[] = []
   for (const l of lines) {
-    const base = { seriesIndex: l.seriesIndex, metricId: l.meta.id, aggregation: l.meta.aggregation, ...(l.split !== undefined ? { split: l.split } : {}) }
+    const base = { seriesIndex: l.seriesIndex, metricId: l.meta.id, aggregation: l.meta.aggregation, ...(l.split !== undefined ? { split: l.split } : {}), ...(l.meta.presentation === 'reference' ? { reference: true } : {}) }
     series.push({ ...base, id: l.id, label: l.label, previous: false, stackId: 'actual', total: seriesTotal(l.cur, l.meta.aggregation, axis) })
   }
   if (prevRange)
     for (const l of lines) {
-      const base = { seriesIndex: l.seriesIndex, metricId: l.meta.id, aggregation: l.meta.aggregation, ...(l.split !== undefined ? { split: l.split } : {}) }
+      const base = { seriesIndex: l.seriesIndex, metricId: l.meta.id, aggregation: l.meta.aggregation, ...(l.split !== undefined ? { split: l.split } : {}), ...(l.meta.presentation === 'reference' ? { reference: true } : {}) }
       series.push({ ...base, id: l.prevId, label: `${l.label} · periodo anterior`, previous: true, of: l.id, stackId: 'anterior', total: seriesTotal(l.prev, l.meta.aggregation, axis) })
     }
 
-  const curMaps = lines.map((l) => new Map(l.cur.map((b) => [b.key, b.value])))
-  const prevMaps = lines.map((l) => new Map(l.prev.map((b) => [b.key, b.value])))
+  // En ratio, un punto con den = 0 sale vacío (null), no como 0 %.
+  const curMaps = lines.map((l) => new Map(l.cur.map((b) => [b.key, pointValue(b, l.meta.aggregation)])))
+  const prevMaps = lines.map((l) => new Map(l.prev.map((b) => [b.key, pointValue(b, l.meta.aggregation)])))
   const points: ChartDataPoint[] = keys.map((key, idx) => {
     const prevKey = !prevRange ? null : time ? (prevKeys![idx] ?? null) : key
     const values: Record<string, number | null> = {}
     lines.forEach((l, li) => {
-      values[l.id] = curMaps[li].get(key) ?? fill(l)
+      values[l.id] = curMaps[li].get(key) ?? (futuro(key) ? null : fill(l))
       if (prevRange) values[l.prevId] = prevKey == null ? null : (prevMaps[li].get(prevKey) ?? fill(l))
     })
     const pl = prevKey == null ? null : time ? prevLabels[idx] : pointLabels[idx]
@@ -206,7 +226,7 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
       x: series[0],
       y: series[1],
       points: keys.flatMap((key, idx) =>
-        a.has(key) && b.has(key) ? [{ key, label: pointLabels[idx].label, longLabel: pointLabels[idx].longLabel, x: a.get(key)!, y: b.get(key)! }] : []
+        a.get(key) != null && b.get(key) != null ? [{ key, label: pointLabels[idx].label, longLabel: pointLabels[idx].longLabel, x: a.get(key)!, y: b.get(key)! }] : []
       )
     }
   }
@@ -220,6 +240,7 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
     axis,
     range,
     previous: prevRange,
+    previousFullMonths,
     now,
     series,
     points,
@@ -231,6 +252,6 @@ export function buildChartData(input: ChartSpec, metas: readonly MetricMeta[], f
       totals: series.map((s) => s.total)
     },
     notes,
-    empty: lines.every((l) => l.cur.length === 0)
+    empty: lines.every((l) => l.cur.length === 0 && l.prev.length === 0)
   }
 }

@@ -7,7 +7,10 @@
 //   a la misma altura: se desplazan `from` y `to` N periodos hacia atrás. Así la duración en periodos
 //   coincide (N), el anterior también queda alineado y cada posición se compara con la misma
 //   (semana con semana, mes con mes). En semanas la duración en días es exactamente la misma; en
-//   meses y años el corte se ajusta al último día del mes si ese día no existe (31 → 28/29/30).
+//   meses y años el corte se ajusta al último día del mes si ese día no existe (31 → 28/29/30), y
+//   si `now` es el último día de su mes, el corte anterior también lo es (30/4 → 31/3, 28/2 → 31/1).
+// - Métricas que solo se calculan por meses (sin días ni semanas): el motor alinea además el
+//   anterior a meses completos (`build.ts`), porque esas métricas cuentan el mes entero.
 // - Rangos por días y rangos con fechas fijas (`previousRange`): el tramo de igual duración en días
 //   justo antes. Si el rango son meses completos (del día 1 al último día de un mes), el anterior
 //   son los mismos meses completos justo antes (igual duración en meses).
@@ -100,7 +103,21 @@ export function previousRangeFor(range: ChartRange, now: ISODate): DateRange {
   const r = resolveRange(range, now)
   if (range.kind === 'absolute' || range.unit === 'day') return previousRange(r.from, r.to)
   const n = range.kind === 'this' ? 1 : range.count
-  return { from: shiftPeriods(r.from, range.unit, -n), to: shiftPeriods(r.to, range.unit, -n) }
+  const to = shiftPeriods(r.to, range.unit, -n)
+  // Si el corte es el último día de su mes, el anterior también (30/4 → 31/3, 29/2 → 31/1).
+  const finDeMes = (range.unit === 'month' || range.unit === 'year') && isMonthEnd(r.to)
+  return { from: shiftPeriods(r.from, range.unit, -n), to: finDeMes ? monthEndOf(to) : to }
+}
+
+/** Último día del mes de `d`. */
+export function monthEndOf(d: ISODate): ISODate {
+  const p = parts(d)
+  return `${d.slice(0, 7)}-${String(daysInMonth(p.y, p.m)).padStart(2, '0')}`
+}
+
+/** Primer día del mes de `d`. */
+export function monthStartOf(d: ISODate): ISODate {
+  return `${d.slice(0, 7)}-01`
 }
 
 /** Clave de tiempo de una fecha: el día, el lunes de su semana, `YYYY-MM` o `YYYY`. */

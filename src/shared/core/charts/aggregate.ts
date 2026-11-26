@@ -34,6 +34,14 @@ export class RatioWithoutPartsError extends Error {
   }
 }
 
+/**
+ * Valor que se dibuja de un punto: en `ratio`, un punto con `den = 0` no tiene valor propio (null),
+ * aunque su `num` y su `den` sigan contando al combinar.
+ */
+export function pointValue(b: AggPoint, aggregation: MetricAggregation): number | null {
+  return aggregation === 'ratio' && b.den === 0 ? null : b.value
+}
+
 /** Combina puntos con la agregación de la métrica. null si no hay ningún punto. */
 export function combine(points: readonly AggPoint[], aggregation: MetricAggregation): AggResult | null {
   if (points.length === 0) return null
@@ -62,11 +70,13 @@ export function combine(points: readonly AggPoint[], aggregation: MetricAggregat
 
 /**
  * Total de una serie a lo largo del eje. En un eje de tiempo, `last` es el último periodo; en un eje
- * de dimensión, `last` suma (cada clave es un saldo distinto).
+ * de dimensión, `last` suma (cada clave es un saldo distinto). En `ratio`, null si Σden es 0.
  */
 export function seriesTotal(points: readonly AggPoint[], aggregation: MetricAggregation, axis: 'time' | 'dimension'): number | null {
   const agg = axis === 'dimension' && aggregation === 'last' ? 'sum' : aggregation
-  return combine(points, agg)?.value ?? null
+  const r = combine(points, agg)
+  if (!r || (agg === 'ratio' && r.den === 0)) return null
+  return r.value
 }
 
 /**

@@ -26,6 +26,7 @@ export function metaOf(d: MetricDef): MetricMeta {
     filters: [...d.filters]
   }
   if (d.description) m.description = d.description
+  if (d.presentation) m.presentation = d.presentation
   return m
 }
 

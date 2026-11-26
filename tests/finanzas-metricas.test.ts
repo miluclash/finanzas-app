@@ -114,11 +114,15 @@ describe('tasas de ahorro', () => {
         const x = sums.get(m)!
         if (x.txCount === 0) continue
         const b = got.get(m)!
-        expect(b.value).toBe(x[key] ?? 0)
-        if (x[key] !== null) {
-          expect(b.num! / b.den!).toBe(x[key])
-          checked++
+        if (x[key] === null) {
+          // sin ingresos: punto con den = 0 y value = 0 (el motor lo dibuja como «—»)
+          expect(b.den).toBe(0)
+          expect(b.value).toBe(0)
+          continue
         }
+        expect(b.value).toBe(x[key])
+        expect(b.num! / b.den!).toBe(x[key])
+        checked++
         expect(Number.isInteger(b.num!) && Number.isInteger(b.den!)).toBe(true)
       }
       expect(checked).toBeGreaterThan(1)

@@ -181,14 +181,16 @@ function def(
 }
 
 /** Átomos de flujo a partir del resumen mensual (solo meses con movimientos). */
-function flow(pick: (s: ReturnType<typeof monthSummaries> extends Map<string, infer S> ? S : never) => Partial<Atom> & { value: number }): CoreCompute {
+function flow(pick: (s: ReturnType<typeof monthSummaries> extends Map<string, infer S> ? S : never) => (Partial<Atom> & { value: number }) | null): CoreCompute {
   return (ctx, q) => {
     const months = monthsOf(q)
     const sums = monthSummaries(ctx, months)
     const out: Atom[] = []
     for (const m of months) {
       const s = sums.get(m)!
-      if (s.txCount > 0) out.push({ month: m, ...pick(s) })
+      if (s.txCount === 0) continue
+      const a = pick(s)
+      if (a) out.push({ month: m, ...a })
     }
     return out
   }
@@ -299,7 +301,7 @@ export const FINANZAS_METRICS: MetricDef<CoreContext>[] = [
   def(
     'tasa-ahorro',
     'Tasa de ahorro',
-    'Flujo neto entre ingresos (num = flujo neto, den = ingresos).',
+    'Flujo neto entre ingresos (num = flujo neto, den = ingresos). Un mes sin ingresos da punto con den = 0 y value = 0 (suma su num en el año).',
     'pct',
     'ratio',
     {},
@@ -308,7 +310,7 @@ export const FINANZAS_METRICS: MetricDef<CoreContext>[] = [
   def(
     'tasa-ahorro-sin-extra',
     'Tasa de ahorro sin extraordinarios',
-    'Tasa de ahorro sin contar gastos extraordinarios (num = flujo neto sin ellos, den = ingresos).',
+    'Tasa de ahorro sin contar gastos extraordinarios (num = flujo neto sin ellos, den = ingresos). Un mes sin ingresos da punto con den = 0 y value = 0 (suma su num en el año).',
     'pct',
     'ratio',
     {},
@@ -338,8 +340,8 @@ export const FINANZAS_METRICS: MetricDef<CoreContext>[] = [
   ),
   def(
     'saldo-cuenta',
-    'Saldo por cuenta',
-    'Saldo de cada cuenta (efectivo y posiciones) a fin de mes.',
+    'Saldo de cuentas',
+    'Saldo a fin de mes (efectivo y posiciones): suma de todas las cuentas elegidas, también pasivos y las que no cuentan para el patrimonio; elige una cuenta o divide por cuenta para verlas por separado.',
     'eur_cents',
     'last',
     { groupings: [...TIME, 'account'], splits: ['account'], filters: ['accountId'] },
@@ -368,15 +370,19 @@ export const FINANZAS_METRICS: MetricDef<CoreContext>[] = [
       investmentsFirstMonth
     )
   ),
-  def(
-    'presupuesto',
-    'Presupuesto',
-    'Suma de los presupuestos del mes (solo categorías de gasto con presupuesto).',
-    'eur_cents',
-    'sum',
-    { groupings: [...TIME, ...CAT_DIMS], splits: CAT_DIMS, filters: CAT_FILTERS },
-    budgetAtoms('budgetCents')
-  ),
+  {
+    // Serie de referencia: se dibuja discontinua (o solo con borde en barras), nunca como lo real.
+    ...def(
+      'presupuesto',
+      'Presupuesto',
+      'Suma de los presupuestos del mes (solo categorías de gasto con presupuesto).',
+      'eur_cents',
+      'sum',
+      { groupings: [...TIME, ...CAT_DIMS], splits: CAT_DIMS, filters: CAT_FILTERS },
+      budgetAtoms('budgetCents')
+    ),
+    presentation: 'reference'
+  },
   def(
     'gasto-presupuestado',
     'Gasto en categorías presupuestadas',

@@ -31,6 +31,7 @@ import { chartCardId, fixedCardId, mergeDashboard } from '@shared/core/charts/da
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useApi, useApiMutation } from '../../lib/api'
+import { toast } from '../../lib/toast'
 import { Button, ConfirmDialog, ErrorState, IconButton, LoadingState, PageHeader, Popover, Select, StatusBadge, cx } from '../ui'
 import { ConstructorGrafico } from './ConstructorGrafico'
 import { GraficoVista } from './GraficoVista'
@@ -91,7 +92,11 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
     [fila.data, lista.data, porDefecto, fijas, graficos]
   )
 
+  /** Diseño por defecto ya fusionado (lo que deja «Restaurar diseño» en el borrador). */
+  const porDefectoCards = useMemo(() => mergeDashboard(null, porDefecto, [...fijas.keys()], [...graficos.keys()]), [porDefecto, fijas, graficos])
   const [borrador, setBorrador] = useState<DashboardCard[] | null>(null)
+  /** Se pulsó «Restaurar diseño» en esta edición: si al pulsar Hecho sigue igual, se borra la fila. */
+  const [restaurado, setRestaurado] = useState(false)
   const editando = borrador !== null
   const tarjetas = borrador ?? guardadas
   const [constructor, setConstructor] = useState<{ chartId?: number } | null>(null)
@@ -111,6 +116,12 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
     }
   }, [borrador, lista.data, graficos])
 
+  // Salir de la página con cambios sin guardar: la app usa <HashRouter> (sin `useBlocker`), así que no
+  // se puede pedir confirmación antes de navegar; al menos se avisa de que se han descartado.
+  const sinGuardar = useRef(false)
+  sinGuardar.current = !!borrador && JSON.stringify(borrador) !== JSON.stringify(guardadas)
+  useEffect(() => () => void (sinGuardar.current && toast.info('Se han descartado los cambios del panel que no habías guardado.')), [])
+
   // Devolver el foco tras cada cambio de la cuadrícula o del modo.
   useEffect(() => {
     if (!foco) return
@@ -129,8 +140,8 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
     return () => window.clearTimeout(t)
   }, [foco, tarjetas])
 
-  const guardar = useApiMutation('core:dashboards.save', { success: 'Panel guardado', onSuccess: () => (setBorrador(null), setFoco('editar')) })
-  const restaurar = useApiMutation('core:dashboards.reset', { success: 'Diseño restaurado', onSuccess: () => (setBorrador(null), setFoco('editar')) })
+  const guardar = useApiMutation('core:dashboards.save', { success: 'Panel guardado', onSuccess: () => (setBorrador(null), setRestaurado(false), setFoco('editar')) })
+  const restaurar = useApiMutation('core:dashboards.reset', { success: 'Diseño restaurado', onSuccess: () => (setBorrador(null), setRestaurado(false), setFoco('editar')) })
   const borrar = useApiMutation('core:charts.delete', { success: (r) => (r.removedCards > 1 ? `Gráfico borrado y quitado de ${r.removedCards} tarjetas` : 'Gráfico borrado') })
 
   const nombreDe = useCallback(
@@ -142,15 +153,20 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
   // --- Acciones del borrador ---
   const empezar = () => {
     setBorrador(guardadas ? guardadas.map((c) => ({ ...c })) : [])
+    setRestaurado(false)
     setFoco('hecho')
   }
   const cancelar = () => {
     setBorrador(null)
+    setRestaurado(false)
     setFoco('editar')
   }
   const hecho = () => {
     if (!borrador) return
-    if (JSON.stringify(borrador) === JSON.stringify(guardadas)) return cancelar()
+    const igual = (a: DashboardCard[] | null) => JSON.stringify(borrador) === JSON.stringify(a)
+    // Restaurado y sin tocar después: vuelve al diseño por defecto borrando la fila (no se guarda una copia).
+    if (restaurado && igual(porDefectoCards)) return fila.data?.saved ? restaurar.mutate([dashboardId]) : cancelar()
+    if (igual(guardadas)) return cancelar()
     guardar.mutate([dashboardId, borrador])
   }
   const mover = (id: string, delta: -1 | 1) => {
@@ -349,27 +365,24 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
           onCerrar={() => setConstructor(null)}
           onGuardado={(g) => {
             setConstructor(null)
-            if (constructor.chartId == null) {
-              if (editando) anadirGrafico(g)
-              else {
-                // Nuevo gráfico desde fuera del modo edición: se añade y se guarda el panel.
-                const base = guardadas ?? []
-                guardar.mutate([dashboardId, [...base, { id: chartCardId(g.id, base.map((c) => c.id)), type: 'chart', ref: String(g.id), size: 'm', hidden: false }]])
-              }
-            }
+            // Un gráfico nuevo solo se crea desde «Añadir tarjeta» (en modo edición): va al borrador.
+            if (constructor.chartId == null && editando) anadirGrafico(g)
           }}
         />
       )}
       {confirmar?.tipo === 'restaurar' && (
         <ConfirmDialog
           titulo="¿Restaurar el diseño del panel?"
-          texto="Vuelven las tarjetas de siempre, en su orden y tamaño. Los gráficos que hayas añadido se quitan del panel, pero no se borran."
+          texto="Vuelven las tarjetas de siempre, en su orden y tamaño. Los gráficos que hayas añadido se quitan del panel, pero no se borran. Se aplica al pulsar «Hecho»; «Cancelar» lo deshace."
           confirmar="Restaurar diseño"
           peligro={false}
           onCancelar={() => setConfirmar(null)}
           onConfirmar={() => {
             setConfirmar(null)
-            restaurar.mutate([dashboardId])
+            setBorrador(porDefectoCards.map((c) => ({ ...c })))
+            setRestaurado(true)
+            setAnuncio('Diseño por defecto en el borrador. Pulsa «Hecho» para guardarlo o «Cancelar» para descartarlo.')
+            setFoco('hecho')
           }}
         />
       )}

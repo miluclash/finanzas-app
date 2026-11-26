@@ -70,7 +70,9 @@ export interface MetricQuery {
 /**
  * Un punto de la serie. `key` es la clave de la agrupación (fecha del lunes, `YYYY-MM`, `YYYY`, `YYYY-MM-DD`
  * o el id de la dimensión). `split` es el valor de `splitBy` si se pidió. En métricas `ratio`, `num` y `den`
- * son obligatorios y `value = num / den` (o 0 si `den` es 0); el motor recalcula con ellos.
+ * son obligatorios y `value = num / den` (o 0 si `den` es 0); el motor recalcula con ellos. En `ratio`, un
+ * punto con `den = 0` no tiene valor propio: el gráfico lo muestra vacío, pero su `num` y su `den` siguen
+ * contando en los totales, en el año derivado y en la comparación (Σnum/Σden; null si Σden es 0).
  */
 export interface MetricBucket {
   key: string
@@ -100,7 +102,15 @@ export interface MetricMeta {
   splits: readonly DimensionGrouping[]
   /** Filtros admitidos. */
   filters: readonly MetricFilterKey[]
+  /**
+   * Cómo se dibuja. `reference`: serie de referencia (un presupuesto, un plan), que se distingue de lo
+   * real: discontinua en líneas y áreas, solo con borde en barras, y así en la leyenda.
+   */
+  presentation?: MetricPresentation
 }
+
+export const METRIC_PRESENTATIONS = ['reference'] as const
+export type MetricPresentation = (typeof METRIC_PRESENTATIONS)[number]
 
 /**
  * Métrica completa, en el proceso principal. `C` es el contexto que recibe `compute` (en el núcleo,

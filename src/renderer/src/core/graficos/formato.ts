@@ -77,6 +77,20 @@ export function textoPeriodo(r: DateRange, groupBy: Grouping): string {
   return `Del ${formatDate(r.from)} al ${formatDate(r.to)} · por ${GROUPING_LABELS[groupBy]}`
 }
 
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const mesDe = (d: string) => MESES[Number(d.slice(5, 7)) - 1]
+
+/**
+ * Periodo anterior para el pie del gráfico: «del 15/06/2026 al 03/09/2026» o, si son meses completos,
+ * «octubre de 2026 completo» / «de junio a octubre de 2026 (meses completos)».
+ */
+export function textoAnterior(r: DateRange, mesesCompletos: boolean): string {
+  if (!mesesCompletos) return `del ${formatDate(r.from)} al ${formatDate(r.to)}`
+  const [a1, a2] = [r.from.slice(0, 4), r.to.slice(0, 4)]
+  if (r.from.slice(0, 7) === r.to.slice(0, 7)) return `${mesDe(r.from)} de ${a1} completo`
+  return a1 === a2 ? `de ${mesDe(r.from)} a ${mesDe(r.to)} de ${a2} (meses completos)` : `de ${mesDe(r.from)} de ${a1} a ${mesDe(r.to)} de ${a2} (meses completos)`
+}
+
 const UNIDAD_RANGO = { day: ['día', 'días'], week: ['semana', 'semanas'], month: ['mes', 'meses'], year: ['año', 'años'] } as const
 
 /** Descripción de un rango: «Últimas 12 semanas», «Este año», «Del 01/01/2026 al 31/03/2026». */

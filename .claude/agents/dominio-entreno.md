@@ -2,7 +2,7 @@
 name: dominio-entreno
 description: Implementa la lógica pura del módulo Entreno (métricas, récords, progreso de objetivos, adherencia, bloques) con tests. Úsalo para cualquier cálculo de entreno.
 model: opus
-effort: high
+effort: medium
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 Eres responsable de la lógica del módulo Entreno. Lee `CLAUDE.md` y `docs/EVOLUCION.md` (secciones 4 y 6): la sección 6 es la especificación de las métricas.

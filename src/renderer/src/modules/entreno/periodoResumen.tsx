@@ -5,10 +5,15 @@ import { createContext, useContext } from 'react'
 import type { SummaryPeriod } from '@shared/modules/entreno/metrics/views'
 import { useApi } from '../../lib/api'
 
-export const PeriodoResumenCtx = createContext<SummaryPeriod>('week')
+export const PeriodoResumenCtx = createContext<SummaryPeriod | null>(null)
 
 export function usePeriodoResumen(): SummaryPeriod {
-  return useContext(PeriodoResumenCtx)
+  return useContext(PeriodoResumenCtx) ?? 'week'
+}
+
+/** ¿Está la tarjeta en el Resumen de Entreno? (el Resumen publica su periodo; en el Inicio no hay) */
+export function useEnResumen(): boolean {
+  return useContext(PeriodoResumenCtx) !== null
 }
 
 /** `entreno:metrics.summary` del periodo elegido. Todas las tarjetas comparten la misma consulta. */

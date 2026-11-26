@@ -1,10 +1,14 @@
 // Dibuja un gráfico del constructor (`ChartData` de `core:charts.data`). Todo llega calculado del
 // proceso principal: aquí solo se elige la forma, el color por función y el formato de las cifras.
 //
-// - Serie actual: color de la serie (paleta del módulo). Desde la quinta, el color se repite con
-//   trama (barras) o punteado (líneas), para no depender solo del color.
-// - Periodo anterior: el mismo color que su serie, discontinua (líneas y áreas) o rayada (barras),
-//   y rotulado «· periodo anterior» en la leyenda y en el tooltip.
+// - Serie actual: color de la serie (paleta del módulo, 4 colores) por patrón (3): hasta 12 series
+//   (el máximo de una división antes de "Otros") sin repetir combinación. Barras: lisa, rayada y
+//   punteada; líneas: continua, raya-punto y raya-doble punto.
+// - Serie de referencia (`reference`: presupuesto, plan): discontinua en líneas y áreas, solo con
+//   borde discontinuo y sin relleno en barras, y con esa misma marca en la leyenda.
+// - Periodo anterior: el color de su serie más claro (mezclado al 55 %), punteado en líneas y áreas y
+//   rayado en barras (el anterior de una referencia, solo con borde). Rotulado «· periodo anterior».
+//   Así presupuesto (discontinuo, color pleno) y periodo anterior (punteado, más claro) no se confunden.
 // - "Otros" (división): gris de contexto.
 // - Objetivo: línea de referencia discontinua rotulada «Objetivo: …».
 // - Estados: cargando, sin datos, error (con reintentar) y «Gráfico no válido · Editar» con el
@@ -28,11 +32,12 @@ import {
   type ItemLeyenda,
   type Patron,
   type Referencia,
+  type RellenoBarra,
   type SerieBarra,
   type SerieLinea,
   type TablaGrafico
 } from '../ui'
-import { NOMBRE_TOTAL, formatoEje, formatoValor, textoCambio, textoPeriodo, textoUnidad } from './formato'
+import { NOMBRE_TOTAL, formatoEje, formatoValor, textoAnterior, textoCambio, textoPeriodo, textoUnidad } from './formato'
 
 const PALETA = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)']
 const OTROS = 'var(--muted-mark)'
@@ -50,10 +55,16 @@ const TIPO_TEXTO: Record<ChartData['type'], string> = {
 
 interface Estilo {
   color: string
-  /** Segunda vuelta de la paleta o periodo anterior: con patrón. */
+  /** Trazo en líneas y áreas. */
   patron: Patron
-  trama: boolean
+  /** Relleno en barras. */
+  relleno: RellenoBarra
 }
+
+const PATRONES_LINEA: Patron[] = ['solida', 'rayapunto', 'rayadoble']
+/** El mismo color, más claro: para el periodo anterior. */
+const masClaro = (color: string) => `color-mix(in srgb, ${color} 55%, transparent)`
+const RELLENOS: RellenoBarra[] = ['solido', 'trama', 'puntos']
 
 /** Color y patrón de cada serie (las anteriores heredan el color de la suya). */
 function estilos(series: ChartDataSeries[]): Map<string, Estilo> {
@@ -63,11 +74,15 @@ function estilos(series: ChartDataSeries[]): Map<string, Estilo> {
     if (s.previous) continue
     const otros = s.split === null
     const color = otros ? OTROS : PALETA[i % PALETA.length]
-    const vuelta = !otros && i >= PALETA.length
-    out.set(s.id, { color, patron: vuelta ? 'punteada' : 'solida', trama: vuelta })
+    const vuelta = otros ? 0 : Math.floor(i / PALETA.length) % PATRONES_LINEA.length
+    out.set(s.id, s.reference ? { color, patron: 'discontinua', relleno: 'contorno' } : { color, patron: PATRONES_LINEA[vuelta], relleno: RELLENOS[vuelta] })
     if (!otros) i++
   }
-  for (const s of series) if (s.previous) out.set(s.id, { color: out.get(s.of!)?.color ?? OTROS, patron: 'discontinua', trama: true })
+  for (const s of series)
+    if (s.previous) {
+      const base = out.get(s.of!)
+      out.set(s.id, { color: masClaro(base?.color ?? OTROS), patron: 'punteada', relleno: base?.relleno === 'contorno' ? 'contorno' : 'trama' })
+    }
   return out
 }
 
@@ -160,9 +175,9 @@ export function GraficoDatos({ data, titulo, alto = 'var(--chart-h)' }: { data: 
   const leyenda: ItemLeyenda[] = [
     ...(resumirAnteriores ? actuales : data.series).map((s) => {
       const e = est.get(s.id)!
-      return { nombre: s.label, color: e.color, patron: barras ? (e.trama ? ('trama' as const) : ('barra' as const)) : e.patron }
+      return { nombre: s.label, color: e.color, patron: barras ? (e.relleno === 'solido' ? ('barra' as const) : e.relleno) : e.patron }
     }),
-    ...(resumirAnteriores ? [{ nombre: 'Periodo anterior (mismos colores, ' + (barras ? 'rayado)' : 'discontinua)'), color: OTROS, patron: barras ? ('trama' as const) : ('discontinua' as const) }] : []),
+    ...(resumirAnteriores ? [{ nombre: 'Periodo anterior (mismos colores, más claros y ' + (barras ? 'rayados)' : 'punteados)'), color: OTROS, patron: barras ? ('trama' as const) : ('punteada' as const) }] : []),
     ...referencias.map((r) => ({ nombre: r.texto, color: 'var(--ref)', patron: 'discontinua' as const }))
   ]
 
@@ -188,7 +203,7 @@ export function GraficoDatos({ data, titulo, alto = 'var(--chart-h)' }: { data: 
   partes.push(...data.notes)
   const referencia = partes.join('. ') || undefined
 
-  const periodo = textoPeriodo(data.range, data.groupBy) + (data.previous ? ` · comparado con ${textoPeriodo(data.previous, data.groupBy).replace(/^Del/, 'del').replace(/ · por .*$/, '')}` : '')
+  const periodo = textoPeriodo(data.range, data.groupBy) + (data.previous ? ` · comparado con ${textoAnterior(data.previous, data.previousFullMonths)}` : '')
   const tabla: TablaGrafico = {
     columnas: [GROUPING_LABELS[data.groupBy].replace(/^./, (c) => c.toUpperCase()), ...data.table.columns.map((c) => c.label)],
     filas: [
@@ -218,7 +233,7 @@ export function GraficoDatos({ data, titulo, alto = 'var(--chart-h)' }: { data: 
   else if (barras) {
     const series: SerieBarra[] = data.series.map((s) => {
       const e = est.get(s.id)!
-      return { key: s.id, nombre: s.label, color: e.color, trama: e.trama, stackId: data.type === 'stacked' ? s.stackId : undefined }
+      return { key: s.id, nombre: s.label, color: e.color, relleno: e.relleno, stackId: data.type === 'stacked' ? s.stackId : undefined }
     })
     cuerpo = <Barras datos={filas} claveX="_k" series={series} alto={alto} formato={fmt} formatoEje={fmtEje} formatoX={formatoX} tituloTooltip={tituloTooltip} referencias={referencias} soloEnteros={UNIDADES_ENTERAS.has(data.unit)} />
   } else {

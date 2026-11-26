@@ -8,6 +8,7 @@ import {
   DIMENSION_GROUPINGS,
   METRIC_AGGREGATIONS,
   METRIC_FILTER_KEYS,
+  METRIC_PRESENTATIONS,
   METRIC_UNITS,
   TIME_GROUPINGS,
   type MetricDef as MetricContract,
@@ -154,6 +155,7 @@ function checkMetrics(m: AppModule, seen: Map<string, string>): void {
     if (!Array.isArray(d.filters)) throw bad(d.id, 'le falta la lista de filtros (vacía si no admite ninguno).')
     const f = notIn(d.filters, METRIC_FILTER_KEYS)
     if (f !== undefined) throw bad(d.id, `filtro no válido «${String(f)}».`)
+    if (d.presentation !== undefined && !METRIC_PRESENTATIONS.includes(d.presentation)) throw bad(d.id, `presentación no válida «${String(d.presentation)}».`)
     if (typeof d.compute !== 'function') throw bad(d.id, 'le falta la función de cálculo.')
   }
 }

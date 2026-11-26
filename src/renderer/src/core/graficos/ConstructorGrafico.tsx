@@ -23,6 +23,7 @@ import {
   type SavedChart
 } from '@shared/core/metrics-types'
 import { GROUPING_LABELS, UNIT_LABELS } from '@shared/core/charts/labels'
+import { entradaAObjetivo, objetivoAEntrada } from '@shared/core/charts/objetivo'
 import { ChartSpecV1Schema } from '@shared/core/charts/schema'
 import { FILTER_LABELS, admitsGrouping, chartGroupings, incompatibilityReason, upgradeSpec, validateSpec } from '@shared/core/charts/validate'
 import { useApi, useApiMutation } from '../../lib/api'
@@ -148,6 +149,14 @@ function Formulario({ metas, chartId, guardado, modulo, onGuardado, onCerrar }: 
   const byId = useMemo(() => new Map(metas.map((m) => [m.id, m])), [metas])
   const m0 = byId.get(spec.series[0]?.metricId ?? '')
   const unidad = m0?.unit
+  // Si la primera métrica cambia de unidad, el objetivo ya no significa lo mismo: se vacía.
+  const unidadAnterior = useRef(unidad)
+  useEffect(() => {
+    if (unidadAnterior.current === unidad) return
+    unidadAnterior.current = unidad
+    setObjetivoTexto('')
+    setSpec((s) => ({ ...s, target: null }))
+  }, [unidad])
   const enviar = useMemo(() => limpia(spec), [spec])
   const previa = useRetrasado(enviar)
   const avisos = useMemo(() => validateSpec(enviar, metas), [enviar, metas])
@@ -468,17 +477,4 @@ function EditorRango({ rango, onChange }: { rango: ChartRange; onChange: (r: Cha
 /** Unidad que se escribe en el campo de objetivo (los euros en euros, los % en %). */
 function unidadEntrada(u: MetricMeta['unit']): string {
   return u === 'eur_cents' ? '€' : u === 'pct' ? '%' : UNIT_LABELS[u]
-}
-/** Valor guardado → texto del campo. */
-function objetivoAEntrada(v: number, u?: MetricMeta['unit']): string {
-  const x = u === 'eur_cents' ? v / 100 : u === 'pct' ? v * 100 : v
-  return String(Math.round(x * 100) / 100).replace('.', ',')
-}
-/** Texto del campo → valor en la unidad de la métrica (null si está vacío o no es un número). */
-function entradaAObjetivo(txt: string, u?: MetricMeta['unit']): number | null {
-  const t = txt.trim().replace(/\./g, '').replace(',', '.')
-  if (!t) return null
-  const n = Number(t)
-  if (!Number.isFinite(n)) return null
-  return u === 'eur_cents' ? Math.round(n * 100) : u === 'pct' ? n / 100 : n
 }

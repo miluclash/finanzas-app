@@ -8,7 +8,7 @@ import { Card, CifraUnidad, EmptyState, TarjetaConsulta, Tag } from '../../core/
 import type { FixedCardDef } from '../../core/graficos'
 import { useApi } from '../../lib/api'
 import { anteriorRecord, fechaCorta, formatCambio, formatEntero, marcaRecord, sinVolumenPrevio, textoComparacionVolumen } from './format'
-import { useResumenEntreno } from './periodoResumen'
+import { useEnResumen, useResumenEntreno } from './periodoResumen'
 import { ConstanciaCard, HyroxCard, ObjetivosCard, ProximaCard, RecordsCard, SemanaCard, SeriesCard, UltimasCard, VolumenCard } from './ResumenTarjetas'
 
 const ERROR = 'No se ha podido calcular el resumen'
@@ -37,10 +37,11 @@ const ConstanciaTarjeta = delResumen('Constancia', ConstanciaCard)
 
 /* ======================= Próxima sesión (Resumen e Inicio) ======================= */
 function ProximaTarjeta() {
+  const enResumen = useEnResumen()
   const q = useApi('entreno:metrics.inicio', [])
   return (
     <TarjetaConsulta q={q} titulo="Próxima sesión" carga="Calculando tu próxima sesión" error="No se han podido calcular tus datos de entreno">
-      {(d) => <ProximaCard n={d.next} today={d.today} />}
+      {(d) => <ProximaCard n={d.next} today={d.today} variante={enResumen ? 'resumen' : 'inicio'} />}
     </TarjetaConsulta>
   )
 }

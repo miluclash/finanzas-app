@@ -271,3 +271,69 @@ describe('buildChartData', () => {
     ).toThrow(ChartSpecError)
   })
 })
+
+describe('buildChartData: revisión de F5', () => {
+  // Como los flujos de Finanzas: solo por meses (cuentan el mes entero).
+  const MES = [...METAS, meta('flujo', { module: 'finanzas', groupings: ['month', 'category'] })]
+  const flujo: Fila[] = [
+    { date: '2026-10-05', value: 100 },
+    { date: '2026-10-30', value: 50 },
+    { date: '2026-11-03', value: 70 },
+    { date: '2026-11-28', value: 30 }
+  ]
+
+  it('métricas solo por meses: el anterior son meses completos y se avisa si el actual va a medias', () => {
+    const spec: ChartSpec = { version: 1, type: 'bar', series: [{ metricId: 'flujo' }], groupBy: 'month', range: { kind: 'this', unit: 'month' }, comparePrevious: true }
+    const d = buildChartData(spec, MES, fetcher({ flujo }, MES), '2026-11-26')
+    expect(d.previous).toEqual({ from: '2026-10-01', to: '2026-10-31' })
+    expect(d.previousFullMonths).toBe(true)
+    expect(d.points[0].values).toEqual({ s0: 70, p0: 150 })
+    expect(d.notes).toContain('Finanzas calcula por meses completos: el mes en curso se compara con el mes anterior entero.')
+    // A fin de mes no hace falta avisar.
+    const fin = buildChartData(spec, MES, fetcher({ flujo }, MES), '2026-11-30')
+    expect(fin.previous).toEqual({ from: '2026-10-01', to: '2026-10-31' })
+    expect(fin.notes).toEqual([])
+    // Con métricas que admiten días, el anterior se corta a la misma altura.
+    const dia = buildChartData({ ...spec, series: [{ metricId: 'gasto' }] }, MES, fetcher({ gasto: flujo }, MES), '2026-11-26')
+    expect(dia.previous).toEqual({ from: '2026-10-01', to: '2026-10-26' })
+    expect(dia.previousFullMonths).toBe(false)
+    expect(dia.points[0].values).toEqual({ s0: 70, p0: 100 })
+  })
+
+  it('periodos futuros de un rango con fechas fijas: sin dato es null, no 0', () => {
+    const d = buildChartData(
+      { version: 1, type: 'bar', series: [{ metricId: 'gasto' }], groupBy: 'month', range: { kind: 'absolute', from: '2026-10-01', to: '2027-01-31' } },
+      METAS,
+      fetcher({ gasto: [{ date: '2026-10-05', value: 100 }] }, METAS),
+      '2026-11-26'
+    )
+    expect(d.points.map((p) => [p.key, p.values.s0])).toEqual([
+      ['2026-10', 100],
+      ['2026-11', 0],
+      ['2026-12', null],
+      ['2027-01', null]
+    ])
+  })
+
+  it('un valor de la división que solo está en el periodo anterior también sale', () => {
+    const d = buildChartData(
+      { version: 1, type: 'stacked', series: [{ metricId: 'gasto' }], groupBy: 'month', splitBy: 'category', range: { kind: 'this', unit: 'month' }, comparePrevious: true },
+      METAS,
+      fetcher({ gasto: [{ date: '2026-11-02', value: 40, split: 'a' }, { date: '2026-10-02', value: 25, split: 'z' }] }, METAS),
+      '2026-11-26'
+    )
+    const z = d.series.find((s) => s.split === 'z' && !s.previous)!
+    const zAnt = d.series.find((s) => s.split === 'z' && s.previous)!
+    expect(z.total).toBeNull()
+    expect(zAnt.total).toBe(25)
+    expect(d.points[0].values[z.id]).toBe(0)
+    expect(d.points[0].values[zAnt.id]).toBe(25)
+  })
+
+  it('empty tiene en cuenta el periodo anterior', () => {
+    const spec: ChartSpec = { version: 1, type: 'bar', series: [{ metricId: 'gasto' }], groupBy: 'month', range: { kind: 'this', unit: 'month' }, comparePrevious: true }
+    const f = fetcher({ gasto: [{ date: '2026-10-02', value: 25 }] }, METAS)
+    expect(buildChartData(spec, METAS, f, '2026-11-26').empty).toBe(false)
+    expect(buildChartData({ ...spec, comparePrevious: false }, METAS, f, '2026-11-26').empty).toBe(true)
+  })
+})

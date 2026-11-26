@@ -1,5 +1,5 @@
 // Tarjetas del Resumen de Entreno. Solo pintan lo que devuelve `entreno:metrics.summary`: no calculan nada.
-import { ArrowDown, ArrowUp, Barbell, CalendarCheck, Flag, Lightning, Medal, Target, Timer, Trophy } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, Barbell, CalendarBlank, CalendarCheck, Flag, Lightning, Medal, Target, Timer, Trophy } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
 import type { EntrenoSummary } from '@shared/modules/entreno/metrics/views'
@@ -82,9 +82,30 @@ export function SemanaCard({ s }: { s: EntrenoSummary }) {
 }
 
 /* ======================= Próxima sesión ======================= */
-/** La usan el Resumen y el Inicio: sus datos no dependen del periodo. */
-export function ProximaCard({ n, today }: { n: NextSession | null; today: string }) {
-  const I = n ? KIND_ICON[n.kind ?? 'OTHER'] : Timer
+/** La usan el Resumen y el Inicio (sus datos no dependen del periodo), cada uno con su disposición de siempre. */
+export function ProximaCard({ n, today, variante }: { n: NextSession | null; today: string; variante: 'resumen' | 'inicio' }) {
+  const I = n ? KIND_ICON[n.kind ?? 'OTHER'] : variante === 'inicio' ? Barbell : Timer
+  if (variante === 'inicio')
+    return (
+      <Card titulo="Próxima sesión" icono={<CalendarBlank size={20} weight="duotone" aria-hidden />} className="h-full">
+        {n ? (
+          <div className="flex flex-col gap-4 @3xl:flex-row @3xl:items-center @3xl:justify-between @5xl:flex-col @5xl:items-stretch @5xl:justify-start">
+            <div>
+              <div className="t-kpi">{n.routineName || 'Sesión'}</div>
+              <p className="t-label mt-2">{cuando(n.date, today, n.time)}</p>
+              <p className="t-meta mt-1 flex items-center gap-1">
+                <I size={14} aria-hidden /> {n.kind ? KIND_LABEL[n.kind] : 'Tipo de entreno borrado'}
+              </p>
+            </div>
+            <Link to="/entreno/plan" className="btn btn-secondary">
+              Ver la semana
+            </Link>
+          </div>
+        ) : (
+          <EmptyState horizontal icono={<Barbell size={20} aria-hidden />} titulo="Sin sesión prevista" texto="Crea tu semana base en Plan y aquí verás la siguiente sesión." accion={<Link to="/entreno/plan?vista=boceto" className="btn btn-secondary btn-sm">Ir a Plan</Link>} />
+        )}
+      </Card>
+    )
   return (
     <Card titulo="Próxima sesión" icono={<Timer size={20} weight="duotone" aria-hidden />} className="flex h-full flex-col">
       {n ? (
@@ -187,7 +208,6 @@ export function SeriesCard({ s }: { s: EntrenoSummary }) {
           <MedidoresLista
             filas={con.map((g) => ({ nombre: g.name, valor: Math.round(g.sets * 10) / 10, rango: { min: g.min, max: g.max }, estado: ESTADO_GRUPO[g.status] }))}
             formato={(x) => formatNum1(x)}
-            rango={mismoRango ? { min: todos[0].min, max: todos[0].max, etiqueta: 'rango' } : undefined}
           />
         </ChartFrame>
       )}

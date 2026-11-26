@@ -18,6 +18,8 @@ export interface ChartDataSeries {
   aggregation: MetricAggregation
   /** Valor de `splitBy` de esta serie; null en la serie "Otros"; ausente si no hay división. */
   split?: string | null
+  /** Serie de referencia (presupuesto, plan): se dibuja discontinua o solo con borde. */
+  reference?: boolean
   /** Serie del periodo anterior. */
   previous: boolean
   /** En las del periodo anterior: id de la serie actual con la que se compara. */
@@ -44,7 +46,10 @@ export interface ChartDataPoint {
   prevKey: string | null
   prevLabel: string | null
   prevLongLabel: string | null
-  /** Valor de cada serie por su `id`. null = sin dato (en métricas `sum`, sin dato es 0). */
+  /**
+   * Valor de cada serie por su `id`. null = sin dato (en métricas `sum`, sin dato es 0; en `ratio`, un
+   * punto con denominador 0 también es null).
+   */
   values: Record<string, number | null>
 }
 
@@ -82,6 +87,11 @@ export interface ChartData {
   range: DateRange
   /** Fechas del periodo anterior, si se compara. */
   previous: DateRange | null
+  /**
+   * El periodo anterior son meses completos: las métricas solo se calculan por meses (cuentan el mes
+   * entero), así que se compara con meses enteros aunque el actual vaya a medias.
+   */
+  previousFullMonths: boolean
   /** Fecha con la que se resolvió el rango. */
   now: ISODate
   series: ChartDataSeries[]
@@ -94,7 +104,7 @@ export interface ChartData {
   table: ChartTable
   /** Avisos para mostrar bajo el gráfico (p. ej. valores de la división agrupados en "Otros"). */
   notes: string[]
-  /** No hay ningún dato en el rango. */
+  /** No hay ningún dato en el rango (ni en el periodo anterior, si se compara). */
   empty: boolean
 }
 

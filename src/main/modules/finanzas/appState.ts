@@ -4,9 +4,6 @@ import type { DataSnapshot } from '@shared/modules/finanzas/types'
 import { createCoreContext, initCore, type CoreContext, type CorePaths } from '../../core/context'
 import type { Db } from '../../core/db'
 import { createRegistry, type AppModule } from '../../core/registry'
-// Ciclo dentro del módulo (index.ts importa AppState): inofensivo, porque ninguno de los dos usa
-// al otro al cargarse, solo dentro de funciones.
-import { finanzasModule } from './index'
 import { loadSnapshot } from './store'
 
 /** Un único `AppState` por contexto del núcleo (lo comparten los handlers y quien lo cree). */
