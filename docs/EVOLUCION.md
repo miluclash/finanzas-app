@@ -277,3 +277,15 @@ La sesión principal (orquestador) va con **Opus 5.5** (desde F2; en F0 y F1 fue
 
 - RAM y GPU del portátil, para elegir el modelo de Ollama.
 - Instalar Ollama antes de la fase F6.
+
+## 13. Estado (27/11/2026)
+
+- **Hechas y en `main`**: F0 a F5. **Publicada la 0.6.0** (primera con Entreno, gráficos y paneles), que Michael ya usa con sus datos reales.
+- **Siguiente**: F6 IA local (§8 y fila F6 de §10), con el agente `ia-local` (opus · high). Antes de planificarla hay que preguntar a Michael la RAM y la GPU y si ya tiene Ollama instalado (§12).
+- **Qué hay para F6**:
+  - Métricas de los dos módulos registradas en el núcleo con su contrato (`src/shared/core/metrics-types.ts`, `core:metrics.list/compute/options`), listas para usarlas como herramientas de lectura.
+  - `entreno:metrics.next` responde a «¿qué me toca?».
+  - Los gráficos se crean con `core:charts.save` y una especificación validada, lo que sirve para la propuesta «crear un gráfico».
+  - El hueco del asistente ya está en el shell (F2) y el rango de migraciones del núcleo (1000–1999) va por la 1002.
+  - Hay que eliminar `src/mcp/`, `scripts/build-mcp.mjs`, el script `mcp` y el paso de `build` que lo compila, la regla de `tests/core/reglas.test.ts` que menciona el MCP congelado y sus entradas en `docs/NOMBRE_APP.md`.
+- **Después**: F7 cierre (1.0.0) y el parche de cambio de nombre.
