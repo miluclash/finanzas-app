@@ -5,8 +5,8 @@
 // se distinguen también por patrón (continua, punteada, discontinua) y por rótulo.
 // Cada gráfico lleva título, periodo, unidad y una referencia para interpretarlo (ChartFrame).
 import { ArrowClockwise, ChartLine, Table as TableIcon, Tray } from '@phosphor-icons/react'
-import { useRef, useState, type ReactNode } from 'react'
-import { type TooltipPayloadEntry, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis, Area, AreaChart } from 'recharts'
+import { useId, useRef, useState, type ReactNode } from 'react'
+import { type TooltipPayloadEntry, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis, Area, AreaChart, Scatter, ScatterChart } from 'recharts'
 import { cx } from './cx'
 import { Button, IconButton } from './controls'
 import { EmptyState, ErrorState, StatusBadge, type Tono } from './feedback'
@@ -589,3 +589,207 @@ export function LeyendaMapa() {
   )
 }
 
+
+/* ======================= Barras (agrupadas o apiladas) ======================= */
+/** Id seguro para `url(#…)` a partir de useId */
+const idSvg = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, '')
+export type SerieBarra = { key: string; nombre: string; color: string; trama?: boolean; stackId?: string }
+/** Barras desde cero con una o varias series. Con `stackId`, apiladas; con `trama`, rayadas a 45° (histórico, periodo anterior) */
+export function Barras({
+  datos,
+  claveX,
+  series,
+  alto = 'var(--chart-h)',
+  formato,
+  formatoEje,
+  formatoX,
+  tituloTooltip,
+  referencias,
+  anchoEje = 56,
+  soloEnteros = false
+}: {
+  datos: object[]
+  claveX: string
+  series: SerieBarra[]
+  alto?: string
+  formato: (v: number, key: string) => string
+  formatoEje?: (v: number) => string
+  formatoX?: (v: string | number) => string
+  tituloTooltip?: (l: string | number) => string
+  referencias?: Referencia[]
+  anchoEje?: number
+  /** La unidad solo toma valores enteros: sin marcas con decimales en el eje */
+  soloEnteros?: boolean
+}) {
+  const uid = idSvg(useId())
+  const ultimaDePila = new Map<string, string>()
+  for (const s of series) if (s.stackId) ultimaDePila.set(s.stackId, s.key)
+  return (
+    <div style={{ height: alto }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={datos} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%" barGap={MARCA.anillo}>
+          <defs>
+            {series.map((s, i) =>
+              s.trama ? (
+                <pattern key={s.key} id={`${uid}-t${i}`} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                  <rect width="2.5" height="6" fill={s.color} />
+                </pattern>
+              ) : null
+            )}
+          </defs>
+          <CartesianGrid vertical={false} />
+          <XAxis dataKey={claveX} tickLine={false} axisLine={{ stroke: 'var(--axis)' }} tickMargin={8} minTickGap={8} tickFormatter={formatoX} />
+          <YAxis tickLine={false} axisLine={false} width={anchoEje} tickFormatter={formatoEje ?? ((v) => String(v))} domain={[(min: number) => Math.min(0, min), 'auto']} allowDecimals={!soloEnteros} />
+          <RTooltip cursor={{ fill: 'var(--interactive)', opacity: 0.5 }} isAnimationActive={false} content={(p: TipProps) => <ChartTip {...p} formato={formato} titulo={tituloTooltip} />} />
+          {referencias?.map((r) => (
+            <ReferenceLine key={r.texto} y={r.y} stroke="var(--ref)" strokeWidth={MARCA.linea - 0.5} strokeDasharray={DASH[r.patron ?? 'discontinua']} label={{ value: r.texto, position: r.posicion ?? 'insideTopRight', fill: 'var(--ink-2)', style: { fontSize: 'var(--fs-label)' } }} />
+          ))}
+          {series.map((s, i) => {
+            const arriba = !s.stackId || ultimaDePila.get(s.stackId) === s.key
+            return (
+              <Bar
+                key={s.key}
+                dataKey={s.key}
+                name={s.nombre}
+                stackId={s.stackId}
+                fill={s.trama ? `url(#${uid}-t${i})` : s.color}
+                stroke={s.trama ? s.color : undefined}
+                strokeWidth={s.trama ? 1 : 0}
+                maxBarSize={MARCA.barraMax}
+                radius={arriba ? [MARCA.radioBarra, MARCA.radioBarra, 0, 0] : 0}
+                isAnimationActive={false}
+              />
+            )
+          })}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/* ======================= Áreas ======================= */
+/** Líneas con relleno suave bajo las series continuas; las de otro patrón (histórico, anterior) van sin relleno */
+export function Areas({
+  datos,
+  claveX,
+  series,
+  alto = 'var(--chart-h)',
+  formato,
+  formatoEje,
+  formatoX,
+  tituloTooltip,
+  referencias,
+  anchoEje = 56,
+  soloEnteros = false
+}: {
+  datos: object[]
+  claveX: string
+  series: SerieLinea[]
+  alto?: string
+  formato: (v: number, key: string) => string
+  formatoEje?: (v: number) => string
+  formatoX?: (v: string | number) => string
+  tituloTooltip?: (l: string | number) => string
+  referencias?: Referencia[]
+  anchoEje?: number
+  /** La unidad solo toma valores enteros: sin marcas con decimales en el eje */
+  soloEnteros?: boolean
+}) {
+  const uid = idSvg(useId())
+  return (
+    <div style={{ height: alto }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={datos} margin={{ top: 16, right: 8, bottom: 0, left: 0 }}>
+          <defs>
+            {series.map((s, i) => (
+              <linearGradient key={s.key} id={`${uid}-g${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={s.color} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+              </linearGradient>
+            ))}
+          </defs>
+          <CartesianGrid vertical={false} />
+          <XAxis dataKey={claveX} tickLine={false} axisLine={{ stroke: 'var(--axis)' }} tickMargin={8} minTickGap={16} tickFormatter={formatoX} />
+          <YAxis tickLine={false} axisLine={false} width={anchoEje} tickFormatter={formatoEje ?? ((v) => String(v))} domain={[(min: number) => Math.min(0, min), 'auto']} allowDecimals={!soloEnteros} />
+          <RTooltip cursor={cursorLinea} isAnimationActive={false} content={(p: TipProps) => <ChartTip {...p} formato={formato} titulo={tituloTooltip} />} />
+          {referencias?.map((r) => (
+            <ReferenceLine key={r.texto} y={r.y} stroke="var(--ref)" strokeWidth={MARCA.linea - 0.5} strokeDasharray={DASH[r.patron ?? 'discontinua']} label={{ value: r.texto, position: r.posicion ?? 'insideTopRight', fill: 'var(--ink-2)', style: { fontSize: 'var(--fs-label)' } }} />
+          ))}
+          {series.map((s, i) =>
+            (s.patron ?? 'solida') === 'solida' ? (
+              <Area key={s.key} type="monotone" dataKey={s.key} name={s.nombre} stroke={s.color} strokeWidth={MARCA.linea} fill={`url(#${uid}-g${i})`} connectNulls activeDot={{ r: MARCA.punto, fill: s.color, stroke: 'var(--card)', strokeWidth: MARCA.anillo }} isAnimationActive={false} />
+            ) : (
+              <Line key={s.key} type="monotone" dataKey={s.key} name={s.nombre} stroke={s.color} strokeWidth={MARCA.linea} strokeDasharray={DASH[s.patron ?? 'solida']} strokeLinecap="round" connectNulls dot={false} activeDot={{ r: MARCA.punto, fill: s.color, stroke: 'var(--card)', strokeWidth: MARCA.anillo }} isAnimationActive={false} />
+            )
+          )}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/* ======================= Dispersión ======================= */
+export type PuntoDispersion = { x: number; y: number; etiqueta: string }
+/** Dispersión de dos series: cada punto es un periodo (o un valor de la dimensión), con su rótulo en el tooltip */
+export function Dispersion({
+  puntos,
+  nombreX,
+  nombreY,
+  formatoX,
+  formatoY,
+  formatoEjeX,
+  formatoEjeY,
+  color = 'var(--accent-mark)',
+  alto = 'var(--chart-h)',
+  referencias,
+  anchoEje = 56,
+  soloEnteros = false
+}: {
+  puntos: PuntoDispersion[]
+  nombreX: string
+  nombreY: string
+  formatoX: (v: number) => string
+  formatoY: (v: number) => string
+  formatoEjeX?: (v: number) => string
+  formatoEjeY?: (v: number) => string
+  color?: string
+  alto?: string
+  referencias?: Referencia[]
+  anchoEje?: number
+  /** La unidad solo toma valores enteros: sin marcas con decimales en el eje */
+  soloEnteros?: boolean
+}) {
+  const Tip = ({ active, payload }: TipProps) => {
+    const p = active ? (payload?.[0]?.payload as PuntoDispersion | undefined) : undefined
+    if (!p) return null
+    return (
+      <div className="elevated pop-in r-control px-3 py-2" style={{ minWidth: '9rem' }}>
+        <div className="t-meta mb-1">{p.etiqueta}</div>
+        <div className="t-label flex justify-between gap-3">
+          <span>{nombreX}</span>
+          <span className="tnum font-semibold text-ink">{formatoX(p.x)}</span>
+        </div>
+        <div className="t-label flex justify-between gap-3">
+          <span>{nombreY}</span>
+          <span className="tnum font-semibold text-ink">{formatoY(p.y)}</span>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div style={{ height: alto }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 16, right: 16, bottom: 8, left: 0 }}>
+          <CartesianGrid />
+          <XAxis type="number" dataKey="x" name={nombreX} tickLine={false} axisLine={{ stroke: 'var(--axis)' }} tickMargin={8} tickFormatter={formatoEjeX ?? formatoX} domain={['auto', 'auto']} />
+          <YAxis type="number" dataKey="y" name={nombreY} tickLine={false} axisLine={false} width={anchoEje} tickFormatter={formatoEjeY ?? formatoY} domain={['auto', 'auto']} />
+          <RTooltip cursor={{ stroke: 'var(--line-strong)', strokeDasharray: '2 4' }} isAnimationActive={false} content={(p: TipProps) => <Tip {...p} />} />
+          {referencias?.map((r) => (
+            <ReferenceLine key={r.texto} y={r.y} stroke="var(--ref)" strokeWidth={MARCA.linea - 0.5} strokeDasharray={DASH[r.patron ?? 'discontinua']} label={{ value: r.texto, position: r.posicion ?? 'insideTopRight', fill: 'var(--ink-2)', style: { fontSize: 'var(--fs-label)' } }} />
+          ))}
+          <Scatter data={puntos} name={`${nombreY} frente a ${nombreX}`} fill={color} stroke="var(--card)" strokeWidth={MARCA.anillo} isAnimationActive={false} />
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}

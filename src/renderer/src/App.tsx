@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorState, LoadingState, Toaster } from './core/ui'
 import { SettingsPage } from './core/ajustes/Settings'
+import { TarjetasProvider, type FixedCardDef } from './core/graficos'
 import { Inicio } from './core/inicio/Inicio'
 import { AppShell } from './core/shell/AppShell'
 import { leerRuta, moduloDe, RUTAS_ANTIGUAS, rutaFinanzas } from './core/shell/nav'
@@ -16,6 +17,7 @@ import { PlanPage } from './modules/entreno/Plan'
 import { SesionDetallePage } from './modules/entreno/SesionDetalle'
 import { SesionEditorPage } from './modules/entreno/SesionEditor'
 import { SesionesPage } from './modules/entreno/Sesiones'
+import { tarjetasEntreno } from './modules/entreno/tarjetas'
 import { AccountsPage } from './modules/finanzas/Accounts'
 import { BudgetsPage } from './modules/finanzas/Budgets'
 import { TxEditorProvider, useTxEditor } from './modules/finanzas/components/TxEditor'
@@ -26,7 +28,11 @@ import { InvestmentsPage } from './modules/finanzas/Investments'
 import { NetWorthPage } from './modules/finanzas/NetWorth'
 import { RecurringPage } from './modules/finanzas/Recurring'
 import { TransactionsPage } from './modules/finanzas/Transactions'
+import { tarjetasFinanzas } from './modules/finanzas/tarjetas'
 import { WelcomePage } from './modules/finanzas/Welcome'
+
+/** Tarjetas fijas de los paneles editables: cada módulo registra las suyas y esta raíz las junta (el núcleo no importa módulos). */
+const TARJETAS: readonly FixedCardDef[] = [...tarjetasFinanzas, ...tarjetasEntreno]
 
 /** Rutas de la versión anterior (/movimientos, /cuentas…): llevan a la nueva, con sus parámetros. */
 function RedirigirAntigua() {
@@ -103,13 +109,15 @@ export function App() {
       </div>
     )
   return (
-    <TxEditorProvider>
-      <ImportarHevyProvider>
-        {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
-        <ModuloActual>
-          <Toaster />
-        </ModuloActual>
-      </ImportarHevyProvider>
-    </TxEditorProvider>
+    <TarjetasProvider tarjetas={TARJETAS}>
+      <TxEditorProvider>
+        <ImportarHevyProvider>
+          {info.data?.isEmpty ? <WelcomePage /> : <ShellConectado version={info.data?.version ?? ''} />}
+          <ModuloActual>
+            <Toaster />
+          </ModuloActual>
+        </ImportarHevyProvider>
+      </TxEditorProvider>
+    </TarjetasProvider>
   )
 }
