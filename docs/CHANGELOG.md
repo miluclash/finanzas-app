@@ -14,7 +14,7 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
   - Finanzas: ingresos, gastos, gasto por categoría y grupo, flujo neto, tasa de ahorro (con y sin extraordinarios), aportación a ahorro e inversiones, patrimonio, liquidez, saldo de cuentas, presupuesto, gasto presupuestado y valor de las inversiones. Dan las mismas cifras que las pantallas de siempre.
   - Entreno: las 17 de F4.
   - Los saldos toman el último valor y las tasas se recalculan, nunca se suman ni se promedian.
-- **Paneles editables**: el Panel de Finanzas, el Resumen de Entreno y el Inicio se pueden editar. Arrastras las tarjetas (con ratón o teclado), cambias su tamaño, ocultas las fijas, añades gráficos propios y guardas con «Hecho». «Restaurar diseño» vuelve al de siempre.
+- **Paneles editables**: el Panel de Finanzas, el Resumen de Entreno y el Inicio se pueden editar. Arrastras las tarjetas (con ratón o teclado), cambias su tamaño, ocultas las fijas, añades gráficos propios y guardas con «Hecho». «Restaurar diseño» vuelve al de siempre. En modo edición, las tarjetas ocultas se ven abajo del todo, atenuadas y con «Mostrar», que las devuelve a su sitio.
 - El presupuesto se dibuja siempre discontinuo. El periodo anterior se dibuja más claro y con trama.
 - Base de datos: tablas del núcleo `core_charts` y `core_dashboards` (migraciones 1001–1002, solo tablas nuevas).
 - Finanzas no cambia: los dos dorados dan las mismas cifras sin regenerar nada. El estado de Finanzas pasa a `appState.ts` sin cambiar su lógica.

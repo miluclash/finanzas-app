@@ -25,7 +25,7 @@ import {
   type ScreenReaderInstructions
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, type SortingStrategy } from '@dnd-kit/sortable'
-import { ArrowCounterClockwise, ArrowLeft, ArrowRight, ChartLineUp, DotsSixVertical, EyeSlash, PencilSimple, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowLeft, ArrowRight, ChartLineUp, DotsSixVertical, Eye, EyeSlash, PencilSimple, Plus, SquaresFour, Trash, X } from '@phosphor-icons/react'
 import type { CardSize, DashboardCard, DashboardDefault, DashboardId, SavedChart } from '@shared/core/metrics-types'
 import { chartCardId, fixedCardId, mergeDashboard } from '@shared/core/charts/dashboard'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -132,7 +132,7 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
       else if (foco === 'anadir') r?.querySelector<HTMLElement>('[data-anadir] button')?.focus()
       else {
         const tarjeta = r?.querySelector<HTMLElement>(`[data-card-id="${CSS_ESCAPE(foco.id)}"]`)
-        const b = tarjeta?.querySelector<HTMLElement>(`[data-accion="${foco.accion}"]:not(:disabled)`) ?? tarjeta?.querySelector<HTMLElement>('[data-accion="mover"]')
+        const b = tarjeta?.querySelector<HTMLElement>(`[data-accion="${foco.accion}"]:not(:disabled)`) ?? tarjeta?.querySelector<HTMLElement>('[data-accion="mover"]') ?? tarjeta?.querySelector<HTMLElement>('[data-accion="mostrar"]')
         b?.focus()
       }
       setFoco(null)
@@ -185,7 +185,10 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
     setBorrador((b) => b && b.map((c) => (c.id === id ? { ...c, size } : c)))
     setFoco({ id, accion: 'tamano' })
   }
-  /** Ocultar una fija o quitar un gráfico: el foco pasa a la tarjeta siguiente (o a "Añadir"). */
+  /**
+   * Ocultar una fija (pasa a «Tarjetas ocultas», abajo; en el borrador solo cambia `hidden`, así que al
+   * mostrarla vuelve a su sitio) o quitar un gráfico. El foco pasa a la siguiente tarjeta visible.
+   */
   const fuera = (id: string, quitar: boolean) => {
     if (!borrador) return
     const vis = borrador.filter((c) => !c.hidden)
@@ -193,8 +196,18 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
     const siguiente = vis[i + 1] ?? vis[i - 1]
     const c = borrador.find((x) => x.id === id)!
     setBorrador(quitar ? borrador.filter((x) => x.id !== id) : borrador.map((x) => (x.id === id ? { ...x, hidden: true } : x)))
-    setAnuncio(quitar ? `«${nombreDe(c)}» se ha quitado del panel.` : `«${nombreDe(c)}» se ha ocultado. Puedes volver a mostrarla con «Añadir tarjeta».`)
-    setFoco(siguiente ? { id: siguiente.id, accion: 'mover' } : 'anadir')
+    setAnuncio(quitar ? `«${nombreDe(c)}» se ha quitado del panel.` : `«${nombreDe(c)}» se ha ocultado. Está abajo, en «Tarjetas ocultas».`)
+    setFoco(siguiente ? { id: siguiente.id, accion: 'mover' } : quitar ? 'anadir' : { id, accion: 'mostrar' })
+  }
+  /** Mostrar una tarjeta oculta: vuelve a la zona visible en la posición que tenía. */
+  const mostrar = (id: string) => {
+    if (!borrador) return
+    const nuevo = borrador.map((x) => (x.id === id ? { ...x, hidden: false } : x))
+    const vis = nuevo.filter((c) => !c.hidden)
+    const c = nuevo.find((x) => x.id === id)!
+    setBorrador(nuevo)
+    setAnuncio(`«${nombreDe(c)}» vuelve a verse en el panel, en la posición ${vis.findIndex((x) => x.id === id) + 1} de ${vis.length}.`)
+    setFoco({ id, accion: 'mover' })
   }
   const anadirFija = (def: FixedCardDef) => {
     setBorrador((b) => {
@@ -240,7 +253,7 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
 
   // --- Lo que se puede añadir ---
   const enPanel = new Set((tarjetas ?? []).filter((c) => !c.hidden).map((c) => (c.type === 'fixed' ? `f:${c.ref}` : `c:${c.ref}`)))
-  const ocultas = disponibles.filter((t) => (tarjetas ?? []).some((c) => c.type === 'fixed' && c.ref === t.id && c.hidden))
+  const ocultasBorrador = (tarjetas ?? []).filter((c) => c.hidden)
   const nuevas = disponibles.filter((t) => !(tarjetas ?? []).some((c) => c.type === 'fixed' && c.ref === t.id))
   const graficosLibres = [...graficos.values()].filter((g) => !enPanel.has(`c:${g.id}`))
 
@@ -275,7 +288,6 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
             >
               {(cerrar) => (
                 <MenuAnadir
-                  ocultas={ocultas}
                   nuevas={nuevas}
                   graficos={graficosLibres}
                   onFija={(d) => (cerrar(), anadirFija(d))}
@@ -351,10 +363,30 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
           )}
         </DndContext>
       )}
+      {editando && ocultasBorrador.length > 0 && (
+        <section aria-labelledby="titulo-ocultas" className="mt-8 border-t border-line pt-6">
+          <h2 id="titulo-ocultas" className="t-card-title">
+            Tarjetas ocultas
+          </h2>
+          <p className="t-label mb-4 mt-1 text-ink-2">No se ven en el panel. Pulsa «Mostrar» para recuperarlas.</p>
+          <div className="page-grid">
+            {ocultasBorrador.map((c) => (
+              <TarjetaOculta
+                key={c.id}
+                card={c}
+                nombre={nombreDe(c)}
+                def={c.type === 'fixed' ? fijas.get(c.ref) : undefined}
+                grafico={c.type === 'chart' ? graficos.get(c.ref) : undefined}
+                onMostrar={() => mostrar(c.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
       {tarjetas && visibles.length === 0 && (
         <div className="card mt-4 flex flex-col items-start gap-3">
           <StatusBadge tono="info">Panel vacío</StatusBadge>
-          <p className="t-label text-ink-2">Todas las tarjetas están ocultas. {editando ? 'Vuelve a mostrarlas con «Añadir tarjeta».' : 'Pulsa «Editar panel» para volver a mostrarlas.'}</p>
+          <p className="t-label text-ink-2">Todas las tarjetas están ocultas. {editando ? 'Están abajo, en «Tarjetas ocultas»: pulsa «Mostrar» para recuperarlas.' : 'Pulsa «Editar panel» para volver a mostrarlas.'}</p>
         </div>
       )}
 
@@ -407,7 +439,7 @@ export function PanelEditable({ dashboardId, porDefecto, titulo, texto, acciones
 /** Escapa un id para usarlo en un selector de atributo. */
 const CSS_ESCAPE = (s: string) => (typeof window !== 'undefined' && window.CSS?.escape ? window.CSS.escape(s) : s.replace(/["\\]/g, '\\$&'))
 
-function MenuAnadir({ ocultas, nuevas, graficos, onFija, onGrafico, onNuevo }: { ocultas: FixedCardDef[]; nuevas: FixedCardDef[]; graficos: Grafico[]; onFija: (d: FixedCardDef) => void; onGrafico: (g: Grafico) => void; onNuevo: () => void }) {
+function MenuAnadir({ nuevas, graficos, onFija, onGrafico, onNuevo }: { nuevas: FixedCardDef[]; graficos: Grafico[]; onFija: (d: FixedCardDef) => void; onGrafico: (g: Grafico) => void; onNuevo: () => void }) {
   const grupo = (titulo: string, items: ReactNode[]) =>
     items.length > 0 && (
       <div>
@@ -425,10 +457,9 @@ function MenuAnadir({ ocultas, nuevas, graficos, onFija, onGrafico, onNuevo }: {
   )
   return (
     <div className="flex max-h-96 w-72 flex-col gap-3 overflow-y-auto">
-      {grupo('Tarjetas ocultas', ocultas.map((t) => item(`o:${t.id}`, t.title, () => onFija(t), <EyeSlash size={16} aria-hidden />)))}
       {grupo('Tarjetas disponibles', nuevas.map((t) => item(`n:${t.id}`, t.title, () => onFija(t), <SquaresFour size={16} aria-hidden />)))}
       {grupo('Gráficos guardados', graficos.map((g) => item(`g:${g.id}`, g.title, () => onGrafico(g), <ChartLineUp size={16} aria-hidden />)))}
-      {ocultas.length + nuevas.length + graficos.length === 0 && <p className="t-label px-2 text-ink-2">Ya está todo en el panel.</p>}
+      {nuevas.length + graficos.length === 0 && <p className="t-label px-2 text-ink-2">Ya está todo en el panel.</p>}
       <div className="border-t border-line pt-3">
         <Button className="w-full" variant="primary" icon={<Plus size={16} aria-hidden />} onClick={onNuevo}>
           Nuevo gráfico
@@ -474,16 +505,7 @@ function Tarjeta({
   // Hueco de destino: contorno discontinuo con el color del foco (no solo color: también el rótulo).
   const destino = isOver && !!active && active.id !== card.id
   const estilo = destino ? { outline: 'var(--mark-line) dashed var(--focus)', outlineOffset: 'var(--space-1)', borderRadius: 'var(--radius-card)' } : undefined
-  const contenido =
-    card.type === 'fixed' ? (
-      def ? (
-        <def.Component size={card.size} editando={editando} />
-      ) : null
-    ) : grafico ? (
-      <section className="card h-full" data-module={grafico.module === 'core' ? undefined : grafico.module} aria-label={grafico.title}>
-        <GraficoVista chartId={grafico.id} titulo={grafico.title} alto={card.size === 's' ? 'var(--chart-h-sm)' : 'var(--chart-h)'} onEditar={() => onEditarGrafico(grafico.id)} />
-      </section>
-    ) : null
+  const contenido = <ContenidoTarjeta card={card} def={def} grafico={grafico} editando={editando} onEditarGrafico={onEditarGrafico} />
   return (
     <div ref={setNodeRef} style={estilo} data-card-id={card.id} className={cx(CLASE_TAMANO[card.size], 'min-w-0', editando && 'flex flex-col gap-2', isDragging && 'opacity-40')}>
       {editando && (
@@ -518,6 +540,42 @@ function Tarjeta({
         </div>
       )}
       <div className={cx('min-w-0', editando ? 'flex-1' : 'h-full')}>{contenido}</div>
+    </div>
+  )
+}
+
+/** Lo que se ve dentro de una tarjeta: la tarjeta fija del módulo o el gráfico guardado. */
+function ContenidoTarjeta({ card, def, grafico, editando, onEditarGrafico }: { card: DashboardCard; def?: FixedCardDef; grafico?: Grafico; editando: boolean; onEditarGrafico?: (id: number) => void }) {
+  if (card.type === 'fixed') return def ? <def.Component size={card.size} editando={editando} /> : null
+  if (!grafico) return null
+  return (
+    <section className="card h-full" data-module={grafico.module === 'core' ? undefined : grafico.module} aria-label={grafico.title}>
+      <GraficoVista chartId={grafico.id} titulo={grafico.title} alto={card.size === 's' ? 'var(--chart-h-sm)' : 'var(--chart-h)'} onEditar={onEditarGrafico ? () => onEditarGrafico(grafico.id) : undefined} />
+    </section>
+  )
+}
+
+/**
+ * Tarjeta oculta, en la zona de abajo del modo edición: con su contenido real y su tamaño, atenuada
+ * (opacidad y sin color) y con la etiqueta «Oculta», para no distinguirla solo por el tono. No se
+ * arrastra ni cambia de tamaño (así su barra cabe también en las pequeñas); «Mostrar» la devuelve a su
+ * sitio. Su contenido es inerte (no recibe foco ni clics) mientras está oculta.
+ */
+function TarjetaOculta({ card, nombre, def, grafico, onMostrar }: { card: DashboardCard; nombre: string; def?: FixedCardDef; grafico?: Grafico; onMostrar: () => void }) {
+  return (
+    <div data-card-id={card.id} data-oculta className={cx(CLASE_TAMANO[card.size], 'flex min-w-0 flex-col gap-2')}>
+      <div role="toolbar" aria-label={`Tarjeta oculta «${nombre}»`} className="flex items-center gap-2 r-control border border-dashed border-line-strong bg-raised px-2 py-1">
+        <span className="t-label min-w-0 flex-1 truncate font-semibold text-ink-2" title={nombre}>
+          {nombre}
+        </span>
+        <StatusBadge tono="neutral">Oculta</StatusBadge>
+        <Button size="sm" data-accion="mostrar" aria-label={`Mostrar «${nombre}»`} icon={<Eye size={16} aria-hidden />} onClick={onMostrar}>
+          Mostrar
+        </Button>
+      </div>
+      <div className="min-w-0 flex-1 opacity-50 grayscale" inert>
+        <ContenidoTarjeta card={card} def={def} grafico={grafico} editando />
+      </div>
     </div>
   )
 }
