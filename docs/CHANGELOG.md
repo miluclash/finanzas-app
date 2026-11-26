@@ -4,6 +4,10 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 
 ## Sin publicar
 
+## 0.6.0 (26/11/2026)
+
+Primera versión con Entreno, gráficos propios y paneles editables (fases F0 a F5 de la evolución a panel de vida). El nombre sigue siendo "Finanzas". Al abrir tu base por primera vez, la app hace una copia `antes-de-migrar` y crea las tablas nuevas de Entreno y del núcleo; tus datos de Finanzas no cambian.
+
 ### F5 Gráficos y panel de vida (evolución a panel de vida)
 
 - **Constructor de gráficos**:
