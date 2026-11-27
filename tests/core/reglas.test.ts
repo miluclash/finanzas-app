@@ -120,22 +120,11 @@ describe('reglas de arquitectura: cola de escritura (regla 3)', () => {
       'src/main/core/writeQueue.ts'
     ])
   })
-
-  it('el servidor MCP (congelado) no escribe: nada de .run(, .exec( ni .tx(', () => {
-    const f = FUENTES.find((x) => x.rel === 'src/mcp/server.ts')
-    expect(f, 'No se encuentra src/mcp/server.ts').toBeDefined()
-    const m = f!.code.match(/\.(run|exec|tx)\s*\(/g) ?? []
-    expect(m, `Regla rota (regla 3): src/mcp/server.ts no puede escribir, pero usa ${m.join(', ')}`).toEqual([])
-  })
 })
 
 describe('reglas de arquitectura: rutas de datos', () => {
-  it('FINANZAS_DATA_DIR solo se lee en index.ts, updater.ts y mcp/server.ts', () => {
-    exigirSoloEn('FINANZAS_DATA_DIR', /FINANZAS_DATA_DIR/, [
-      'src/main/index.ts',
-      'src/main/core/updater.ts',
-      'src/mcp/server.ts'
-    ])
+  it('FINANZAS_DATA_DIR solo se lee en index.ts y updater.ts', () => {
+    exigirSoloEn('FINANZAS_DATA_DIR', /FINANZAS_DATA_DIR/, ['src/main/index.ts', 'src/main/core/updater.ts'])
   })
 
   it('app.getPath( solo se usa en src/main/index.ts', () => {

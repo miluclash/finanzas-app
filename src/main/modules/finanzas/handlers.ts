@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 // Handlers IPC de finanzas. Todos los métodos se validan aquí o en sus servicios.
 // Los del núcleo (app.info, audit.list, backup.*, data.openFolder) están en core/handlers.ts.
 import { dashboardData, computeAlerts } from '@shared/modules/finanzas/dashboard'
@@ -114,16 +112,6 @@ export function createFinanzasHandlers(s: AppState, dialogs: DialogProvider) {
 
     // Inversiones
     'inv.overview': () => inv.investmentsOverview(s),
-    'mcp.config': () => {
-      // Claude Desktop lanza el ejecutable de la app como si fuera Node (ELECTRON_RUN_AS_NODE=1),
-      // así no hace falta tener Node instalado. El script va fuera de app.asar (asarUnpack).
-      const res = (process as { resourcesPath?: string }).resourcesPath ?? ''
-      const packaged = path.join(res, 'app.asar.unpacked', 'out', 'mcp', 'server.cjs')
-      const script = fs.existsSync(packaged) ? packaged : path.resolve('out', 'mcp', 'server.cjs')
-      const env: Record<string, string> = { ELECTRON_RUN_AS_NODE: '1' }
-      if (s.paths.dbPath) env.FINANZAS_DB = s.paths.dbPath
-      return { mcpServers: { finanzas: { command: process.execPath, args: [script], env } } }
-    },
     'inv.plan': () => planReport(s.ctx(), s.snap().settings.investmentPlan),
     'inv.saveBlock': (input: BlockInput) => write('inv.saveBlock', () => inv.saveBlock(s, input)),
     'inv.deleteBlock': (id: string) => write('inv.deleteBlock', () => inv.deleteBlock(s, id)),
