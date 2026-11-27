@@ -206,7 +206,53 @@ describe('reglas de arquitectura: IA solo local (regla 8)', () => {
     }
     expect(malos, `Regla rota (regla 8): IA solo local, sin APIs externas.\n${malos.join('\n')}`).toEqual([])
   })
+
+  it('las peticiones de red (fetch, http, https, net de Electron) solo están en src/main/core/ai/ollama.ts', () => {
+    const malos = usosDeRed(FUENTES.filter((f) => /^src\/(main|shared|preload)\//.test(f.rel))).filter((m) => !m.startsWith(`${OLLAMA}:`))
+    expect(malos, `Regla rota (regla 8): solo OllamaProvider habla por la red, y solo con este equipo.\n${malos.join('\n')}`).toEqual([])
+  })
+
+  it('el proveedor Ollama existe y es quien hace fetch (control)', () => {
+    const f = FUENTES.find((x) => x.rel === OLLAMA)
+    expect(f, `No se encuentra ${OLLAMA}`).toBeDefined()
+    expect(usosDeRed([f!])).toEqual([`${OLLAMA}: fetch(`])
+    expect(f!.code).toMatch(/isLocalAiUrl\s*\(/)
+  })
+
+  it('la regla de red detecta fetch, http, https y net de Electron, y no un parámetro llamado fetch (control)', () => {
+    const falsa = (rel: string, code: string): Fuente => ({ rel, abs: rel, code: sinComentarios(code) })
+    expect(
+      usosDeRed([
+        falsa('a.ts', "await fetch('https://ejemplo.invalid')"),
+        falsa('b.ts', "import https from 'node:https'"),
+        falsa('c.ts', "const http = require('http')"),
+        falsa('d.ts', "import { app, net } from 'electron'\nnet.request('x')"),
+        falsa('e.ts', 'await globalThis.fetch(u)'),
+        falsa('f.ts', 'function build(fetch: F) { return fetch(1) }'),
+        falsa('g.ts', '// fetch( en un comentario no cuenta')
+      ])
+    ).toEqual(['a.ts: fetch(', 'b.ts: http/https/net', 'c.ts: http/https/net', 'd.ts: net de Electron', 'e.ts: fetch('])
+  })
 })
+
+const OLLAMA = 'src/main/core/ai/ollama.ts'
+
+/**
+ * Usos de red en unas fuentes: `fetch(` global (no cuenta si el archivo tiene un parámetro o una
+ * variable propia llamada `fetch`, como el motor de gráficos), módulos `http`/`https`/`net`/`tls`/
+ * `undici` y `net` de Electron.
+ */
+function usosDeRed(fuentes: Fuente[]): string[] {
+  const out: string[] = []
+  for (const f of fuentes) {
+    const c = f.code
+    const local = /(?:[(,]\s*fetch\s*[:,)=])|\b(?:const|let|var|function)\s+fetch\b/.test(c)
+    if (/(?:globalThis|window|self)\.fetch\s*\(/.test(c) || (!local && /(?<![.\w$])fetch\s*\(/.test(c))) out.push(`${f.rel}: fetch(`)
+    if (/(?:from\s*|require\s*\(\s*|import\s*\(\s*)['"](?:node:)?(?:https?|net|tls|dgram|undici)['"]/.test(c)) out.push(`${f.rel}: http/https/net`)
+    if (/import\s*\{[^}]*\bnet\b[^}]*\}\s*from\s*['"]electron['"]/.test(c) || /\bnet\.(?:request|fetch)\s*\(/.test(c)) out.push(`${f.rel}: net de Electron`)
+  }
+  return out
+}
 
 /**
  * Tablas sin prefijo `trn_`/`core_` creadas por migraciones que no son de finanzas: las del núcleo

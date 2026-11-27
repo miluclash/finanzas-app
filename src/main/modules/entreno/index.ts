@@ -5,6 +5,7 @@
 // las tablas de Entreno y sus datos iniciales.
 import { ENTRENO_CHART_METRICS, entrenoMetricOptions } from '@shared/modules/entreno/metrics'
 import { defineModule, type MetricDef } from '../../core/registry'
+import { ENTRENO_AI_TOOLS } from './aiTools'
 import { restoreEntrenoJson } from './exports'
 import { createEntrenoHandlers, isEmpty } from './handlers'
 import { metricsServiceFor } from './metrics'
@@ -30,7 +31,7 @@ export const entrenoModule = defineModule({
   restoreJson: (ctx, obj) => restoreEntrenoJson(ctx, obj),
   metrics,
   metricOptions: (ctx, kind) => entrenoMetricOptions(metricsServiceFor(ctx).context(), kind),
-  aiTools: [],
+  aiTools: ENTRENO_AI_TOOLS,
   suggestions: entrenoSuggestions,
   seed: (db) => seedEntreno(db),
   // Guarda con el boceto las semanas empezadas sin plan (no escribe nada si no falta ninguna).

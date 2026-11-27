@@ -2,13 +2,23 @@
 // Los de cada módulo los construye su `ipc` (ver registry.ts) y se juntan en la raíz de composición.
 // Los de lectura son síncronos y no pasan por la cola; los que escriben (o necesitan turno)
 // devuelven una promesa de la cola de escritura.
+//
+// Asistente (`core:ai.*`, F6): las firmas son exactamente las de `AiHandlers` del contrato. Las
+// respuestas llegan por eventos (`ai:event`) con `opts.aiEmit`, que conecta la raíz de la app.
+import type { AiEvent, AiHandlers, AiSettings, AiSettingsPatch, AiAcceptInput, AiSendInput, LlmProvider } from '@shared/core/ai-types'
 import type { ChartInput, ChartSpec, DashboardCard, DashboardId, MetricOptionKind, MetricQuery } from '@shared/core/metrics-types'
+import { Assistant, collectSuggestions } from './ai/assistant'
+import { CORE_AI_TOOLS } from './ai/coreTools'
+import { OllamaProvider } from './ai/ollama'
+import { createAiStore } from './aiStore'
 import { autoBackup, createBackup, listBackups, restoreBackup } from './backup'
 import { createChartsService, createDashboardsService } from './charts'
 import type { CoreContext } from './context'
+import { createAiSettingsStore } from './coreSettings'
 import { UserError } from './errors'
 import { createCoreMetrics } from './metrics'
 import { schemaVersion } from './migrations'
+import { checkAiTools } from './registry'
 
 /** Diálogos nativos y acciones del sistema (en tests se sustituyen por unos falsos). */
 export interface DialogProvider {
@@ -19,11 +29,60 @@ export interface DialogProvider {
   openPath(p: string): void
 }
 
-export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, appVersion = '0.0.0') {
+export interface CoreHandlerOptions {
+  /** Eventos del asistente hacia la interfaz (canal `ai:event`). Sin él, los eventos se descartan. */
+  aiEmit?: (event: AiEvent) => void
+  /** Proveedor del asistente para unos ajustes (por defecto, Ollama con su URL). En tests, uno falso. */
+  aiProvider?: (settings: AiSettings) => LlmProvider
+  /** Recibe el asistente creado (la app lo usa para cancelar las respuestas al cerrar). */
+  onAssistant?: (assistant: Assistant<CoreContext>) => void
+}
+
+/** Asistente del núcleo: herramientas `core_*` y las de los módulos del registro, sugerencias de todos. */
+export function createCoreAssistant(ctx: CoreContext, opts: CoreHandlerOptions = {}): Assistant<CoreContext> {
+  checkAiTools(CORE_AI_TOOLS, 'core', new Map(ctx.registry.aiTools.map((t) => [t.name, 'un módulo'])))
+  return new Assistant<CoreContext>({
+    ctx,
+    store: createAiStore(ctx),
+    settings: createAiSettingsStore(ctx),
+    provider: opts.aiProvider ?? ((s) => new OllamaProvider({ baseUrl: s.baseUrl })),
+    tools: [...CORE_AI_TOOLS, ...ctx.registry.aiTools],
+    suggestions: () => collectSuggestions(ctx.registry.modules, ctx),
+    emit: (e) => opts.aiEmit?.(e),
+    today: () => ctx.today()
+  })
+}
+
+export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, appVersion = '0.0.0', opts: CoreHandlerOptions = {}) {
   const metrics = createCoreMetrics(ctx)
   const charts = createChartsService(ctx, metrics)
   const dashboards = createDashboardsService(ctx)
+  const assistant = createCoreAssistant(ctx, opts)
+  opts.onAssistant?.(assistant)
+  const aiStore = createAiStore(ctx)
+  const aiSettings = createAiSettingsStore(ctx)
+  const ai = {
+    'ai.status': () => assistant.status(),
+    'ai.settings.get': () => aiSettings.get(),
+    'ai.settings.save': (patch: AiSettingsPatch) => aiSettings.save(patch),
+    'ai.threads.list': () => aiStore.listThreads(),
+    'ai.threads.get': (id: string) => aiStore.getThread(id),
+    'ai.threads.delete': (id: string) => {
+      assistant.cancelThread(id)
+      return aiStore.deleteThread(id)
+    },
+    'ai.threads.deleteAll': () => {
+      assistant.cancelAll()
+      return aiStore.deleteAllThreads()
+    },
+    'ai.send': (input: AiSendInput) => assistant.send(input),
+    'ai.cancel': (runId: string) => assistant.cancel(runId),
+    'ai.proposals.accept': (input: AiAcceptInput) => assistant.acceptProposal(input?.proposalId),
+    'ai.proposals.reject': (proposalId: string) => assistant.rejectProposal(proposalId),
+    'ai.suggestions': () => assistant.suggestions()
+  } satisfies AiHandlers
   return {
+    ...ai,
     'app.info': () => ({
       version: appVersion,
       dbPath: ctx.paths.dbPath,

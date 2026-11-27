@@ -2,7 +2,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell, type MessageBoxSyncOptions } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { AI_EVENT_CHANNEL, type AiEvent } from '@shared/core/ai-types'
 import { createAppHandlers, createAppRegistry, type Handlers } from './app'
+import type { Assistant } from './core/ai/assistant'
 import { createBackup } from './core/backup'
 import { createCoreContext, initCore, runModuleStartups, type CoreContext } from './core/context'
 import { Db, SaveError } from './core/db'
@@ -26,6 +28,14 @@ let mainWindow: BrowserWindow | null = null
 let core: CoreContext | null = null
 let handlers: Handlers | null = null
 let updater: UpdaterControl | null = null
+let assistant: Assistant<CoreContext> | null = null
+
+/** Eventos del asistente (streaming de respuestas) a la ventana, si sigue abierta. */
+function sendAiEvent(event: AiEvent): void {
+  const w = mainWindow
+  if (!w || w.isDestroyed() || w.webContents.isDestroyed()) return
+  w.webContents.send(AI_EVENT_CHANNEL, event)
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -91,7 +101,12 @@ async function initData(): Promise<void> {
   // Los pasos de arranque de los módulos van después de la copia diaria (que así es de antes de
   // cualquier escritura de arranque) y, si fallan, no impiden abrir la app.
   initCore(core, { startup: false })
-  handlers = createAppHandlers(core, dialogs, app.getVersion())
+  handlers = createAppHandlers(core, dialogs, app.getVersion(), {
+    aiEmit: sendAiEvent,
+    onAssistant: (a) => {
+      assistant = a
+    }
+  })
   try {
     await handlers['core:backup.auto']()
   } catch (e) {
@@ -295,6 +310,8 @@ else {
   // (o desde "Cerrar sin guardar"); si ha entrado alguna, se repite el proceso.
   let settling = false
   app.on('before-quit', (e) => {
+    // Las respuestas del asistente en curso se cancelan (lo que ya hayan escrito se guarda por la cola).
+    assistant?.cancelAll()
     const c = core
     if (!c || puedeSalir(c)) return
     e.preventDefault()

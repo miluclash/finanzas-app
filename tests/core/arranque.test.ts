@@ -76,7 +76,9 @@ const ESCRITURA = [
   'scenarios.save', 'scenarios.delete',
   'inv.saveBlock', 'inv.deleteBlock', 'inv.saveInstrument', 'inv.deleteInstrument',
   'inv.saveOp', 'inv.deleteOp', 'inv.savePrice', 'inv.deletePrice',
-  'import.apply', 'tr.apply'
+  'import.apply', 'tr.apply',
+  // Núcleo: el único handler del asistente que escribe sin argumentos (los demás rechazan antes de encolar).
+  'ai.threads.deleteAll'
 ]
 
 const LECTURA = [

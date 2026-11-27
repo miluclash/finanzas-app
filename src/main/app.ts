@@ -8,7 +8,7 @@
 // ApiArgs), con el tipo exacto de cada método.
 import type { CoreContext } from './core/context'
 import { CORE_MIGRATIONS } from './core/coreMigrations'
-import { createCoreHandlers, type CoreHandlers, type DialogProvider } from './core/handlers'
+import { createCoreHandlers, type CoreHandlerOptions, type CoreHandlers, type DialogProvider } from './core/handlers'
 import { createRegistry, mergeHandlers, type ModuleDeps, type Registry } from './core/registry'
 import { entrenoModule } from './modules/entreno'
 import { finanzasModule } from './modules/finanzas'
@@ -44,10 +44,10 @@ export type ApiArgs<K extends ApiMethod> = Parameters<Handlers[K]>
  * Handlers del núcleo y de todos los módulos del registro del contexto. Lanza error si dos usan
  * el mismo nombre.
  */
-export function createAppHandlers(ctx: CoreContext, dialogs: DialogProvider, appVersion = '0.0.0'): Handlers {
+export function createAppHandlers(ctx: CoreContext, dialogs: DialogProvider, appVersion = '0.0.0', opts: CoreHandlerOptions = {}): Handlers {
   const deps: ModuleDeps = { dialogs, appVersion }
   const merged = mergeHandlers([
-    { owner: 'core', handlers: createCoreHandlers(ctx, dialogs, appVersion) },
+    { owner: 'core', handlers: createCoreHandlers(ctx, dialogs, appVersion, opts) },
     ...ctx.registry.modules.map((m) => ({ owner: m.id, handlers: m.ipc(ctx, deps) }))
   ])
   // `mergeHandlers` pierde el tipo de cada handler; el registro del contexto es el de APP_MODULES.

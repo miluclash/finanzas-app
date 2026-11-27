@@ -1,11 +1,13 @@
 // Módulo Finanzas: lo que registra en el núcleo.
 import { defineModule } from '../../core/registry'
+import { FINANZAS_AI_TOOLS } from './aiTools'
 import { restoreFromJson } from './exports'
 import { createFinanzasHandlers, isEmpty } from './handlers'
 import { MIGRATIONS } from './migrations'
 import { FINANZAS_METRICS, finanzasMetricOptions } from './metrics'
 import { AppState, registerFinanzasModule } from './appState'
 import { seedIfEmpty } from './store'
+import { finanzasSuggestions } from './suggestions'
 
 export const finanzasModule = defineModule({
   id: 'finanzas',
@@ -14,7 +16,8 @@ export const finanzasModule = defineModule({
   ipc: (ctx, deps) => createFinanzasHandlers(AppState.for(ctx), deps.dialogs),
   metrics: FINANZAS_METRICS,
   metricOptions: (ctx, kind) => finanzasMetricOptions(ctx, kind),
-  aiTools: [],
+  aiTools: FINANZAS_AI_TOOLS,
+  suggestions: (ctx) => finanzasSuggestions(ctx),
   seed: (db) => {
     seedIfEmpty(db)
   },
