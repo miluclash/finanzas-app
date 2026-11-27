@@ -130,9 +130,9 @@ function TablaCambios({ cambios, conEtiqueta, conEstado, titulo, alto }: { cambi
                   </td>
                 )}
                 <td className="px-3 py-2 text-ink-2">{f.label}</td>
-                {!soloAlta && <td className={cx('tnum px-3 py-2 [overflow-wrap:anywhere]', c.op === 'delete' ? 'text-ink' : 'text-ink-2')}>{c.op === 'create' ? VACIO : texto(f.before)}</td>}
+                {!soloAlta && <td className={cx('px-3 py-2 break-words', c.op === 'delete' ? 'text-ink' : 'text-ink-2')}>{c.op === 'create' ? VACIO : texto(f.before)}</td>}
                 {!soloBaja && (
-                  <td className="tnum px-3 py-2 text-ink [overflow-wrap:anywhere]">
+                  <td className="px-3 py-2 text-ink break-words">
                     {c.op === 'delete' ? (
                       <span className="text-ink-3">Se borra</span>
                     ) : (
@@ -212,7 +212,7 @@ export function PropuestaCard({ propuesta }: { propuesta: AiProposal }) {
                 {resumenOps && p.changes.some((c) => c.op !== 'update') ? ` · ${resumenOps}` : ''}
               </p>
             ) : (
-              p.title !== primero?.label && <p className="t-label mt-1">{p.title}</p>
+              !p.title.includes(primero?.label ?? ' ') && <p className="t-label mt-1">{p.title}</p>
             )}
           </div>
           {!esGrupo && primero && <EtiquetaOp op={primero.op} />}

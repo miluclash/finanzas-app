@@ -84,28 +84,20 @@ function ProblemaAsistente({ s, q }: { s: AiStatus; q: ReturnType<typeof useAiSt
     <Aviso tono="warning">
       <span className="t-strong">{s.state === 'unreachable' ? 'No encuentro Ollama' : `Falta el modelo ${s.settings.model}`}</span>
       <span>{s.message}</span>
-      <ol className="mt-1 list-decimal pl-5">
-        {s.state === 'unreachable' && (
-          <>
-            <li>Instala Ollama desde ollama.com, si aún no lo tienes.</li>
-            <li>Ábrelo y déjalo en marcha.</li>
-          </>
-        )}
-        <li>
-          Descarga el modelo con este comando en una terminal:
-          <span className="mt-1 flex flex-wrap items-center gap-2">
-            <code className="tnum r-tag bg-interactive px-2 py-1">{comando}</code>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<Copy size={14} aria-hidden />}
-              onClick={() => navigator.clipboard.writeText(comando).then(() => toast.success('Comando copiado'), () => toast.error('No se ha podido copiar'))}
-            >
-              Copiar
-            </Button>
-          </span>
-        </li>
-      </ol>
+      <div className="mt-1 flex flex-col gap-1">
+        <span>{s.state === 'unreachable' ? 'Cuando Ollama esté en marcha, descarga el modelo con este comando en una terminal:' : 'Descarga el modelo con este comando en una terminal:'}</span>
+        <span className="flex flex-wrap items-center gap-2">
+          <code className="tnum r-tag bg-interactive px-2 py-1">{comando}</code>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Copy size={14} aria-hidden />}
+            onClick={() => navigator.clipboard.writeText(comando).then(() => toast.success('Comando copiado'), () => toast.error('No se ha podido copiar'))}
+          >
+            Copiar
+          </Button>
+        </span>
+      </div>
       <div className="mt-1 flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={() => q.refetch()} cargando={q.isFetching}>
           Reintentar
@@ -244,7 +236,8 @@ function Chat({
   const idSug = useId()
   const lista = useRef<HTMLDivElement>(null)
   const pegado = useRef(true)
-  const mensajes = (hilo.data?.messages ?? []).filter((m) => m.role === 'user' || m.content.trim() || m.proposals?.length)
+  // El hilo trae también los resultados de herramientas y los mensajes del asistente que solo llevan llamadas: no se pintan
+  const mensajes = (hilo.data?.messages ?? []).filter((m) => m.role === 'user' || (m.role === 'assistant' && (m.content.trim() || m.proposals?.length)))
   const usuarios = (hilo.data?.messages ?? []).filter((m) => m.role === 'user').length
   const preguntaPendiente = run?.pregunta && usuarios <= run.pregunta.mensajesPrevios ? run.pregunta.texto : (enviando ?? null)
   const vacio = mensajes.length === 0 && !run && enviando === null

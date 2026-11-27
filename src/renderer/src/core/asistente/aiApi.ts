@@ -1,63 +1,29 @@
-// Cliente tipado del asistente (`core:ai.*`) con hooks de React Query, y la respuesta en curso (`ai:event`).
+// Hooks de React Query del asistente (`core:ai.*`) y la respuesta en curso (`ai:event`).
 //
-// Se tipa con `AiHandlers` del contrato (`src/shared/core/ai-types.ts`) y llama a `window.finanzas.call`
-// con el mismo manejo de errores que `lib/api.ts` (reutiliza `ApiError`). Si el proceso principal aún no
-// tiene un handler («Método desconocido»), es un error normal: los hooks lo devuelven en `error`.
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+// Las firmas salen de `Handlers` (src/main/app.ts, que a su vez usa `AiHandlers` del contrato) a través de
+// `api` y `useApi` de `lib/api.ts`: no se duplican tipos. «Método desconocido» u otro error es un error
+// normal de la consulta (los componentes enseñan el estado de error con «Reintentar»).
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
-import type {
-  AiAcceptInput,
-  AiEvent,
-  AiProposal,
-  AiSendInput,
-  AiSendResult,
-  AiSettings,
-  AiSettingsPatch,
-  AiStatus,
-  AiSuggestion,
-  AiThread,
-  AiThreadDetail,
-  AiHandlers
-} from '@shared/core/ai-types'
-import { ApiError } from '../../lib/api'
+import type { AiEvent, AiSendInput, AiSettingsPatch, AiThreadDetail } from '@shared/core/ai-types'
+import type { ApiArgs, ApiResult } from '../../../../main/app'
+import { api, useApi, type ApiError } from '../../lib/api'
 import { toast } from '../../lib/toast'
 
-type AiKey = keyof AiHandlers
-type AiArgs<K extends AiKey> = Parameters<AiHandlers[K]>
-type AiResult<K extends AiKey> = Awaited<ReturnType<AiHandlers[K]>>
-
-/** Llama a `core:ai.<clave>` con los tipos del contrato. */
-export async function aiApi<K extends AiKey>(clave: K, ...args: AiArgs<K>): Promise<AiResult<K>> {
-  const res = await window.finanzas.call(`core:${clave}`, args as unknown[])
-  if (!res.ok) throw new ApiError(res.error ?? 'Error desconocido', !!res.user, !!res.saved)
-  return res.data as AiResult<K>
-}
-
-/* ======================= Claves de consulta ======================= */
+/* ======================= Claves de consulta (las de `useApi`: método + argumentos) ======================= */
 export const CLAVE_ESTADO = ['core:ai.status'] as const
 const CLAVE_AJUSTES = ['core:ai.settings.get'] as const
 const CLAVE_HILOS = ['core:ai.threads.list'] as const
 const claveHilo = (id: string) => ['core:ai.threads.get', id] as const
-const CLAVE_SUGERENCIAS = ['core:ai.suggestions'] as const
 
 /* ======================= Lecturas ======================= */
 /** Estado del asistente. Si Ollama está apagado, el estado lo dice: no es un error de la consulta. */
-export function useAiStatus() {
-  return useQuery<AiStatus, ApiError>({ queryKey: CLAVE_ESTADO, queryFn: () => aiApi('ai.status'), staleTime: 15_000 })
-}
-export function useAiSettings() {
-  return useQuery<AiSettings, ApiError>({ queryKey: CLAVE_AJUSTES, queryFn: () => aiApi('ai.settings.get') })
-}
-export function useAiThreads() {
-  return useQuery<AiThread[], ApiError>({ queryKey: CLAVE_HILOS, queryFn: () => aiApi('ai.threads.list') })
-}
-export function useAiThread(id: string | null) {
-  return useQuery<AiThreadDetail | null, ApiError>({ queryKey: claveHilo(id ?? ''), queryFn: () => aiApi('ai.threads.get', id as string), enabled: id !== null })
-}
+export const useAiStatus = () => useApi('core:ai.status', [], { staleTime: 15_000 })
+export const useAiSettings = () => useApi('core:ai.settings.get', [])
+export const useAiThreads = () => useApi('core:ai.threads.list', [])
+export const useAiThread = (id: string | null) => useApi('core:ai.threads.get', [id ?? ''], { enabled: id !== null })
 /** Sugerencias de todos los módulos (las calcula la app, funcionan con Ollama apagado). */
-export function useAiSuggestions() {
-  return useQuery<AiSuggestion[], ApiError>({ queryKey: CLAVE_SUGERENCIAS, queryFn: () => aiApi('ai.suggestions') })
-}
+export const useAiSuggestions = () => useApi('core:ai.suggestions', [])
 
 /* ======================= Mutaciones ======================= */
 /** Refresca todo lo que pueda haber cambiado tras aplicar una propuesta, sin volver a preguntar por Ollama. */
@@ -67,8 +33,8 @@ function refrescarDatos(qc: QueryClient) {
 
 export function useAiSaveSettings() {
   const qc = useQueryClient()
-  return useMutation<AiSettings, ApiError, AiSettingsPatch>({
-    mutationFn: (patch) => aiApi('ai.settings.save', patch),
+  return useMutation<ApiResult<'core:ai.settings.save'>, ApiError, AiSettingsPatch>({
+    mutationFn: (patch) => api('core:ai.settings.save', patch),
     onSuccess: async () => {
       await Promise.all([qc.invalidateQueries({ queryKey: CLAVE_AJUSTES }), qc.invalidateQueries({ queryKey: CLAVE_ESTADO })])
     },
@@ -79,7 +45,7 @@ export function useAiSaveSettings() {
 export function useAiDeleteThread() {
   const qc = useQueryClient()
   return useMutation<void, ApiError, string>({
-    mutationFn: (id) => aiApi('ai.threads.delete', id),
+    mutationFn: (id) => api('core:ai.threads.delete', id),
     onSuccess: async (_r, id) => {
       qc.removeQueries({ queryKey: claveHilo(id) })
       await qc.invalidateQueries({ queryKey: CLAVE_HILOS })
@@ -91,7 +57,7 @@ export function useAiDeleteThread() {
 export function useAiDeleteAllThreads() {
   const qc = useQueryClient()
   return useMutation<number, ApiError, void>({
-    mutationFn: () => aiApi('ai.threads.deleteAll'),
+    mutationFn: () => api('core:ai.threads.deleteAll'),
     onSuccess: async (n) => {
       qc.removeQueries({ queryKey: ['core:ai.threads.get'] })
       await qc.invalidateQueries({ queryKey: CLAVE_HILOS })
@@ -103,8 +69,8 @@ export function useAiDeleteAllThreads() {
 
 export function useAiSend() {
   const qc = useQueryClient()
-  return useMutation<AiSendResult, ApiError, AiSendInput & { /** Mensajes de Michael que ya tiene la conversación. */ mensajesPrevios?: number }>({
-    mutationFn: ({ mensajesPrevios: _m, ...input }) => aiApi('ai.send', input),
+  return useMutation<ApiResult<'core:ai.send'>, ApiError, AiSendInput & { /** Mensajes de Michael que ya tiene la conversación. */ mensajesPrevios?: number }>({
+    mutationFn: ({ mensajesPrevios: _m, ...input }) => api('core:ai.send', input),
     onSuccess: async (r, v) => {
       respuestas.registrarEnvio(r.threadId, r.runId, v.text, v.mensajesPrevios ?? 0)
       await Promise.all([qc.invalidateQueries({ queryKey: CLAVE_HILOS }), qc.invalidateQueries({ queryKey: claveHilo(r.threadId) })])
@@ -114,20 +80,20 @@ export function useAiSend() {
 }
 
 export function useAiCancel() {
-  return useMutation<boolean, ApiError, string>({ mutationFn: (runId) => aiApi('ai.cancel', runId), onError: (e) => toast.error(e.message) })
+  return useMutation<boolean, ApiError, string>({ mutationFn: (runId) => api('core:ai.cancel', runId), onError: (e) => toast.error(e.message) })
 }
 
 /** Confirma una propuesta. Al aplicarla se refresca el resto de la app. */
 export function useAiAccept() {
   const qc = useQueryClient()
-  return useMutation<AiProposal, ApiError, AiAcceptInput>({
-    mutationFn: (input) => aiApi('ai.proposals.accept', input),
+  return useMutation<ApiResult<'core:ai.proposals.accept'>, ApiError, ApiArgs<'core:ai.proposals.accept'>[0]>({
+    mutationFn: (input) => api('core:ai.proposals.accept', input),
     onSuccess: async (p) => {
       await Promise.all([refrescarDatos(qc), qc.invalidateQueries({ queryKey: claveHilo(p.threadId) })])
     },
     onError: async (e) => {
       toast.error(e.message)
-      // Si el error dejó la propuesta a medias, que la pantalla enseñe lo que quedó
+      // Si ya no estaba pendiente o se aplicó a medias, que la pantalla enseñe lo que quedó
       await refrescarDatos(qc)
     }
   })
@@ -135,10 +101,13 @@ export function useAiAccept() {
 
 export function useAiReject() {
   const qc = useQueryClient()
-  return useMutation<AiProposal, ApiError, string>({
-    mutationFn: (id) => aiApi('ai.proposals.reject', id),
+  return useMutation<ApiResult<'core:ai.proposals.reject'>, ApiError, string>({
+    mutationFn: (id) => api('core:ai.proposals.reject', id),
     onSuccess: (p) => qc.invalidateQueries({ queryKey: claveHilo(p.threadId) }),
-    onError: (e) => toast.error(e.message)
+    onError: async (e) => {
+      toast.error(e.message)
+      await qc.invalidateQueries({ queryKey: ['core:ai.threads.get'] })
+    }
   })
 }
 
@@ -211,10 +180,11 @@ class Respuestas {
         void qc?.invalidateQueries({ queryKey: CLAVE_HILOS })
         break
       case 'delta':
-        this.poner(e.threadId, (r) => ({ ...(r ?? { runId: e.runId, threadId: e.threadId, herramienta: null, estado: 'activa' as const }), texto: (r?.texto ?? '') + e.text }))
+        this.poner(e.threadId, (r) => ({ ...(r ?? { runId: e.runId, threadId: e.threadId, estado: 'activa' as const }), herramienta: null, texto: (r?.texto ?? '') + e.text }))
         break
       case 'tool':
-        this.poner(e.threadId, (r) => ({ ...(r ?? { runId: e.runId, threadId: e.threadId, texto: '', estado: 'activa' as const }), herramienta: e.state === 'start' ? { name: e.name, label: e.label } : null }))
+        // Al terminar la herramienta la etiqueta se queda hasta que llegue texto: las consultas son tan rápidas que, si no, no se llegaría a leer
+        if (e.state === 'start') this.poner(e.threadId, (r) => ({ ...(r ?? { runId: e.runId, threadId: e.threadId, texto: '', estado: 'activa' as const }), herramienta: { name: e.name, label: e.label } }))
         break
       case 'message': {
         // Se añade al hilo guardado al momento (sin esperar a la consulta) para que el texto no parpadee
