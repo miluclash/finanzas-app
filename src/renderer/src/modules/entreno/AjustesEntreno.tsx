@@ -1,4 +1,4 @@
-// Ajustes › Entreno: grupos musculares, métricas, reglas de tipo de sesión, historial de importaciones y datos (exportar y restaurar).
+// Ajustes › Entreno: grupos musculares, métricas, revisión semanal, reglas de tipo de sesión, historial de importaciones y datos (exportar y restaurar).
 import { ArrowDown, ArrowUp, DownloadSimple, FileArrowUp, Plus, Trash } from '@phosphor-icons/react'
 import { useState, type ReactNode } from 'react'
 import { E1RM_FORMULAS, KIND_RULE_FIELDS, SET_TYPES, WORKOUT_KINDS, type E1rmFormula, type EntrenoSettings, type KindRule, type KindRuleField, type MuscleGroup, type SetType, type WorkoutKind } from '@shared/modules/entreno/types'
@@ -25,6 +25,7 @@ export function AjustesEntreno() {
     <div className="flex flex-col gap-8">
       <GruposMusculares />
       <Metricas />
+      <RevisionSemanal />
       <ReglasDeTipo />
       <Importaciones />
       <DatosDeEntreno />
@@ -262,6 +263,105 @@ function MetricasForm({ s }: { s: EntrenoSettings }) {
       <div className="flex flex-wrap items-center gap-3" role="group" aria-label="Guardado de métricas">
         <Button type="submit" variant="primary" disabled={!sucio || hayError} cargando={guardar.isPending}>
           Guardar métricas
+        </Button>
+        <Button variant="ghost" disabled={!sucio} onClick={descartar}>
+          Descartar
+        </Button>
+        <div role="status" aria-live="polite">
+          {hayError ? <StatusBadge tono="error">Hay campos con errores: corrígelos para guardar</StatusBadge> : sucio ? <StatusBadge tono="warning">Tienes cambios sin guardar</StatusBadge> : guardado ? <StatusBadge tono="success">Cambios guardados</StatusBadge> : <span className="t-meta">Sin cambios</span>}
+        </div>
+      </div>
+    </form>
+  )
+}
+
+/* ======================= Revisión semanal ======================= */
+function RevisionSemanal() {
+  const q = useApi('entreno:settings.get', [])
+  return (
+    <Sub titulo="Revisión semanal" texto="Cuándo te avisan las sugerencias de Entreno: estancamientos, grupos musculares, adherencia y estaciones de HYROX.">
+      {q.isLoading && <LoadingState filas={2} etiqueta="Cargando la revisión semanal" />}
+      {q.error && (
+        <ErrorState
+          titulo="No se ha podido cargar la revisión semanal"
+          texto={q.error.message}
+          accion={
+            <Button size="sm" onClick={() => q.refetch()}>
+              Reintentar
+            </Button>
+          }
+        />
+      )}
+      {q.data && <RevisionForm key={JSON.stringify(q.data)} s={q.data} />}
+    </Sub>
+  )
+}
+
+function RevisionForm({ s }: { s: EntrenoSettings }) {
+  const aPct = (v: number) => String(Math.round(v * 1000) / 10).replace('.', ',')
+  const [stall, setStall] = useState(String(s.reviewStallWeeks))
+  const [minSes, setMinSes] = useState(String(s.reviewStallMinSessions))
+  const [adh, setAdh] = useState(aPct(s.reviewAdherenceMin))
+  const [muscle, setMuscle] = useState(String(s.reviewMuscleWeeks))
+  const [hyrox, setHyrox] = useState(String(s.reviewHyroxStationWeeks))
+  const [guardado, setGuardado] = useState(false)
+  const guardar = useApiMutation('entreno:settings.save', { success: 'Revisión semanal guardada' })
+
+  const nStall = leerEntero(stall)
+  const nMinSes = leerEntero(minSes)
+  const nAdh = leerNumero(adh)
+  const nMuscle = leerEntero(muscle)
+  const nHyrox = leerEntero(hyrox)
+  const entero = (n: number | null, min: number, max: number) => n !== null && !Number.isNaN(n) && n >= min && n <= max
+  const errores = {
+    stall: entero(nStall, 2, 26) ? undefined : 'Un número entero entre 2 y 26.',
+    minSes: entero(nMinSes, 1, 20) ? undefined : 'Un número entero entre 1 y 20.',
+    adh: nAdh !== null && !Number.isNaN(nAdh) && nAdh >= 0 && nAdh <= 100 ? undefined : 'Un porcentaje entre 0 y 100.',
+    muscle: entero(nMuscle, 1, 26) ? undefined : 'Un número entero entre 1 y 26.',
+    hyrox: entero(nHyrox, 1, 26) ? undefined : 'Un número entero entre 1 y 26.'
+  }
+  const hayError = Object.values(errores).some(Boolean)
+
+  const patch: Partial<EntrenoSettings> = {}
+  if (nStall !== null && nStall !== s.reviewStallWeeks) patch.reviewStallWeeks = nStall
+  if (nMinSes !== null && nMinSes !== s.reviewStallMinSessions) patch.reviewStallMinSessions = nMinSes
+  // Se edita en %; se guarda como fracción de 0 a 1
+  const fraccion = nAdh === null || Number.isNaN(nAdh) ? null : Math.round(nAdh * 10) / 1000
+  if (fraccion !== null && Math.abs(fraccion - s.reviewAdherenceMin) > 1e-9) patch.reviewAdherenceMin = fraccion
+  if (nMuscle !== null && nMuscle !== s.reviewMuscleWeeks) patch.reviewMuscleWeeks = nMuscle
+  if (nHyrox !== null && nHyrox !== s.reviewHyroxStationWeeks) patch.reviewHyroxStationWeeks = nHyrox
+  const sucio = Object.keys(patch).length > 0
+
+  const descartar = () => {
+    setStall(String(s.reviewStallWeeks))
+    setMinSes(String(s.reviewStallMinSessions))
+    setAdh(aPct(s.reviewAdherenceMin))
+    setMuscle(String(s.reviewMuscleWeeks))
+    setHyrox(String(s.reviewHyroxStationWeeks))
+    setGuardado(false)
+  }
+  const cambia = (set: (v: string) => void) => (v: string) => (set(v), setGuardado(false))
+  const num = '[&_input]:text-right [&_input]:tabular-nums'
+
+  return (
+    <form
+      className="flex flex-col gap-6"
+      aria-label="Revisión semanal"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (sucio && !hayError) guardar.mutate([patch], { onSuccess: () => setGuardado(true) })
+      }}
+    >
+      <div className="auto-grid-wide">
+        <TextField label="Semanas sin mejorar para avisar de un estancamiento" unidad="semanas" inputMode="numeric" value={stall} onChange={(e) => cambia(setStall)(e.target.value)} error={errores.stall} ayuda="Por defecto, 4." className={num} />
+        <TextField label="Sesiones mínimas del ejercicio en esas semanas" unidad="sesiones" inputMode="numeric" value={minSes} onChange={(e) => cambia(setMinSes)(e.target.value)} error={errores.minSes} ayuda="Por defecto, 3." className={num} />
+        <TextField label="Adherencia mínima de la semana" unidad="%" inputMode="decimal" value={adh} onChange={(e) => cambia(setAdh)(e.target.value)} error={errores.adh} ayuda="Por defecto, 80 %." className={num} />
+        <TextField label="Semanas que se miran para saber qué grupos entrenas" unidad="semanas" inputMode="numeric" value={muscle} onChange={(e) => cambia(setMuscle)(e.target.value)} error={errores.muscle} ayuda="Los grupos sin series en esas semanas no avisan. Por defecto, 4." className={num} />
+        <TextField label="Semanas sin practicar una estación de HYROX para avisar" unidad="semanas" inputMode="numeric" value={hyrox} onChange={(e) => cambia(setHyrox)(e.target.value)} error={errores.hyrox} ayuda="Por defecto, 3." className={num} />
+      </div>
+      <div className="flex flex-wrap items-center gap-3" role="group" aria-label="Guardado de la revisión semanal">
+        <Button type="submit" variant="primary" disabled={!sucio || hayError} cargando={guardar.isPending}>
+          Guardar revisión
         </Button>
         <Button variant="ghost" disabled={!sucio} onClick={descartar}>
           Descartar

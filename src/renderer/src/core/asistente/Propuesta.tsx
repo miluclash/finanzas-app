@@ -11,15 +11,15 @@ import { GraficoVista } from '../graficos'
 import { useAiAccept, useAiReject } from './aiApi'
 
 const OP: Record<AiChangeOp, { texto: string; plural: string; Icono: typeof Plus }> = {
-  create: { texto: 'Crear', plural: 'altas', Icono: Plus },
-  update: { texto: 'Editar', plural: 'ediciones', Icono: PencilSimple },
-  delete: { texto: 'Borrar', plural: 'borrados', Icono: Trash }
+  create: { texto: 'Nuevo', plural: 'altas', Icono: Plus },
+  update: { texto: 'Cambio', plural: 'ediciones', Icono: PencilSimple },
+  delete: { texto: 'Borrado', plural: 'borrados', Icono: Trash }
 }
 
 function EtiquetaOp({ op }: { op: AiChangeOp }) {
   const { texto, Icono } = OP[op]
   return (
-    <Tag icono={<Icono size={14} weight={op === 'delete' ? 'fill' : 'bold'} aria-hidden />} tono={op === 'delete' ? 'warning' : op === 'create' ? 'accent' : 'info'}>
+    <Tag className="border-transparent bg-transparent px-0" icono={<Icono size={14} weight={op === 'delete' ? 'fill' : 'bold'} aria-hidden />} tono={op === 'delete' ? 'warning' : op === 'create' ? 'accent' : 'info'}>
       {texto}
     </Tag>
   )
