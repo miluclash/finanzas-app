@@ -1,5 +1,6 @@
-import { Copy, DownloadSimple, FloppyDisk, FolderOpen, PencilSimple, Plus, ShieldCheck, UploadSimple } from '@phosphor-icons/react'
+import { DownloadSimple, FloppyDisk, FolderOpen, PencilSimple, Plus, ShieldCheck, UploadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { formatDate } from '@shared/dates'
 import { COST_METHOD_LABEL, GROUP_KIND_LABEL, NATURE_LABEL } from '@shared/modules/finanzas/labels'
 import { formatEur } from '@shared/money'
@@ -31,6 +32,7 @@ import { toast } from '../../lib/toast'
 import type { ImportPreview } from '../../../../main/modules/finanzas/importExcel'
 import { AjustesEntreno } from '../../modules/entreno/AjustesEntreno'
 import { Apariencia } from './Apariencia'
+import { AjustesAsistente } from './AjustesAsistente'
 
 /* ======================= Estructura: navegación interna y secciones ======================= */
 const ANCLAS = [
@@ -41,7 +43,7 @@ const ANCLAS = [
   ['categorias', 'Categorías'],
   ['entreno', 'Entreno'],
   ['datos', 'Datos y copias'],
-  ['mcp', 'Claude (MCP)'],
+  ['asistente', 'Asistente'],
   ['registro', 'Registro de cambios']
 ] as const
 
@@ -59,6 +61,14 @@ function Bloque({ id, titulo, texto, children }: { id: string; titulo: string; t
 
 export function SettingsPage() {
   const [activa, setActiva] = useState<string>('apariencia')
+  const { hash } = useLocation()
+  // Un enlace con ancla (/ajustes#asistente) lleva directo a esa sección
+  useEffect(() => {
+    const id = hash.replace('#', '')
+    if (!id || !ANCLAS.some(([a]) => a === id)) return
+    const t = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 0)
+    return () => window.clearTimeout(t)
+  }, [hash])
   // La sección activa sigue al scroll del contenido
   useEffect(() => {
     const el = document.getElementById('contenido')
@@ -111,8 +121,8 @@ export function SettingsPage() {
           <Bloque id="datos" titulo="Datos y copias" texto="Importar, exportar, copiar y restaurar son cuatro cosas distintas. Antes de importar, restaurar o actualizar, la app hace una copia sola.">
             <DataSettings />
           </Bloque>
-          <Bloque id="mcp" titulo="Conectar con Claude (MCP)" texto="Claude Desktop podrá leer tus datos (solo lectura) y revisar el plan de inversión.">
-            <ClaudeMcp />
+          <Bloque id="asistente" titulo="Asistente" texto="Un modelo de IA que funciona en tu equipo con Ollama. Lee tus datos, te responde y propone cambios que solo se aplican cuando los confirmas. Nada sale de tu equipo.">
+            <AjustesAsistente />
           </Bloque>
           <Bloque id="registro" titulo="Registro de cambios" texto="Lo último que ha cambiado en tus datos: altas, cambios, borrados, importaciones y restauraciones.">
             <AuditLog />
@@ -722,35 +732,6 @@ function DataSettings() {
           onConfirmar={() => (restore.mutate(restaurar.ruta ? [restaurar.ruta] : []), setRestaurar(null))}
         />
       )}
-    </div>
-  )
-}
-
-function ClaudeMcp() {
-  const q = useApi('finanzas:mcp.config', [])
-  const json = q.data ? JSON.stringify(q.data, null, 2) : ''
-  return (
-    <div>
-      <p className="t-label">Pega esto en claude_desktop_config.json y reinicia Claude.</p>
-      <pre className="t-meta tnum mt-3 max-h-60 overflow-auto r-control bg-raised p-4" tabIndex={0} aria-label="Configuración para Claude Desktop">
-        {json || 'Cargando…'}
-      </pre>
-      <div className="mt-3 flex gap-2">
-        <Button
-          size="sm"
-          icon={<Copy size={14} />}
-          disabled={!json}
-          onClick={async () => {
-            await navigator.clipboard.writeText(json)
-            toast.success('Configuración copiada')
-          }}
-        >
-          Copiar configuración
-        </Button>
-      </div>
-      <p className="t-meta mt-3">
-        En Claude Desktop: Ajustes → Desarrollador → Editar configuración. Si ya tienes otros servidores en «mcpServers», añade solo la entrada «finanzas». Tras actualizar la app, la ruta no cambia.
-      </p>
     </div>
   )
 }

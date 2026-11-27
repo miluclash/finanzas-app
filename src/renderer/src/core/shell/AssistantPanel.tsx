@@ -1,17 +1,32 @@
-import { ShieldCheck, Sparkle, X } from '@phosphor-icons/react'
-import { useRef, type ReactNode, type RefObject } from 'react'
-import { IconButton, Tag, useFocusScope } from '../ui'
+import { ChatsCircle, PencilSimpleLine, Sparkle, X } from '@phosphor-icons/react'
+import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { PanelAsistente, type Vista } from '../asistente/PanelAsistente'
+import { IconButton, useFocusScope } from '../ui'
 export const AI_MIN = 320
 export const AI_MAX = 560
 
-/** AssistantPanel: solo el hueco. Redimensionable (mín. y máx.), por encima del contenido en ventanas estrechas.
- *  Estado vacío «Próximamente», sin respuestas simuladas. */
+/** La conversación abierta se recuerda al cerrar y abrir el panel (mientras la app sigue abierta). */
+let hiloRecordado: string | null = null
+
+/** AssistantPanel: marco del asistente. Redimensionable (mín. y máx.), por encima del contenido en ventanas estrechas.
+ *  El contenido (estado, conversaciones, chat, propuestas y sugerencias) vive en `core/asistente/`. */
 export function AssistantPanel({ ancho, onAncho, onCerrar, superpuesto }: { ancho: number; onAncho: (n: number) => void; onCerrar: () => void; superpuesto: boolean }) {
   const arrastrando = useRef(false)
   const cerrar = useRef<HTMLButtonElement>(null)
+  const [vista, setVista] = useState<Vista>('chat')
+  const [hilo, setHilo] = useState<string | null>(hiloRecordado)
+  const elegirHilo = (id: string | null) => {
+    hiloRecordado = id
+    setHilo(id)
+  }
   const limitar = (n: number) => Math.min(AI_MAX, Math.max(AI_MIN, n))
   const panel = (
-    <aside aria-label="Asistente" className="slide-in relative flex h-full shrink-0 flex-col border-l border-line bg-sidebar" style={{ width: Math.min(ancho, superpuesto ? window.innerWidth - 64 : ancho) }}>
+    <aside
+      aria-label="Asistente"
+      onClick={(e) => superpuesto && (e.target as HTMLElement).closest('a[href]') && onCerrar()}
+      className="slide-in relative flex h-full shrink-0 flex-col border-l border-line bg-sidebar"
+      style={{ width: Math.min(ancho, superpuesto ? window.innerWidth - 64 : ancho) }}
+    >
       <div
         role="separator"
         aria-orientation="vertical"
@@ -37,24 +52,20 @@ export function AssistantPanel({ ancho, onAncho, onCerrar, superpuesto }: { anch
           <Sparkle size={20} weight="duotone" className="text-accent-text" aria-hidden />
           Asistente
         </h2>
-        <IconButton ref={cerrar} variant="ghost" size="sm" etiqueta="Cerrar el asistente" onClick={onCerrar} icono={<X size={16} />} />
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-        <div className="grid size-16 place-items-center r-card border border-line-strong bg-raised">
-          <Sparkle size={32} weight="duotone" className="text-accent-text" aria-hidden />
+        <div className="flex items-center gap-1">
+          <IconButton
+            variant={vista === 'lista' ? 'secondary' : 'ghost'}
+            size="sm"
+            aria-pressed={vista === 'lista'}
+            etiqueta={vista === 'lista' ? 'Volver a la conversación' : 'Ver las conversaciones'}
+            onClick={() => setVista(vista === 'lista' ? 'chat' : 'lista')}
+            icono={<ChatsCircle size={16} />}
+          />
+          <IconButton variant="ghost" size="sm" etiqueta="Nueva conversación" onClick={() => (elegirHilo(null), setVista('chat'))} icono={<PencilSimpleLine size={16} />} />
+          <IconButton ref={cerrar} variant="ghost" size="sm" etiqueta="Cerrar el asistente" onClick={onCerrar} icono={<X size={16} />} />
         </div>
-        <div>
-          <h3 className="t-section">Próximamente</h3>
-          <p className="t-label mt-2">El asistente local llegará en la fase de IA local. Funcionará con un modelo en tu equipo, sin enviar nada a internet.</p>
-        </div>
-        <Tag icono={<ShieldCheck size={14} weight="fill" aria-hidden />}>Solo en tu equipo</Tag>
       </div>
-      <div className="border-t border-line p-4">
-        <label htmlFor="ia-entrada" className="sr-only">
-          Pregunta al asistente (aún no disponible)
-        </label>
-        <input id="ia-entrada" className="input" disabled placeholder="Aún no disponible" />
-      </div>
+      <PanelAsistente vista={vista} setVista={setVista} threadId={hilo} setThreadId={elegirHilo} />
     </aside>
   )
   if (!superpuesto) return panel

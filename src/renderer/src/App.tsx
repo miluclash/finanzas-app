@@ -2,6 +2,7 @@ import { useCallback, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorState, LoadingState, Toaster } from './core/ui'
 import { SettingsPage } from './core/ajustes/Settings'
+import { tarjetasAsistente } from './core/asistente/tarjetas'
 import { TarjetasProvider, type FixedCardDef } from './core/graficos'
 import { Inicio } from './core/inicio/Inicio'
 import { AppShell } from './core/shell/AppShell'
@@ -31,8 +32,8 @@ import { TransactionsPage } from './modules/finanzas/Transactions'
 import { tarjetasFinanzas } from './modules/finanzas/tarjetas'
 import { WelcomePage } from './modules/finanzas/Welcome'
 
-/** Tarjetas fijas de los paneles editables: cada módulo registra las suyas y esta raíz las junta (el núcleo no importa módulos). */
-const TARJETAS: readonly FixedCardDef[] = [...tarjetasFinanzas, ...tarjetasEntreno]
+/** Tarjetas fijas de los paneles editables: cada módulo registra las suyas (y el núcleo la del asistente) y esta raíz las junta (el núcleo no importa módulos). */
+const TARJETAS: readonly FixedCardDef[] = [...tarjetasFinanzas, ...tarjetasEntreno, ...tarjetasAsistente]
 
 /** Rutas de la versión anterior (/movimientos, /cuentas…): llevan a la nueva, con sus parámetros. */
 function RedirigirAntigua() {

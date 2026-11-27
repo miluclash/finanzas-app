@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useAiEvents, useSolicitudAsistente } from '../asistente/aiApi'
 import { AI_MAX, AI_MIN, AssistantPanel } from './AssistantPanel'
 import { CommandPalette, type AccionesShell } from './CommandPalette'
 import { moduloDe, MODULOS, type Ruta } from './nav'
@@ -34,6 +35,13 @@ export function AppShell({
   const [ia, setIa] = useState(false)
   const [anchoIa, setAnchoIa] = useState(Number(leerLocal(CLAVE_ASISTENTE)) || 360)
   const [paleta, setPaleta] = useState(false)
+  // Las respuestas del asistente llegan por eventos aunque el panel esté cerrado
+  useAiEvents()
+  // «Coméntalo» desde una tarjeta abre el panel, que es quien envía la petición
+  const { solicitud } = useSolicitudAsistente()
+  useEffect(() => {
+    if (solicitud) setIa(true)
+  }, [solicitud])
   const [abierto, setAbierto] = useState<Record<string, boolean>>({ finanzas: ruta.modulo === 'finanzas', entreno: ruta.modulo === 'entreno' })
 
   // Al entrar en un módulo, su grupo se despliega
