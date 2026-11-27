@@ -2,6 +2,8 @@
 
 interface FinanzasBridge {
   call: (method: string, args: unknown[]) => Promise<{ ok: boolean; data?: unknown; error?: string; user?: boolean; saved?: boolean }>
+  /** Eventos del asistente (`AiEvent` de src/shared/core/ai-types.ts). Devuelve la baja. */
+  onAiEvent: (cb: (event: import('@shared/core/ai-types').AiEvent) => void) => () => void
   updateStatus: () => Promise<UpdateStatus>
   checkUpdate: () => Promise<unknown>
   /** `null` si no hay nada que instalar; si no se ha podido guardar antes, el motivo. */

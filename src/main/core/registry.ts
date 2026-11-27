@@ -15,6 +15,7 @@ import {
   type MetricOption,
   type MetricOptionKind
 } from '@shared/core/metrics-types'
+import type { AiSuggestion, AiToolDef as AiToolContract } from '@shared/core/ai-types'
 import { MIGRATION_RANGES, type Migration, type MigrationOwner, type VersionRange } from './migrations'
 
 /** Identificadores de módulo. Cada uno tiene su rango de migraciones en `MIGRATION_RANGES`. */
@@ -42,12 +43,11 @@ export interface ModuleDeps {
 export type MetricDef = MetricContract<CoreContext>
 
 /**
- * Herramienta que la IA local puede usar. Marcador de posición: se define en la fase de IA local.
+ * Herramienta que la IA local puede usar: el contrato de `src/shared/core/ai-types.ts` con el
+ * contexto del núcleo. Las de lectura devuelven datos resumidos; las de acción solo proponen
+ * cambios, que se escriben cuando Michael confirma.
  */
-export interface AiToolDef {
-  name: string
-  description: string
-}
+export type AiToolDef = AiToolContract<CoreContext>
 
 /** Importador declarado por un módulo. Marcador de posición (los importadores actuales van por `ipc`). */
 export interface ImporterDef {
@@ -76,7 +76,13 @@ export interface AppModule<H extends HandlerMap = HandlerMap, I extends ModuleId
    * este módulo no conoce esa lista; el núcleo junta las respuestas de todos los módulos.
    */
   metricOptions?(ctx: CoreContext, kind: MetricOptionKind): MetricOption[] | null
+  /** Herramientas de la IA local (nombres `<id>_<nombre>`, únicos en toda la app). */
   aiTools: readonly AiToolDef[]
+  /**
+   * Sugerencias que calcula el módulo (revisión semanal de entreno, avisos de finanzas). Funciones
+   * puras sobre el estado en memoria: funcionan aunque Ollama esté apagado.
+   */
+  suggestions?(ctx: CoreContext): AiSuggestion[]
   importers?: readonly ImporterDef[]
   exporters?: readonly ExporterDef[]
   /**
