@@ -21,6 +21,7 @@ import {
   type RecordsResult,
   type ResolvedWeek,
   type SummaryQuery,
+  type WeeklyReview,
   buildInicio,
   buildSummary,
   computeMetric,
@@ -34,6 +35,7 @@ import {
   prepareMetrics,
   resolveWeek,
   toMetricsFacts,
+  weeklyReview,
   workoutRecordsView
 } from '@shared/modules/entreno/metrics'
 import { WORKOUT_KINDS } from '@shared/modules/entreno/types'
@@ -76,6 +78,8 @@ export interface EntrenoMetricsService {
   hyrox(eventId: number): HyroxStatus | null
   compute(metricId: string, query: MetricQuery): Bucket[]
   inicio(): EntrenoInicio
+  /** Revisión de la última semana completa (umbrales de los ajustes de Entreno). */
+  review(): WeeklyReview
   /** Contexto de métricas preparado (de la caché): lo usan las métricas del constructor de gráficos. */
   context(): MetricsContext
   /** Para tests: cuántas veces se ha leído la base. */
@@ -141,6 +145,10 @@ export function createMetricsService(ctx: CoreContext): EntrenoMetricsService {
     inicio: () => {
       const c = get()
       return buildInicio(c.m, c.records, ctx.today())
+    },
+    review: () => {
+      const c = get()
+      return weeklyReview({ ctx: c.m, records: c.records, today: ctx.today(), stations: HYROX_STATION_KEYS })
     },
     context: () => get().m,
     get loads() {

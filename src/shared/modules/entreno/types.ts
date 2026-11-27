@@ -312,6 +312,17 @@ export interface EntrenoSettings {
   /** Semanas para la tendencia de los objetivos. */
   trendWeeks: number
   timeZone: string
+  // Revisión semanal (sugerencias, `metrics/review.ts`).
+  /** Semanas sin mejorar la mejor marca de un ejercicio para avisar de un estancamiento. */
+  reviewStallWeeks: number
+  /** Sesiones mínimas del ejercicio en esas semanas para avisar (con menos no se juzga). */
+  reviewStallMinSessions: number
+  /** Adherencia de la semana (0–1) por debajo de la cual se avisa. */
+  reviewAdherenceMin: number
+  /** Semanas hacia atrás para saber qué grupos musculares entrenas (los demás no avisan). */
+  reviewMuscleWeeks: number
+  /** Semanas sin practicar una estación de HYROX para avisar. */
+  reviewHyroxStationWeeks: number
 }
 
 export interface ImportRecord {

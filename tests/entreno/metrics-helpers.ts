@@ -20,7 +20,12 @@ export const SETTINGS: EntrenoSettings = {
   weekStartsOn: 1,
   secondaryMuscleFactor: 0.5,
   trendWeeks: 6,
-  timeZone: 'Europe/Madrid'
+  timeZone: 'Europe/Madrid',
+  reviewStallWeeks: 4,
+  reviewStallMinSessions: 3,
+  reviewAdherenceMin: 0.8,
+  reviewMuscleWeeks: 4,
+  reviewHyroxStationWeeks: 3
 }
 
 export function facts(p: Partial<MetricsFacts> = {}): MetricsFacts {

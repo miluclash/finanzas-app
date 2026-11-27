@@ -155,7 +155,13 @@ export const SettingsSchema = z
     weekStartsOn: z.number().refine((v) => v === 1, 'La semana empieza siempre en lunes: no se puede cambiar.'),
     secondaryMuscleFactor: z.number().min(0).max(1),
     trendWeeks: z.number().int().min(1).max(104),
-    timeZone: z.string().trim().min(1)
+    timeZone: z.string().trim().min(1),
+    // Revisión semanal (metrics/review.ts).
+    reviewStallWeeks: z.number().int().min(2).max(26),
+    reviewStallMinSessions: z.number().int().min(1).max(20),
+    reviewAdherenceMin: z.number().min(0).max(1),
+    reviewMuscleWeeks: z.number().int().min(1).max(26),
+    reviewHyroxStationWeeks: z.number().int().min(1).max(26)
   })
   .strict()
 

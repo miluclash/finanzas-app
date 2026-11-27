@@ -8,6 +8,7 @@
 // Los grupos musculares y las reglas de tipo iniciales van en la migración 2005: así se crean una
 // sola vez por base (también al restaurar una copia de antes de Entreno, que migra pero no siembra)
 // y no reaparecen si Michael los borra.
+import { REVIEW_DEFAULTS } from '@shared/modules/entreno/metrics/review'
 import type { EntrenoSettings } from '@shared/modules/entreno/types'
 import type { Db } from '../../core/db'
 
@@ -19,7 +20,13 @@ export const DEFAULT_SETTINGS: EntrenoSettings = {
   weekStartsOn: 1,
   secondaryMuscleFactor: 0.5,
   trendWeeks: 6,
-  timeZone: 'Europe/Madrid'
+  timeZone: 'Europe/Madrid',
+  // Umbrales de la revisión semanal (los mismos valores que REVIEW_DEFAULTS).
+  reviewStallWeeks: REVIEW_DEFAULTS.stallWeeks,
+  reviewStallMinSessions: REVIEW_DEFAULTS.stallMinSessions,
+  reviewAdherenceMin: REVIEW_DEFAULTS.adherenceMin,
+  reviewMuscleWeeks: REVIEW_DEFAULTS.muscleWeeks,
+  reviewHyroxStationWeeks: REVIEW_DEFAULTS.hyroxStationWeeks
 }
 
 /** Añade los ajustes por defecto que falten. Idempotente. */

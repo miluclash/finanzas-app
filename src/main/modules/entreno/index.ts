@@ -11,6 +11,7 @@ import { metricsServiceFor } from './metrics'
 import { MIGRATIONS } from './migrations'
 import { autosaveWeeks } from './planning'
 import { seedEntreno } from './seed'
+import { entrenoSuggestions } from './suggestions'
 
 /**
  * Métricas con el contrato del núcleo (`entreno.<id>`). Calculan sobre el contexto de métricas en
@@ -30,6 +31,7 @@ export const entrenoModule = defineModule({
   metrics,
   metricOptions: (ctx, kind) => entrenoMetricOptions(metricsServiceFor(ctx).context(), kind),
   aiTools: [],
+  suggestions: entrenoSuggestions,
   seed: (db) => seedEntreno(db),
   // Guarda con el boceto las semanas empezadas sin plan (no escribe nada si no falta ninguna).
   startup: (ctx) => void autosaveWeeks(ctx.db, ctx.today()),
