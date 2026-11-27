@@ -61,3 +61,15 @@ La interfaz nunca toca la base de datos: pide datos al proceso principal por IPC
 - Cada PR termina con: tests en verde, typecheck limpio, revisión del agente `revisor` y una nota en `docs/CHANGELOG.md`.
 - No publiques versiones (tags) sin que Michael lo pida: la app instalada se actualiza sola.
 - Si una decisión no está en `docs/EVOLUCION.md` y no se puede deshacer fácilmente, pregunta a Michael antes.
+
+### Cómo ha funcionado en F3–F5 (síguelo)
+
+- **Plan**: modo plan, explora con `explorador` (haiku · low) y pregunta a Michael solo lo que cambia el diseño. Michael suele **editar el plan y devolverlo al rechazar**: ese texto pasa a ser el plan aprobado, se guarda tal cual en el archivo de plan y no se reinterpreta.
+- **Contrato primero**: si dos agentes trabajan en paralelo sobre la misma frontera (tipos, IPC, componentes), el orquestador escribe y sube antes un archivo de tipos compartido (como `src/shared/core/metrics-types.ts` en F5) y los dos compilan contra él.
+- **Los agentes no hacen commits.** El orquestador revisa el diff, pasa `npm run typecheck`, `npm test` y los dorados, y hace un commit por etapa (`F<N> etapa 1A: …`), solo con los archivos de esa etapa si hay otro agente trabajando.
+- **Encargos a agentes**: autocontenidos (qué leer, qué archivos son suyos y cuáles no tocar, qué agentes trabajan a la vez, verificación e informe con extensión máxima). Para continuar o corregir, `SendMessage` al mismo agente, que conserva el contexto. Si un agente se corta por el límite de uso, se le reanuda con `SendMessage` cuando se restablece, sin empezar otro.
+- **Antes de cerrar**: `tests` cubre huecos (sin tocar producción), `revisor` revisa la rama entera, los arreglos los hace el agente dueño de cada parte, `registro-nombre` actualiza `docs/NOMBRE_APP.md`, y el orquestador escribe `docs/CHANGELOG.md` y la sección «Cómo quedó tras F<N>» de `docs/EVOLUCION.md`.
+- **PR**: `gh` no está instalado. Se sube la rama y se da a Michael el enlace `https://github.com/miluclash/finanzas-app/pull/new/<rama>` con título y texto listos.
+- **Pruebas en Windows**: recuérdale que reinicie `npm run dev`, porque no recarga el proceso principal (un error «Método desconocido» casi siempre es eso).
+- **Dorado real**: `%APPDATA%\Finanzas-golden` se capturó en F0 y sigue valiendo. No se recaptura con `--force` sin que Michael lo pida.
+- **Publicar** (solo si Michael lo pide): rama `version/X.Y.Z` con `npm version X.Y.Z --no-git-tag-version` y la nota en el CHANGELOG. Michael hace el merge y pulsa «Run workflow» en GitHub Actions, que compila y publica el release.
