@@ -15,7 +15,7 @@ import {
   type MetricOption,
   type MetricOptionKind
 } from '@shared/core/metrics-types'
-import type { AiSuggestion, AiToolDef as AiToolContract } from '@shared/core/ai-types'
+import { AI_TOOL_NAME_RE, type AiSuggestion, type AiToolDef as AiToolContract, type AiToolOwner } from '@shared/core/ai-types'
 import { MIGRATION_RANGES, type Migration, type MigrationOwner, type VersionRange } from './migrations'
 
 /** Identificadores de módulo. Cada uno tiene su rango de migraciones en `MIGRATION_RANGES`. */
@@ -120,8 +120,11 @@ export interface Registry {
   readonly requiredTables: readonly string[]
   /** Métricas de todos los módulos, en el orden del registro. */
   readonly metrics: readonly MetricDef[]
+  /** Herramientas de la IA de todos los módulos, en el orden del registro (sin las `core_*`). */
+  readonly aiTools: readonly AiToolDef[]
   get(id: ModuleId): AppModule | undefined
   metric(id: string): MetricDef | undefined
+  aiTool(name: string): AiToolDef | undefined
 }
 
 function checkRange(owner: string, range: VersionRange, migrations: readonly Migration[], seen: Map<number, string>): void {
@@ -167,9 +170,47 @@ function checkMetrics(m: AppModule, seen: Map<string, string>): void {
 }
 
 /**
+ * Comprueba herramientas de la IA contra el contrato: nombre `<dueño>_<nombre>` (`AI_TOOL_NAME_RE`)
+ * con el prefijo de `owner` (si se da), nombres únicos (también frente a los ya apuntados en
+ * `seen`, que se va rellenando), `kind` `read` o `action` con sus funciones, descripción y etiqueta,
+ * y parámetros de tipo `object` con `properties`. Lanza error con el primer problema. La usa el
+ * registro con las de cada módulo y el núcleo con las suyas (`core_*`).
+ */
+export function checkAiTools<C>(tools: readonly AiToolContract<C>[], owner?: AiToolOwner, seen: Map<string, string> = new Map()): void {
+  const who = owner ?? 'la app'
+  if (!Array.isArray(tools))
+    throw new Error(`${who} no tiene lista de herramientas de IA (¿un ciclo de importaciones la deja sin definir al registrarlo?).`)
+  for (const t of tools) {
+    const name: unknown = t?.name
+    if (typeof name !== 'string' || !name) throw new Error(`Herramienta de IA sin nombre en ${who}.`)
+    const bad = (why: string) => new Error(`Herramienta de IA «${name}» de ${who}: ${why}`)
+    if (!AI_TOOL_NAME_RE.test(name)) throw bad('el nombre tiene que ser <dueño>_<nombre> en minúsculas (core_, finanzas_ o entreno_).')
+    if (owner && !name.startsWith(`${owner}_`)) throw bad(`tiene que empezar por «${owner}_».`)
+    const prev = seen.get(name)
+    if (prev) throw new Error(`Nombre de herramienta de IA repetido: «${name}» (${prev} y ${who}).`)
+    seen.set(name, who)
+    if (typeof t.description !== 'string' || !t.description.trim()) throw bad('le falta la descripción.')
+    if (typeof t.label !== 'string' || !t.label.trim()) throw bad('le falta la etiqueta.')
+    const p = t.parameters as { type?: unknown; properties?: unknown } | undefined
+    if (!p || p.type !== 'object') throw bad('los parámetros tienen que ser un esquema de tipo «object».')
+    if (!p.properties || typeof p.properties !== 'object' || Array.isArray(p.properties))
+      throw bad('a los parámetros les faltan las propiedades (un objeto vacío si no tiene).')
+    const kind: unknown = t.kind
+    if (kind === 'read') {
+      if (typeof (t as { run?: unknown }).run !== 'function') throw bad('le falta la función run.')
+    } else if (kind === 'action') {
+      const a = t as { plan?: unknown; apply?: unknown; fingerprint?: unknown }
+      for (const fn of ['plan', 'apply', 'fingerprint'] as const) if (typeof a[fn] !== 'function') throw bad(`le falta la función ${fn}.`)
+    } else throw bad(`tipo «${String(kind)}» desconocido (read o action).`)
+  }
+}
+
+/**
  * Crea el registro y lo valida: ids únicos, migraciones dentro del rango de su dueño, versiones
- * no repetidas y métricas conformes al contrato (ids únicos en toda la app). Los nombres de handler se validan al construirlos (`mergeHandlers`), porque solo
- * existen cuando hay un contexto.
+ * no repetidas, métricas conformes al contrato (ids únicos en toda la app) y herramientas de la IA
+ * conformes al contrato (prefijo del módulo, nombres únicos en toda la app; ver `checkAiTools`).
+ * Los nombres de handler se validan al construirlos (`mergeHandlers`), porque solo existen cuando
+ * hay un contexto.
  */
 export function createRegistry(modules: readonly AppModule[], coreMigrations: readonly Migration[] = []): Registry {
   const ids = new Set<string>()
@@ -188,13 +229,19 @@ export function createRegistry(modules: readonly AppModule[], coreMigrations: re
   const list = [...modules]
   const metrics = list.flatMap((m) => m.metrics)
   const byId = new Map(metrics.map((d) => [d.id, d]))
+  const toolNames = new Map<string, string>()
+  for (const m of list) checkAiTools(m.aiTools, m.id, toolNames)
+  const aiTools = list.flatMap((m) => m.aiTools)
+  const toolByName = new Map(aiTools.map((t) => [t.name, t]))
   return {
     modules: list,
     migrations,
     requiredTables,
     metrics,
+    aiTools,
     get: (id) => list.find((m) => m.id === id),
-    metric: (id) => byId.get(id)
+    metric: (id) => byId.get(id),
+    aiTool: (name) => toolByName.get(name)
   }
 }
 

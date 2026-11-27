@@ -54,12 +54,17 @@ async function baseF4(file: string): Promise<void> {
   db.close()
 }
 
+/** Tablas del núcleo tras todas sus migraciones (1001–1004). */
+const CORE_TABLES = ['core_ai_messages', 'core_ai_threads', 'core_charts', 'core_dashboards', 'core_settings']
+
 describe('migraciones del núcleo 1001–1002', () => {
-  it('son solo CREATE de tablas core_, en el rango del núcleo', () => {
-    expect(CORE_MIGRATIONS.map((m) => m.version)).toEqual([1001, 1002])
+  it('son solo CREATE de tablas (e índices) core_, en el rango del núcleo', () => {
+    expect(CORE_MIGRATIONS.map((m) => m.version)).toEqual([1001, 1002, 1003, 1004])
     for (const m of CORE_MIGRATIONS) {
       expect(m.up).toMatch(/^CREATE TABLE core_\w+ \(/)
-      expect(m.up).not.toMatch(/\b(DROP|ALTER|INSERT|UPDATE|DELETE|PRAGMA)\b/i)
+      // `ON DELETE CASCADE` de las claves ajenas no es una sentencia DELETE.
+      expect(m.up.replace(/\bON DELETE CASCADE\b/g, '')).not.toMatch(/\b(DROP|ALTER|INSERT|UPDATE|DELETE|PRAGMA)\b/i)
+      for (const s of m.up.matchAll(/CREATE\s+(?:TABLE|INDEX)\s+(\w+)/gi)) expect(s[1]).toMatch(/^core_/)
       expect(m.data).toBeUndefined()
     }
   })
@@ -77,7 +82,7 @@ describe('migraciones del núcleo 1001–1002', () => {
     const { db } = await entrenoApp({ dbPath: file, backupsDir: backups })
     const copias = fs.readdirSync(backups).filter((f) => f.endsWith('-antes-de-migrar.sqlite'))
     expect(copias).toHaveLength(1)
-    expect(tablas(db).filter((t) => t.startsWith('core_'))).toEqual(['core_charts', 'core_dashboards'])
+    expect(tablas(db).filter((t) => t.startsWith('core_'))).toEqual(CORE_TABLES)
     expect(versiones(db)).toEqual(expect.arrayContaining([1001, 1002, 2006]))
     expect(volcado(db)).toEqual(antes)
     // La copia es la base de antes, sin las tablas nuevas.
@@ -101,7 +106,7 @@ describe('migraciones del núcleo 1001–1002', () => {
     await app.h['core:dashboards.save']('inicio', [{ id: 'fixed:x', type: 'fixed', ref: 'x', size: 'm', hidden: false }])
     await restoreBackup(app.ctx, file)
     const db = app.ctx.db
-    expect(tablas(db).filter((t) => t.startsWith('core_'))).toEqual(['core_charts', 'core_dashboards'])
+    expect(tablas(db).filter((t) => t.startsWith('core_'))).toEqual(CORE_TABLES)
     expect(versiones(db)).toEqual(expect.arrayContaining([1001, 1002]))
     // La copia no tenía paneles: el panel vuelve al diseño por defecto.
     expect(app.h['core:dashboards.get']('inicio')).toEqual({ dashboardId: 'inicio', cards: [], saved: false })

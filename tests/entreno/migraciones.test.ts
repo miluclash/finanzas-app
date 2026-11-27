@@ -82,7 +82,7 @@ describe('migraciones de entreno', () => {
       for (const alter of m.up.matchAll(/\bALTER\s+TABLE\s+\w+\s+(\w+)/gi)) expect(alter[1].toUpperCase()).toBe('ADD')
       expect(m.up).not.toMatch(/PRAGMA/i)
     }
-    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 1001, 1002, 2001, 2002, 2003, 2004, 2005, 2006])
+    expect(createAppRegistry().migrations.map((m) => m.version)).toEqual([1, 1001, 1002, 1003, 1004, 2001, 2002, 2003, 2004, 2005, 2006])
   })
 
   it('base vacía: crea las tablas, la vista y los datos iniciales', async () => {

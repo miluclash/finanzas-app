@@ -11,7 +11,7 @@ import { Db } from '../../src/main/core/db'
 import { UserError } from '../../src/main/core/errors'
 import type { DialogProvider } from '../../src/main/core/handlers'
 import { MIGRATION_RANGES, migrate, pendingMigrations, schemaVersion, type Migration, type OpRunner } from '../../src/main/core/migrations'
-import { createRegistry, defineModule, mergeHandlers, type AppModule } from '../../src/main/core/registry'
+import { checkAiTools, createRegistry, defineModule, mergeHandlers, type AiToolDef, type AppModule } from '../../src/main/core/registry'
 import { WriteQueue } from '../../src/main/core/writeQueue'
 import { exportJsonObject } from '../../src/main/modules/finanzas/exports'
 import { finanzasModule } from '../../src/main/modules/finanzas'
@@ -257,7 +257,7 @@ describe('registro de módulos', () => {
     expect(APP_MODULES.map((m) => m.name)).toEqual(['Finanzas', 'Entreno'])
     // Entreno no exige tablas: una copia de antes de F3 (sin trn_) se tiene que poder restaurar.
     expect(r.requiredTables).toEqual(['schema_migrations', 'accounts', 'transactions', 'categories'])
-    expect(r.migrations.map((m) => m.version)).toEqual([1, 1001, 1002, 2001, 2002, 2003, 2004, 2005, 2006])
+    expect(r.migrations.map((m) => m.version)).toEqual([1, 1001, 1002, 1003, 1004, 2001, 2002, 2003, 2004, 2005, 2006])
   })
 
   it('rechaza ids repetidos', () => {
@@ -419,5 +419,89 @@ describe('contexto y copias del núcleo', () => {
     expect(fs.existsSync(b1.path) && fs.existsSync(b2.path)).toBe(true)
     expect(b2.name).toMatch(/^finanzas-\d{8}-\d{6}-antes-de-importar\.sqlite$/)
     s.db.close()
+  })
+})
+
+describe('herramientas de la IA en el registro', () => {
+  const lectura = (name: string, extra: Record<string, unknown> = {}): AiToolDef =>
+    ({
+      kind: 'read',
+      name,
+      description: 'Herramienta de prueba.',
+      label: 'Consultando',
+      parameters: { type: 'object', properties: {} },
+      run: () => ({ ok: true }),
+      ...extra
+    }) as AiToolDef
+  const accion = (name: string, extra: Record<string, unknown> = {}): AiToolDef =>
+    ({
+      kind: 'action',
+      name,
+      description: 'Propone un cambio de prueba.',
+      label: 'Preparando el cambio',
+      parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+      plan: () => ({ criterion: null, changes: [] }),
+      apply: async () => undefined,
+      fingerprint: () => null,
+      ...extra
+    }) as AiToolDef
+  const finanzasCon = (aiTools: AiToolDef[]): AppModule => ({ ...finanzasModule, aiTools }) as AppModule
+  const entrenoCon = (aiTools: AiToolDef[]) => moduloPrueba([], { aiTools })
+
+  it('junta las herramientas de todos los módulos en el orden del registro y las busca por nombre', () => {
+    const f = lectura('finanzas_month_summary')
+    const e1 = lectura('entreno_week')
+    const e2 = accion('entreno_goal_save')
+    const r = createRegistry([finanzasCon([f]), entrenoCon([e1, e2])])
+    expect(r.aiTools.map((t) => t.name)).toEqual(['finanzas_month_summary', 'entreno_week', 'entreno_goal_save'])
+    expect(r.aiTool('entreno_goal_save')).toBe(e2)
+    expect(r.aiTool('core_metrics_list')).toBeUndefined()
+  })
+
+  it('las de la app cumplen el contrato y llevan el prefijo de su módulo', () => {
+    const r = createAppRegistry()
+    for (const t of r.aiTools) expect(['finanzas', 'entreno']).toContain(t.name.split('_')[0])
+    expect(new Set(r.aiTools.map((t) => t.name)).size).toBe(r.aiTools.length)
+  })
+
+  it('rechaza nombres mal formados', () => {
+    for (const name of ['entreno.week', 'Entreno_week', 'entreno_', 'entreno_Semana', 'entreno-week', 'otro_week', 'entreno_1x', 'entreno week', ''])
+      expect(() => createRegistry([entrenoCon([lectura(name)])]), name).toThrow(/Herramienta de IA/)
+  })
+
+  it('rechaza un prefijo que no es el del módulo (también core_ dentro de un módulo)', () => {
+    expect(() => createRegistry([entrenoCon([lectura('finanzas_week')])])).toThrow(/empezar por «entreno_»/)
+    expect(() => createRegistry([finanzasCon([lectura('core_metrics_list')])])).toThrow(/empezar por «finanzas_»/)
+  })
+
+  it('rechaza nombres repetidos en el mismo módulo', () => {
+    expect(() => createRegistry([entrenoCon([lectura('entreno_week'), accion('entreno_week')])])).toThrow(/repetido/)
+  })
+
+  it('rechaza tipo, parámetros o funciones que no cumplen el contrato', () => {
+    const casos: Array<[AiToolDef, RegExp]> = [
+      [lectura('entreno_a', { kind: 'write' }), /tipo «write» desconocido/],
+      [lectura('entreno_a', { parameters: { type: 'array', properties: {} } }), /tipo «object»/],
+      [lectura('entreno_a', { parameters: undefined }), /tipo «object»/],
+      [lectura('entreno_a', { parameters: { type: 'object' } }), /propiedades/],
+      [lectura('entreno_a', { run: undefined }), /función run/],
+      [accion('entreno_a', { apply: undefined }), /función apply/],
+      [accion('entreno_a', { fingerprint: 'x' }), /función fingerprint/],
+      [lectura('entreno_a', { description: '  ' }), /descripción/],
+      [lectura('entreno_a', { label: '' }), /etiqueta/]
+    ]
+    for (const [tool, re] of casos) expect(() => createRegistry([entrenoCon([tool])])).toThrow(re)
+    expect(() => createRegistry([moduloPrueba([], { aiTools: undefined as never })])).toThrow(/lista de herramientas/)
+  })
+
+  it('checkAiTools sirve para las del núcleo y comprueba que no choquen con las ya vistas', () => {
+    const vistas = new Map<string, string>()
+    checkAiTools([lectura('core_metrics_list'), accion('core_chart_propose')], 'core', vistas)
+    expect([...vistas.keys()]).toEqual(['core_metrics_list', 'core_chart_propose'])
+    expect(() => checkAiTools([lectura('core_metrics_list')], 'core', vistas)).toThrow(/repetido/)
+    expect(() => checkAiTools([lectura('entreno_week')], 'core')).toThrow(/empezar por «core_»/)
+    // Sin dueño: vale cualquier prefijo del contrato, pero no se repiten.
+    expect(() => checkAiTools([lectura('core_a'), lectura('finanzas_b'), lectura('entreno_c')])).not.toThrow()
+    expect(() => checkAiTools([lectura('core_a'), lectura('core_a')])).toThrow(/repetido/)
   })
 })
