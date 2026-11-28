@@ -309,9 +309,22 @@ else {
   // Se sale sin repetir nada si la cola está libre y no ha entrado ninguna escritura desde la copia
   // (o desde "Cerrar sin guardar"); si ha entrado alguna, se repite el proceso.
   let settling = false
+  // Respuestas del asistente en curso: se cancelan y se espera (como mucho AI_STOP_MS) a que hayan
+  // encolado lo que llevaban escrito; después se vuelve a pedir el cierre, que ya ve esas escrituras
+  // en la cola. Solo se intenta una vez: si alguna no acaba a tiempo, se sigue cerrando igual.
+  const AI_STOP_MS = 3000
+  let aiStopTried = false
   app.on('before-quit', (e) => {
-    // Las respuestas del asistente en curso se cancelan (lo que ya hayan escrito se guarda por la cola).
-    assistant?.cancelAll()
+    const a = assistant
+    if (a && a.running > 0 && !aiStopTried) {
+      e.preventDefault()
+      aiStopTried = true
+      const timeout = new Promise<void>((r) => setTimeout(r, AI_STOP_MS))
+      void Promise.race([a.cancelAll(), timeout])
+        .catch((err) => console.error('No se pudieron cancelar las respuestas del asistente al cerrar', err))
+        .finally(() => app.quit())
+      return
+    }
     const c = core
     if (!c || puedeSalir(c)) return
     e.preventDefault()

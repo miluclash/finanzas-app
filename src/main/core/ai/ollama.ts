@@ -126,6 +126,10 @@ export class OllamaProvider implements LlmProvider {
             'Ollama no ha respondido a tiempo. Si es la primera pregunta, puede que aún esté cargando el modelo: espera un poco y vuelve a intentarlo.'
           )
         : new LlmError('timeout', `Ollama no responde en ${this.base}. Comprueba que está en marcha.`)
+    // `redirect: 'error'`: una redirección (que podría llevar fuera de este equipo) no se sigue.
+    const cause = (e as { cause?: { message?: unknown } } | null)?.cause?.message
+    if (typeof cause === 'string' && /redirect/i.test(cause))
+      return new LlmError('bad_url', `La dirección ${this.base} responde con una redirección y, por seguridad, no se sigue. Revisa la dirección de Ollama en Ajustes → Asistente.`)
     return new LlmError(
       'unreachable',
       `No se puede conectar con Ollama en ${this.base}. Comprueba que está instalado y en marcha (abre Ollama o ejecuta «ollama serve»).`

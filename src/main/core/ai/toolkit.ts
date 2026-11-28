@@ -42,17 +42,34 @@ export function readTool<C, A>(def: ToolBase & { args: z.ZodType<A>; run(ctx: C,
 }
 
 /**
+ * El registro cambió desde la propuesta. Lo lanza la comprobación de la huella DENTRO de la operación
+ * de la cola que escribe (así no se cuela ninguna escritura entre comprobar y escribir); el
+ * orquestador lo trata como propuesta caducada.
+ */
+export class StaleChangeError extends UserError {
+  constructor() {
+    super('El registro ha cambiado desde la propuesta y no se ha tocado. Pide la propuesta otra vez.')
+    this.name = 'StaleChangeError'
+  }
+}
+
+/**
  * Herramienta de acción con sus argumentos validados. `plan` no escribe; `apply` escribe un cambio
- * confirmado (por la cola, con el mismo servicio que la página).
+ * confirmado (por la cola, con el mismo servicio que la página). `apply` recibe `guard`, que hay que
+ * llamar al principio de la función encolada: recalcula la huella del registro en ese mismo turno de
+ * la cola y lanza `StaleChangeError` si ya no es la de la propuesta.
  */
 export function actionTool<C, A>(
   def: ToolBase & {
     args: z.ZodType<A>
     plan(ctx: C, args: A): AiActionPlan
-    apply(ctx: C, change: AiChange): Promise<void>
+    apply(ctx: C, change: AiChange, guard: () => void): Promise<void>
     fingerprint(ctx: C, change: AiChange): string | null
   }
 ): AiActionToolDef<C> {
+  const guard = (ctx: C, change: AiChange) => () => {
+    if (def.fingerprint(ctx, change) !== change.fingerprint) throw new StaleChangeError()
+  }
   return {
     kind: 'action',
     name: def.name,
@@ -60,7 +77,7 @@ export function actionTool<C, A>(
     label: def.label,
     parameters: def.parameters,
     plan: (ctx, args) => def.plan(ctx, parseArgs(def.args, args, def.name)),
-    apply: (ctx, change) => def.apply(ctx, change),
+    apply: (ctx, change) => def.apply(ctx, change, guard(ctx, change)),
     fingerprint: (ctx, change) => def.fingerprint(ctx, change)
   }
 }

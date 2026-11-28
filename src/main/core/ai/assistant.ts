@@ -39,6 +39,7 @@ import {
 } from '@shared/core/ai-types'
 import { UserError } from '../errors'
 import { LlmError } from './llmError'
+import { StaleChangeError } from './toolkit'
 
 /** Tamaño máximo de un resultado de herramienta de turnos anteriores al reenviarlo como contexto. */
 export const AI_HISTORY_TOOL_MAX_CHARS = 1500
@@ -252,16 +253,26 @@ export class Assistant<C> {
     return true
   }
 
-  /** Cancela todas las respuestas (al cerrar la app). */
-  cancelAll(): number {
+  /**
+   * Cancela todas las respuestas (al cerrar la app). La promesa se cumple cuando todas han terminado
+   * y han guardado (por la cola) lo que llevaban escrito; nunca se rechaza.
+   */
+  cancelAll(): Promise<void> {
     for (const r of this.runs.values()) r.controller.abort()
+    return this.wait()
+  }
+
+  /** Respuestas en marcha. */
+  get running(): number {
     return this.runs.size
   }
 
   /** Cancela la respuesta en curso de un hilo, si la hay. */
-  cancelThread(threadId: string): void {
+  cancelThread(threadId: string): Promise<void> {
     const runId = this.byThread.get(threadId)
-    if (runId) this.cancel(runId)
+    if (!runId) return Promise.resolve()
+    this.cancel(runId)
+    return this.wait(runId)
   }
 
   isRunning(threadId: string): boolean {
@@ -419,6 +430,7 @@ export class Assistant<C> {
           ? {
               estado: 'propuesta creada, pendiente de confirmar',
               propuestas: created.map((p) => ({ titulo: p.title, cambios: p.changes.length, modo: p.mode === 'group' ? 'en grupo' : 'suelta' })),
+              ...(created[0].criterion ? { criterio: created[0].criterion } : {}),
               aviso: 'Todavía no se ha cambiado nada. Dile que lo revise y lo confirme en la tarjeta de la propuesta.'
             }
           : { estado: 'sin cambios', motivo: 'Ningún registro cumple lo pedido o ya está así. No se ha creado ninguna propuesta.' }
@@ -469,7 +481,7 @@ export class Assistant<C> {
     const p = this.deps.store.getProposal(id)
     if (!p) throw new UserError('Esa propuesta ya no existe.')
     if (p.status !== 'pending') throw new UserError('Esta propuesta ya no está pendiente.')
-    if (this.resolving.has(id)) throw new UserError('Esta propuesta ya se está aplicando.')
+    if (this.resolving.has(id)) throw new UserError('Esta propuesta ya se está resolviendo.')
     return p
   }
 
@@ -506,8 +518,12 @@ export class Assistant<C> {
         await this.deps.store.updateProposal(out)
         return out
       }
+      // La comprobación de arriba es un atajo: la que vale la repite cada `apply` dentro de su operación
+      // de la cola (`StaleChangeError`), así que una escritura que se cuele mientras la cola está ocupada
+      // (otra propuesta, una edición en la página, una importación…) no se pisa.
       const changes: AiChange[] = p.changes.map((c) => ({ ...c }))
       let failedAt = -1
+      let staleAt = -1
       for (let i = 0; i < changes.length; i++) {
         try {
           await tool.apply(this.deps.ctx, changes[i])
@@ -515,11 +531,17 @@ export class Assistant<C> {
         } catch (e) {
           changes[i] = { ...changes[i], status: 'failed', error: errorMessage(e) }
           failedAt = i
+          if (e instanceof StaleChangeError) staleAt = i
           break
         }
       }
       if (failedAt >= 0) for (let i = failedAt + 1; i < changes.length; i++) changes[i] = { ...changes[i], status: 'skipped' }
-      const status: AiProposal['status'] = failedAt < 0 ? 'applied' : failedAt === 0 ? 'failed' : 'partial'
+      let status: AiProposal['status'] = failedAt < 0 ? 'applied' : failedAt === 0 ? 'failed' : 'partial'
+      if (staleAt === 0) {
+        // Caducó antes de escribir nada: igual que la comprobación previa.
+        status = 'stale'
+        changes[0] = { ...changes[0], status: 'skipped' }
+      }
       const out: AiProposal = { ...p, status, changes, resolvedAt: resolvedAt() }
       await this.deps.store.updateProposal(out)
       return out
@@ -530,14 +552,20 @@ export class Assistant<C> {
 
   async rejectProposal(proposalId: string): Promise<AiProposal> {
     const p = this.pendingProposal(proposalId)
-    const out: AiProposal = {
-      ...p,
-      status: 'rejected',
-      resolvedAt: this.now().toISOString(),
-      changes: p.changes.map((c) => ({ ...c, status: 'skipped' }))
+    // Mientras se guarda el descarte, nadie puede aceptarla (ni descartarla otra vez).
+    this.resolving.add(p.id)
+    try {
+      const out: AiProposal = {
+        ...p,
+        status: 'rejected',
+        resolvedAt: this.now().toISOString(),
+        changes: p.changes.map((c) => ({ ...c, status: 'skipped' }))
+      }
+      await this.deps.store.updateProposal(out)
+      return out
+    } finally {
+      this.resolving.delete(p.id)
     }
-    await this.deps.store.updateProposal(out)
-    return out
   }
 
   // -------------------------------------------------------------------------------------------------

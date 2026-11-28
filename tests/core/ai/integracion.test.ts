@@ -172,7 +172,7 @@ describe('herramientas de finanzas', () => {
     expect(proposals).toHaveLength(1)
     const p = proposals[0]
     expect(p.mode).toBe('group')
-    expect(p.criterion).toBe('pasar a «Entretenimiento» los movimientos que contienen «steam»')
+    expect(p.criterion).toBe('pasar a «Entretenimiento» los movimientos cuya descripción o comercio contiene «steam»')
     expect(p.changes.map((c) => c.entityId).sort()).toEqual(steam.map((t) => t.id).sort())
     expect(p.changes[0].fields).toEqual([{ label: 'Categoría', before: 'Otros gastos', after: 'Entretenimiento' }])
     // Mientras se proponía solo escribió el almacén del asistente.
@@ -414,5 +414,102 @@ describe('herramientas de entreno', () => {
     expect((await h['core:ai.proposals.accept']({ proposalId: proposals[0].id })).status).toBe('stale')
     const r = await proponer('entreno_semana_guardar', { semana: '2026-11-25', sesiones: [] })
     expect(r.toolResult).toMatch(/lunes/)
+  })
+})
+
+describe('arreglos de la revisión: carreras con la cola ocupada y detalles de los planes', () => {
+  /** Ocupa la cola hasta que se llame a la función devuelta (como una copia o una importación larga). */
+  function ocuparCola(ctx: CoreContext): () => Promise<void> {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const busy = ctx.queue.enqueueTask('test:ocupada', async () => {
+      await gate
+    })
+    return async () => {
+      release()
+      await busy
+    }
+  }
+
+  it('dos propuestas sueltas sobre el mismo movimiento, confirmadas con la cola ocupada: la segunda caduca', async () => {
+    const { app, s, h, proponer, steam } = await montar()
+    const p1 = (await proponer('finanzas_movimiento_editar', { id: steam[0].id, importe: 20 })).proposals[0]
+    const p2 = (await proponer('finanzas_movimiento_editar', { id: steam[0].id, importe: 30 })).proposals[0]
+    const liberar = ocuparCola(app.ctx)
+    // Las dos pasan la comprobación previa (nada ha cambiado todavía) y encolan su escritura.
+    const a1 = h['core:ai.proposals.accept']({ proposalId: p1.id })
+    const a2 = h['core:ai.proposals.accept']({ proposalId: p2.id })
+    await liberar()
+    const [r1, r2] = await Promise.all([a1, a2])
+    expect(r1.status).toBe('applied')
+    expect(r2.status).toBe('stale')
+    expect(r2.changes.map((c) => c.status)).toEqual(['skipped'])
+    expect(s.ctx().txById.get(steam[0].id)!.amountCents).toBe(-2000)
+    expect(h['core:ai.threads.get'](p2.threadId)!.messages.find((m) => m.id === p2.messageId)!.proposals![0].status).toBe('stale')
+  })
+
+  it('un grupo no pisa una edición hecha en la página entre dos cambios: se para (partial)', async () => {
+    const { app, s, h, proponer } = await montar()
+    const p = (await proponer('finanzas_movimientos_recategorizar', { texto: 'steam', categoriaNueva: 'Entretenimiento' })).proposals[0]
+    expect(p.mode).toBe('group')
+    const segundo = p.changes[1].entityId!
+    const liberar = ocuparCola(app.ctx)
+    const acc = h['core:ai.proposals.accept']({ proposalId: p.id })
+    // La edición de la página entra en la cola después del primer cambio y antes del segundo.
+    await Promise.resolve()
+    const pagina = h['finanzas:tx.save']({ ...s.ctx().txById.get(segundo)!, description: 'Editado en la página' })
+    await liberar()
+    const out = await acc
+    await pagina
+    expect(out.status).toBe('partial')
+    expect(out.changes.map((c) => c.status)).toEqual(['applied', 'failed', 'skipped'])
+    expect(out.changes[1].error).toMatch(/ha cambiado desde la propuesta/)
+    const t = s.ctx().txById.get(segundo)!
+    expect(t.description).toBe('Editado en la página')
+    expect(t.categoryId).toBe(cat(s, 'Otros gastos'))
+    expect(s.ctx().txById.get(p.changes[0].entityId!)!.categoryId).toBe(cat(s, 'Entretenimiento'))
+  })
+
+  it('editar el importe de un ajuste conserva su signo (como la página)', async () => {
+    const { s, h, acc, proponer } = await montar()
+    const ajuste = tx(s, { accountId: acc.id, amountCents: -5000, type: 'ADJUSTMENT', categoryId: null, description: 'Ajuste de saldo' })
+    const { proposals } = await proponer('finanzas_movimiento_editar', { id: ajuste.id, importe: 30 })
+    expect(proposals[0].changes[0].fields).toEqual([{ label: 'Importe', before: '-50,00 €', after: '-30,00 €' }])
+    await h['core:ai.proposals.accept']({ proposalId: proposals[0].id })
+    expect(s.ctx().txById.get(ajuste.id)!.amountCents).toBe(-3000)
+  })
+
+  it('presupuesto: sin aviso se conserva el que hay; con null se quita', async () => {
+    const { s, h, proponer } = await montar()
+    await h['finanzas:budgets.set']({ month: '2026-11', categoryId: cat(s, 'Alimentación'), amountCents: 20_000, alertPct: 80 })
+    const igual = (await proponer('finanzas_presupuesto_fijar', { mes: '2026-11', categoria: 'Alimentación', importe: 300 })).proposals[0]
+    expect(igual.changes[0].payload).toMatchObject({ alertPct: 80 })
+    expect(igual.changes[0].fields.map((f) => f.label)).toEqual(['Presupuesto'])
+    const quitar = (await proponer('finanzas_presupuesto_fijar', { mes: '2026-11', categoria: 'Alimentación', importe: 200, alertaPct: null })).proposals[0]
+    expect(quitar.changes[0].payload).toMatchObject({ alertPct: null })
+    expect(quitar.changes[0].fields).toEqual([{ label: 'Aviso al', before: '80 %', after: null }])
+  })
+
+  it('recategorizar: busca el texto solo en descripción y comercio, y dice cuántos omite y por qué', async () => {
+    const { s, acc, proponer } = await montar()
+    tx(s, { accountId: acc.id, amountCents: 500, description: 'Steam venta de cromos', date: '2026-11-20' })
+    // «steam» en las notas no cuenta (el buscador general sí lo encontraría).
+    tx(s, { accountId: acc.id, amountCents: -700, description: 'Kiosco', notes: 'regalo de steam', date: '2026-11-21' })
+    const r = await proponer('finanzas_movimientos_recategorizar', { texto: 'steam', categoriaNueva: 'Entretenimiento' })
+    const p = r.proposals[0]
+    expect(p.changes).toHaveLength(3)
+    expect(p.changes.every((c) => /^Steam juego/.test(c.label))).toBe(true)
+    expect(p.criterion).toMatch(/^pasar a «Entretenimiento» los movimientos cuya descripción o comercio contiene «steam» \(se omite 1 que no admite el cambio; p\. ej\. Steam venta de cromos/)
+    expect(r.toolResult).toContain('se omite 1')
+  })
+
+  it('plan de la semana: un cambio solo de nota también es un cambio', async () => {
+    const { h, proponer } = await montar()
+    const torso = await h['entreno:routines.save']({ name: 'Torso A', kind: 'GYM' })
+    await h['entreno:weekPlan.save']('2026-11-30', [{ date: '2026-12-01', routineId: torso.id, note: 'suave' }])
+    const igual = await proponer('entreno_semana_guardar', { semana: '2026-11-30', sesiones: [{ fecha: '2026-12-01', rutina: 'Torso A', nota: 'suave' }] })
+    expect(igual.proposals).toEqual([])
+    const nota = await proponer('entreno_semana_guardar', { semana: '2026-11-30', sesiones: [{ fecha: '2026-12-01', rutina: 'Torso A', nota: 'fuerte' }] })
+    expect(nota.proposals[0].changes[0].fields).toEqual([{ label: 'Sesiones', before: 'martes Torso A · suave', after: 'martes Torso A · fuerte' }])
   })
 })

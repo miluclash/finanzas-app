@@ -107,9 +107,15 @@ function workoutOrNull(db: Db, id: number): WorkoutDetail | null {
   }
 }
 
-/** Escribe como el handler: una operación de la cola con la misma etiqueta y la misma función. */
-function write<T>(ctx: CoreContext, name: string, fn: (db: Db) => T): Promise<T> {
-  return ctx.queue.enqueue(`entreno:${name}`, () => fn(ctx.db))
+/**
+ * Escribe como el handler: una operación de la cola con la misma etiqueta y la misma función. Antes,
+ * en el mismo turno, `guard` comprueba que el registro sigue como al proponer el cambio.
+ */
+function write<T>(ctx: CoreContext, guard: () => void, name: string, fn: (db: Db) => T): Promise<T> {
+  return ctx.queue.enqueue(`entreno:${name}`, () => {
+    guard()
+    return fn(ctx.db)
+  })
 }
 
 function parseOrThrow<T>(schema: z.ZodType<T>, v: unknown, what: string): T {
@@ -142,9 +148,13 @@ function slotsOf(plan: WeekPlan) {
   return plan.slots.map((s) => ({ date: s.date, order: s.order, routineId: s.routineId, time: s.time, note: s.note }))
 }
 
+/** Una sesión del plan en texto: «jueves Torso A (18:00) · nota». */
+const slotText = (weekday: number, name: string, time: string | null | undefined, note: string | null | undefined) =>
+  `${WEEKDAYS[weekday]} ${name}${time ? ` (${time})` : ''}${note ? ` · ${note}` : ''}`
+
 function weekText(plan: WeekPlan): string | null {
   if (!plan.slots.length) return null
-  return plan.slots.map((s) => `${WEEKDAYS[s.weekday]} ${s.routineName}${s.time ? ` (${s.time})` : ''}`).join(', ')
+  return plan.slots.map((s) => slotText(s.weekday, s.routineName, s.time, s.note)).join(', ')
 }
 
 const weekFingerprint = (db: Db, weekStart: string) => fingerprintOf(slotsOf(planning.getWeekPlan(db, weekStart)))
@@ -707,8 +717,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'workouts.saveManual', (db) => workouts.saveManualWorkout(db, change.payload as ManualWorkoutInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'workouts.saveManual', (db) => workouts.saveManualWorkout(db, change.payload as ManualWorkoutInput))
     },
     fingerprint: workoutFingerprint
   }),
@@ -765,8 +775,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'workouts.updateExtras', (db) => workouts.updateWorkoutExtras(db, change.payload as WorkoutExtrasInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'workouts.updateExtras', (db) => workouts.updateWorkoutExtras(db, change.payload as WorkoutExtrasInput))
     },
     fingerprint: workoutFingerprint
   }),
@@ -841,8 +851,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'goals.save', (db) => goals.saveGoal(db, change.payload as GoalInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'goals.save', (db) => goals.saveGoal(db, change.payload as GoalInput))
     },
     fingerprint: (ctx, change) => (change.entityId ? fingerprintOf(goals.listGoals(ctx.db).find((g) => g.id === Number(change.entityId)) ?? null) : null)
   }),
@@ -871,9 +881,9 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
+    apply: async (ctx, change, guard) => {
       const p = change.payload as { id: number; status: GoalStatus }
-      await write(ctx, 'goals.setStatus', (db) => goals.setGoalStatus(db, p.id, p.status))
+      await write(ctx, guard, 'goals.setStatus', (db) => goals.setGoalStatus(db, p.id, p.status))
     },
     fingerprint: (ctx, change) => (change.entityId ? fingerprintOf(goals.listGoals(ctx.db).find((g) => g.id === Number(change.entityId)) ?? null) : null)
   }),
@@ -916,8 +926,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'events.save', (db) => blocks.saveEvent(db, change.payload as TrainingEventInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'events.save', (db) => blocks.saveEvent(db, change.payload as TrainingEventInput))
     },
     fingerprint: (ctx, change) => (change.entityId ? fingerprintOf(blocks.listEvents(ctx.db).find((e) => e.id === Number(change.entityId)) ?? null) : null)
   }),
@@ -954,10 +964,17 @@ const actionTools: AiToolDef[] = [
       slots.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0))
       const before = planning.getWeekPlan(db, ws)
       const names = new Map(routines.listRoutines(db).map((r) => [r.id, r.name]))
-      const dow = (d: string) => WEEKDAYS[new Date(`${d}T12:00:00Z`).getUTCDay() || 7]
-      const after = slots.length ? slots.map((s) => `${dow(s.date)} ${names.get(s.routineId) ?? s.routineId}${s.time ? ` (${s.time})` : ''}`).join(', ') : null
+      const dow = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay() || 7
+      const after = slots.length ? slots.map((s) => slotText(dow(s.date), names.get(s.routineId) ?? String(s.routineId), s.time, s.note)).join(', ') : null
       const prev = weekText(before)
-      if (prev === after && before.saved) return { criterion: null, changes: [] }
+      // Se compara todo lo que se guarda (fecha, orden del día, rutina, hora y nota), como `slotsOf`.
+      const perDay = new Map<string, number>()
+      const next = slots.map((x) => {
+        const order = perDay.get(x.date) ?? 0
+        perDay.set(x.date, order + 1)
+        return { date: x.date, order, routineId: x.routineId, time: x.time ?? null, note: x.note ?? null }
+      })
+      if (before.saved && JSON.stringify(next) === JSON.stringify(slotsOf(before))) return { criterion: null, changes: [] }
       return {
         criterion: null,
         changes: [
@@ -973,9 +990,9 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
+    apply: async (ctx, change, guard) => {
       const p = change.payload as { weekStart: string; slots: WeekPlanSlotInput[] }
-      await write(ctx, 'weekPlan.save', (db) => planning.saveWeekPlan(db, p.weekStart, p.slots))
+      await write(ctx, guard, 'weekPlan.save', (db) => planning.saveWeekPlan(db, p.weekStart, p.slots))
     },
     fingerprint: (ctx, change) => weekFingerprint(ctx.db, String(change.entityId))
   }),
@@ -1016,8 +1033,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'weekPlan.move', (db) => planning.moveWeekSlot(db, change.payload as WeekPlanMoveInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'weekPlan.move', (db) => planning.moveWeekSlot(db, change.payload as WeekPlanMoveInput))
     },
     fingerprint: (ctx, change) => weekFingerprint(ctx.db, String(change.entityId))
   }),
@@ -1047,8 +1064,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'weekPlan.remove', (db) => planning.removeWeekSlot(db, change.payload as WeekPlanSlotRef))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'weekPlan.remove', (db) => planning.removeWeekSlot(db, change.payload as WeekPlanSlotRef))
     },
     fingerprint: (ctx, change) => weekFingerprint(ctx.db, String(change.entityId))
   }),
@@ -1133,8 +1150,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'routines.save', (db) => routines.saveRoutine(db, change.payload as RoutineInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'routines.save', (db) => routines.saveRoutine(db, change.payload as RoutineInput))
     },
     fingerprint: (ctx, change) => (change.entityId ? fingerprintOf(routines.listRoutines(ctx.db).find((r) => r.id === Number(change.entityId)) ?? null) : null)
   })

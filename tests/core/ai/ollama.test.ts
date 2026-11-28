@@ -140,6 +140,27 @@ describe('OllamaProvider', () => {
     expect(chunks[0]).toEqual({ type: 'delta', text: 'ok' })
   })
 
+  it('una línea del NDJSON que no es JSON → bad_response', async () => {
+    handler = (_q, _b, res) => res.end(ndjson({ message: { content: 'a' }, done: false }) + 'esto no es json\n' + ndjson({ done: true }))
+    const e = await collect(new OllamaProvider({ baseUrl: base }).chat(req)).catch((x) => x)
+    expect(e).toBeInstanceOf(LlmError)
+    expect(e.code).toBe('bad_response')
+    expect(e.message).toMatch(/no se entiende/)
+  })
+
+  it('una redirección no se sigue (redirect: error) → bad_url, y el destino no recibe nada', async () => {
+    handler = (q, _b, res) => {
+      if (q.url === '/destino') return res.end(ndjson({ done: true }))
+      res.writeHead(302, { Location: `${base}/destino` })
+      res.end()
+    }
+    const antes = bodies.filter((b) => b.url === '/destino').length
+    const p = new OllamaProvider({ baseUrl: base })
+    expect(await codeOf(collect(p.chat(req)))).toBe('bad_url')
+    expect(await codeOf(p.listModels())).toBe('bad_url')
+    expect(bodies.filter((b) => b.url === '/destino').length).toBe(antes)
+  })
+
   it('una respuesta que se corta antes de terminar → bad_response', async () => {
     handler = (_q, _b, res) => res.end(ndjson({ message: { content: 'a' }, done: false }))
     expect(await codeOf(collect(new OllamaProvider({ baseUrl: base }).chat(req)))).toBe('bad_response')

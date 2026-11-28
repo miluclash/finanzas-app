@@ -7,6 +7,7 @@ import { createAppHandlers } from '../../../src/main/app'
 import type { Assistant } from '../../../src/main/core/ai/assistant'
 import { CORE_AI_TOOLS } from '../../../src/main/core/ai/coreTools'
 import { LlmError } from '../../../src/main/core/ai/llmError'
+import { StaleChangeError } from '../../../src/main/core/ai/toolkit'
 import type { CoreContext } from '../../../src/main/core/context'
 import { checkAiTools } from '../../../src/main/core/registry'
 import { AppState } from '../../../src/main/modules/finanzas/state'
@@ -321,7 +322,11 @@ describe('herramientas reales: nombres, textos y alcance', () => {
     const enqueue = vi.spyOn(ctx.queue, 'enqueue')
     for (const [name, plan] of planes) {
       const t = tool(name) as AiActionToolDef<CoreContext>
-      for (const [i, d] of plan.changes.entries()) await t.apply(ctx, { ...d, id: `y${i}`, status: 'pending' } as AiChange)
+      // Varios casos tocan el mismo registro: al aplicarlos seguidos, los posteriores caducan (y no escriben).
+      for (const [i, d] of plan.changes.entries())
+        await t.apply(ctx, { ...d, id: `y${i}`, status: 'pending' } as AiChange).catch((e) => {
+          if (!(e instanceof StaleChangeError)) throw e
+        })
     }
     const labels = [...new Set(enqueue.mock.calls.map((c) => String(c[0])))]
     expect(labels.length).toBeGreaterThan(8)

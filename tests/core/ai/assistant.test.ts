@@ -315,6 +315,23 @@ describe('asistente: propuestas', () => {
     await expect(s.assistant.acceptProposal('no-existe')).rejects.toThrow(/ya no existe/)
   })
 
+  it('aceptar y descartar a la vez: gana el primero y el otro se rechaza (en los dos órdenes)', async () => {
+    const a = await ask({ ids: ['a'], value: '2' })
+    const id = a.proposals[0].id
+    const [acc, rej] = await Promise.allSettled([a.assistant.acceptProposal(id), a.assistant.rejectProposal(id)])
+    expect(acc).toMatchObject({ status: 'fulfilled', value: { status: 'applied' } })
+    expect(rej).toMatchObject({ status: 'rejected', reason: { message: expect.stringMatching(/resolviendo/) } })
+    expect(a.store.getProposal(id)!.status).toBe('applied')
+
+    const b = await ask({ ids: ['a'], value: '3' })
+    const id2 = b.proposals[0].id
+    const [rej2, acc2] = await Promise.allSettled([b.assistant.rejectProposal(id2), b.assistant.acceptProposal(id2)])
+    expect(rej2).toMatchObject({ status: 'fulfilled', value: { status: 'rejected' } })
+    expect(acc2.status).toBe('rejected')
+    expect(b.store.getProposal(id2)!.status).toBe('rejected')
+    expect(b.ctx.applied).toEqual([])
+  })
+
   it('descartar no escribe nada', async () => {
     const s = await ask({ ids: ['a'], value: '2' })
     const out = await s.assistant.rejectProposal(s.proposals[0].id)

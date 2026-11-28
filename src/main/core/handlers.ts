@@ -67,12 +67,14 @@ export function createCoreHandlers(ctx: CoreContext, dialogs: DialogProvider, ap
     'ai.settings.save': (patch: AiSettingsPatch) => aiSettings.save(patch),
     'ai.threads.list': () => aiStore.listThreads(),
     'ai.threads.get': (id: string) => aiStore.getThread(id),
-    'ai.threads.delete': (id: string) => {
-      assistant.cancelThread(id)
+    // Antes de borrar se cancela la respuesta en curso y se espera a que acabe (lo que guarde va antes
+    // del borrado en la cola, así que no queda nada suelto).
+    'ai.threads.delete': async (id: string) => {
+      await assistant.cancelThread(id)
       return aiStore.deleteThread(id)
     },
-    'ai.threads.deleteAll': () => {
-      assistant.cancelAll()
+    'ai.threads.deleteAll': async () => {
+      await assistant.cancelAll()
       return aiStore.deleteAllThreads()
     },
     'ai.send': (input: AiSendInput) => assistant.send(input),

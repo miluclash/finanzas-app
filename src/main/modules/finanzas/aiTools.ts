@@ -32,7 +32,7 @@ import {
 import { expectedSign, validateTransaction, type TxDraft } from '@shared/modules/finanzas/validation'
 import type { CoreContext } from '../../core/context'
 import { UserError } from '../../core/errors'
-import { actionTool, eur, eurosToCents, fecha, fingerprintOf, limited, params, pct, readTool, resolveByName } from '../../core/ai/toolkit'
+import { actionTool, eur, eurosToCents, fecha, fingerprintOf, limited, norm, params, pct, readTool, resolveByName } from '../../core/ai/toolkit'
 import type { AiToolDef } from '../../core/registry'
 import { AppState } from './appState'
 import * as planning from './planning'
@@ -204,10 +204,16 @@ function viewOfInput(i: TxInput): TxView {
 const txFingerprint = (ctx: CoreContext, change: AiChange) =>
   change.entityId ? fingerprintOf(st(ctx).ctx().txById.get(change.entityId) ?? null) : null
 
-/** Escribe como el handler: una operación de la cola con la misma etiqueta y la misma función. */
-function write<T>(ctx: CoreContext, name: string, fn: (s: AppState) => T): Promise<T> {
+/**
+ * Escribe como el handler: una operación de la cola con la misma etiqueta y la misma función. Antes,
+ * en el mismo turno, `guard` comprueba que el registro sigue como al proponer el cambio.
+ */
+function write<T>(ctx: CoreContext, guard: () => void, name: string, fn: (s: AppState) => T): Promise<T> {
   const s = st(ctx)
-  return ctx.queue.enqueue(`finanzas:${name}`, () => fn(s))
+  return ctx.queue.enqueue(`finanzas:${name}`, () => {
+    guard()
+    return fn(s)
+  })
 }
 
 function txUpdateDraft(s: AppState, before: Transaction, input: TxInput, extraWarnings: string[] = []): AiChangeDraft {
@@ -472,7 +478,7 @@ const readTools: AiToolDef[] = [
   readTool<CoreContext, SearchArgs>({
     name: 'finanzas_movimientos_buscar',
     label: 'Buscando movimientos',
-    description: `Busca movimientos con filtros (texto en descripción, comercio o notas; categoría; cuenta; fechas; mes; tipo; estado; importe mínimo y máximo en euros, sin signo). Devuelve como mucho ${AI_TX_SEARCH_MAX}, de los más recientes a los más antiguos, con el total de coincidencias y su suma.`,
+    description: `Busca movimientos con filtros (texto en descripción, comercio, notas, categoría o importe; categoría; cuenta; fechas; mes; tipo; estado; importe mínimo y máximo en euros, sin signo). Devuelve como mucho ${AI_TX_SEARCH_MAX}, de los más recientes a los más antiguos, con el total de coincidencias y su suma.`,
     parameters: params({
       texto: { type: 'string' },
       categoria: { type: 'string', description: 'Id o nombre de la categoría.' },
@@ -579,12 +585,17 @@ const GoalArgs = z
 
 function recatCriterion(s: AppState, a: z.infer<typeof RecatArgs>, target: Category): string {
   const parts: string[] = []
-  if (a.texto) parts.push(`que contienen «${a.texto}»`)
+  if (a.texto) parts.push(`cuya descripción o comercio contiene «${a.texto}»`)
   if (a.categoriaActual !== undefined) parts.push(`de «${category(s, a.categoriaActual).name}»`)
   if (a.cuenta !== undefined) parts.push(`de la cuenta «${account(s, a.cuenta).name}»`)
   if (a.desde && a.hasta) parts.push(`del ${fecha(a.desde)} al ${fecha(a.hasta)}`)
   else if (a.desde) parts.push(`desde el ${fecha(a.desde)}`)
   else if (a.hasta) parts.push(`hasta el ${fecha(a.hasta)}`)
+  const min = a.importeMin !== undefined ? eur(eurosToCents(Math.abs(a.importeMin))) : null
+  const max = a.importeMax !== undefined ? eur(eurosToCents(Math.abs(a.importeMax))) : null
+  if (min && max) parts.push(`de entre ${min} y ${max}`)
+  else if (min) parts.push(`de ${min} o más`)
+  else if (max) parts.push(`de hasta ${max}`)
   if (a.tipo) parts.push(`(${a.tipo === 'gasto' ? 'gastos' : a.tipo === 'ingreso' ? 'ingresos' : 'reembolsos'})`)
   return `pasar a «${target.name}» los movimientos ${parts.join(' ')}`
 }
@@ -640,8 +651,8 @@ const actionTools: AiToolDef[] = [
         changes: [{ entity: 'transaction', entityId: null, op: 'create', label: txLabel(input), fields, payload: input, fingerprint: null }]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
     },
     fingerprint: () => null
   }),
@@ -675,7 +686,9 @@ const actionTools: AiToolDef[] = [
       if (a.tipo) input.type = TYPE_OF_ARG[a.tipo]
       if (a.importe !== undefined || a.tipo) {
         const abs = a.importe !== undefined ? eurosToCents(Math.abs(a.importe)) : Math.abs(t.amountCents)
-        input.amountCents = abs * (expectedSign(input.type) || 1)
+        // El signo sale del tipo; los que no tienen signo fijo (ajustes) conservan el del original.
+        const sign = expectedSign(input.type) || Math.sign(t.amountCents) || 1
+        input.amountCents = abs * sign
       }
       if (a.categoria !== undefined) {
         const c = category(s, a.categoria).id
@@ -688,8 +701,8 @@ const actionTools: AiToolDef[] = [
       const draft = txUpdateDraft(s, t, input)
       return { criterion: null, changes: draft.fields.length ? [draft] : [] }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
     },
     fingerprint: txFingerprint
   }),
@@ -715,8 +728,8 @@ const actionTools: AiToolDef[] = [
       }
       return { criterion: null, changes }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
     },
     fingerprint: txFingerprint
   }),
@@ -729,7 +742,7 @@ const actionTools: AiToolDef[] = [
     parameters: params(
       {
         categoriaNueva: { type: 'string', description: 'Id o nombre de la categoría de destino.' },
-        texto: { type: 'string', description: 'Texto en la descripción, el comercio o las notas.' },
+        texto: { type: 'string', description: 'Texto que tiene que estar en la descripción o el comercio.' },
         categoriaActual: { type: 'string' },
         cuenta: { type: 'string' },
         desde: { type: 'string' },
@@ -744,8 +757,10 @@ const actionTools: AiToolDef[] = [
     plan: (ctx, a): AiActionPlan => {
       const s = st(ctx)
       const target = category(s, a.categoriaNueva)
+      // El texto solo se busca en la descripción y el comercio («los de Steam»), no en la categoría, las
+      // notas ni el importe como el buscador general: así el criterio dice exactamente qué se cambia.
+      const q = a.texto ? norm(a.texto) : ''
       const found = search(s, {
-        texto: a.texto,
         categoria: a.categoriaActual,
         cuenta: a.cuenta,
         desde: a.desde,
@@ -753,21 +768,30 @@ const actionTools: AiToolDef[] = [
         tipo: a.tipo,
         importeMin: a.importeMin,
         importeMax: a.importeMax
-      }).filter((t) => (EDITABLE_TYPES as readonly string[]).includes(t.type) && !t.investmentOpId && t.categoryId !== target.id)
+      }).filter(
+        (t) =>
+          (EDITABLE_TYPES as readonly string[]).includes(t.type) &&
+          !t.investmentOpId &&
+          t.categoryId !== target.id &&
+          (!q || norm(`${t.description} ${t.merchant ?? ''}`).includes(q))
+      )
       const changes: AiChangeDraft[] = []
+      let skipped = 0
       let firstError: string | null = null
       for (const t of found) {
         try {
           changes.push(txUpdateDraft(s, t, { ...txToInput(t), categoryId: target.id, subcategoryId: null }))
         } catch (e) {
+          skipped++
           firstError ??= `${txLabel(t)}: ${e instanceof Error ? e.message : String(e)}`
         }
       }
       if (!changes.length && firstError) throw new UserError(`No se puede: ${firstError}`)
-      return { criterion: recatCriterion(s, a, target), changes }
+      const omitted = skipped ? ` (${skipped === 1 ? 'se omite 1 que no admite' : `se omiten ${skipped} que no admiten`} el cambio; p. ej. ${firstError})` : ''
+      return { criterion: recatCriterion(s, a, target) + omitted, changes }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'tx.save', (s) => txs.saveTransaction(s, change.payload as TxInput))
     },
     fingerprint: txFingerprint
   }),
@@ -802,10 +826,10 @@ const actionTools: AiToolDef[] = [
       }
       return { criterion: null, changes }
     },
-    apply: async (ctx, change) => {
+    apply: async (ctx, change, guard) => {
       const p = change.payload as { ids: string[]; status: TxStatus }
       if (!(TX_STATUSES as readonly string[]).includes(p.status)) throw new UserError('Estado no válido.')
-      await write(ctx, 'tx.setStatus', (s) => txs.setStatus(s, p.ids, p.status))
+      await write(ctx, guard, 'tx.setStatus', (s) => txs.setStatus(s, p.ids, p.status))
     },
     fingerprint: txFingerprint
   }),
@@ -828,9 +852,9 @@ const actionTools: AiToolDef[] = [
       })
       return { criterion: null, changes }
     },
-    apply: async (ctx, change) => {
+    apply: async (ctx, change, guard) => {
       const p = change.payload as { id: string }
-      await write(ctx, 'tx.delete', (s) => txs.deleteTransaction(s, p.id))
+      await write(ctx, guard, 'tx.delete', (s) => txs.deleteTransaction(s, p.id))
     },
     fingerprint: txFingerprint
   }),
@@ -845,7 +869,7 @@ const actionTools: AiToolDef[] = [
         mes: { type: 'string', description: 'AAAA-MM' },
         categoria: { type: 'string', description: 'Id o nombre de la categoría.' },
         importe: { type: ['number', 'null'], description: 'Euros al mes; null para quitar el presupuesto.' },
-        alertaPct: { type: 'integer', description: 'Aviso al llegar a este % (opcional).' }
+        alertaPct: { type: ['integer', 'null'], description: 'Aviso al llegar a este % (sin poner: se queda como está; null: se quita).' }
       },
       ['mes', 'categoria', 'importe']
     ),
@@ -854,14 +878,17 @@ const actionTools: AiToolDef[] = [
       const s = st(ctx)
       const c = category(s, a.categoria)
       const before = budgetRow(s, a.mes, c.id)
-      const payload = { month: a.mes, categoryId: c.id, amountCents: a.importe === null ? null : eurosToCents(a.importe), alertPct: a.alertaPct ?? before?.alertPct ?? null }
+      const payload = { month: a.mes, categoryId: c.id, amountCents: a.importe === null ? null : eurosToCents(a.importe), alertPct: a.alertaPct === undefined ? (before?.alertPct ?? null) : a.alertaPct }
       const r = BudgetSetInput.safeParse(payload)
       if (!r.success) throw new UserError(r.error.issues[0]?.message ?? 'Presupuesto no válido.')
       if (!before && payload.amountCents === null) return { criterion: null, changes: [] }
-      const fields: AiFieldDiff[] = [{ label: 'Presupuesto', before: before ? eur(before.amountCents) : null, after: payload.amountCents === null ? null : eur(payload.amountCents) }]
-      if ((before?.alertPct ?? null) !== payload.alertPct)
+      // Solo lo que cambia (al crear, todo).
+      const fields: AiFieldDiff[] = []
+      if (!before || before.amountCents !== payload.amountCents)
+        fields.push({ label: 'Presupuesto', before: before ? eur(before.amountCents) : null, after: payload.amountCents === null ? null : eur(payload.amountCents) })
+      if ((before?.alertPct ?? null) !== payload.alertPct && payload.amountCents !== null)
         fields.push({ label: 'Aviso al', before: before?.alertPct ? `${before.alertPct} %` : null, after: payload.alertPct ? `${payload.alertPct} %` : null })
-      if (before && before.amountCents === payload.amountCents && fields.length === 1) return { criterion: null, changes: [] }
+      if (!fields.length) return { criterion: null, changes: [] }
       return {
         criterion: null,
         changes: [
@@ -877,9 +904,9 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
+    apply: async (ctx, change, guard) => {
       const p = change.payload as { month: string; categoryId: string; amountCents: number | null; alertPct: number | null }
-      await write(ctx, 'budgets.set', (s) => planning.setBudget(s, p))
+      await write(ctx, guard, 'budgets.set', (s) => planning.setBudget(s, p))
     },
     fingerprint: (ctx, change) => {
       const p = change.payload as { month: string; categoryId: string }
@@ -962,8 +989,8 @@ const actionTools: AiToolDef[] = [
         ]
       }
     },
-    apply: async (ctx, change) => {
-      await write(ctx, 'goals.save', (s) => planning.saveGoal(s, change.payload as GoalInput))
+    apply: async (ctx, change, guard) => {
+      await write(ctx, guard, 'goals.save', (s) => planning.saveGoal(s, change.payload as GoalInput))
     },
     fingerprint: (ctx, change) => (change.entityId ? fingerprintOf(st(ctx).ctx().goals.find((g) => g.id === change.entityId) ?? null) : null)
   })
