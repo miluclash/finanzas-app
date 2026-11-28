@@ -146,7 +146,8 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
   - Nada de cuentas, categorías, inversiones, reglas, ajustes, fusiones, importaciones ni restaurar. Un test falla si aparece una acción nueva sin su caso.
 - **Propuestas**:
   - Con criterio común y 3 o más cambios, se agrupan en una ventana con «Confirmar todo». Si no, van una a una. Hoy solo «recategorizar» da criterio.
-  - Huella (sha1 del registro) para caducar: si el registro cambió, la propuesta pasa a `stale` y no escribe nada.
+  - Huella (sha1 del registro) para caducar: si el registro cambió, la propuesta pasa a `stale` y no escribe nada. Se comprueba antes de escribir y otra vez dentro de la misma operación de la cola que escribe (`guard` en `toolkit.ts`), así que ninguna escritura se cuela entre las dos.
+  - «Recategorizar» busca el texto solo en la descripción y el comercio, y el criterio dice cuántos movimientos se omiten y por qué.
   - Un grupo se aplica en orden: si se para a mitad queda `partial`, y si falla el primero, `failed`.
   - Se guardan en el mensaje del asistente (`proposals_json`).
 - **Sugerencias**:
