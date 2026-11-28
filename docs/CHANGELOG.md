@@ -4,6 +4,34 @@ Una nota por PR, lo más nuevo arriba. Las versiones publicadas llevan su fecha;
 
 ## Sin publicar
 
+### F6 IA local (evolución a panel de vida)
+
+- **Asistente en el panel lateral**, con un modelo local de Ollama (por defecto `qwen3:8b`). No se conecta a nada fuera de tu equipo.
+  - Responde en directo y enseña qué está consultando. Puedes pararlo.
+  - Las conversaciones se guardan y se pueden borrar una a una o todas.
+- **Qué puede leer**:
+  - Las métricas de los gráficos y el resumen del mes.
+  - Avisos, presupuestos, objetivos y patrimonio.
+  - La semana de entreno, «¿qué me toca?», récords, objetivos y la revisión semanal.
+  - Movimientos concretos cuando hace falta, como mucho 50 por búsqueda.
+- **Qué puede cambiar**: lo que le pidas, y siempre lo confirmas tú antes de que se guarde.
+  - Finanzas: movimientos, presupuestos y objetivos.
+  - Entreno: sesiones manuales, objetivos, eventos, plan de la semana y rutinas.
+  - Gráficos nuevos.
+  - Si el registro cambió entretanto, la propuesta caduca y no se escribe nada.
+- **Cómo lo confirmas**:
+  - Los cambios sueltos, uno a uno.
+  - Si son 3 o más cambios con un mismo criterio (p. ej. «pon en Ocio lo de Steam»), en una ventana con «Confirmar todo».
+  - Los cambios usan el mismo guardado que las páginas, así que la lógica de Finanzas no cambia.
+- **Sugerencias**: revisión semanal de entreno (adherencia, estancamientos, grupos por debajo de su mínimo, ritmo de objetivos, HYROX y récords) y avisos de Finanzas.
+  - Las calcula la app, así que se ven aunque Ollama esté apagado.
+  - «Coméntalo» le pide al asistente que te las explique.
+  - Hay una tarjeta «Sugerencias» para los paneles, y los umbrales se cambian en Ajustes › Entreno.
+- **Ajustes › Asistente**: activarlo, elegir el modelo entre los descargados, la dirección de Ollama (solo de este equipo), el razonamiento, probar la conexión y borrar las conversaciones. Si Ollama está apagado o falta el modelo, el panel te dice qué hacer y el resto de la app funciona igual.
+- **Se ha eliminado el servidor MCP antiguo** y su sección de Ajustes.
+- **Base de datos**: tablas del núcleo `core_ai_threads`, `core_ai_messages` y `core_settings` (migraciones 1003–1004, solo tablas nuevas, con la copia `antes-de-migrar` de siempre).
+- Finanzas no cambia: los dos dorados dan las mismas cifras sin regenerar nada.
+
 ## 0.6.0 (26/11/2026)
 
 Primera versión con Entreno, gráficos propios y paneles editables (fases F0 a F5 de la evolución a panel de vida). El nombre sigue siendo "Finanzas". Al abrir tu base por primera vez, la app hace una copia `antes-de-migrar` y crea las tablas nuevas de Entreno y del núcleo; tus datos de Finanzas no cambian.

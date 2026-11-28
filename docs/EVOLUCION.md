@@ -20,7 +20,7 @@ El nombre sigue siendo "Finanzas" hasta el parche de cambio de nombre (ver `docs
 | Natación | Sin tiempos. Se guarda qué ejercicios se hicieron (y distancia si la hay) |
 | Peso corporal y nutrición | Fuera de la v1. Puerta abierta a un módulo "Nutrición" en el futuro |
 | IA | Solo local con Ollama desde el principio. Sin API de Anthropic ni OpenAI. Conectar el modelo local con Claude Desktop (MCP) se estudiará en un parche futuro |
-| Servidor MCP actual | Congelado. Se elimina en la fase de IA local |
+| Servidor MCP actual | Congelado hasta F6, donde se eliminó (lo sustituye el asistente local) |
 | Escrituras en la base de datos | Las ordena la app con una cola de escritura única. Se mantiene sql.js (no se migra a better-sqlite3) |
 | Nombre | "Finanzas" durante toda la evolución. Cambio de nombre en un parche aparte |
 | Claves y secretos | `.env` en la carpeta de datos, fuera del repo |
@@ -125,6 +125,43 @@ Añadir un módulo nuevo = crear su carpeta y registrarlo. El núcleo no conoce 
 - **Decisiones de Michael en F5**: los paneles por defecto van a mitades y tercios (los antiguos 7/5 y 5/4/3 ya no existen), el arrastre no recoloca en vivo, no hay lápiz fuera del modo editar y el presupuesto siempre se dibuja discontinuo.
 - **Pendiente**: al salir de la página en modo edición se descartan los cambios con un aviso, sin confirmar antes (el `HashRouter` actual no permite `useBlocker`). Exportar o importar paneles queda fuera.
 
+### 3.8 Cómo quedó tras F6 (decisiones de implementación)
+
+- **Contrato** en `src/shared/core/ai-types.ts`: `LlmProvider`, herramientas `read`/`action` (`AiToolDef`), propuestas con antes/después y estado, sugerencias, conversaciones, métodos `core:ai.*` (`AiHandlers`) y eventos `ai:event` (`AiEvent`). La validación de los ajustes y de la URL local está en `src/shared/core/ai-settings.ts`.
+- **Proveedor**: `src/main/core/ai/ollama.ts` es el único `fetch` del proceso principal (lo comprueba `reglas.test.ts`). Valida que la URL sea de este equipo antes de cada petición, no sigue redirecciones, va en streaming NDJSON, tiene tiempos de espera y se puede cancelar. Los errores llevan código (`unreachable`, `model_missing`, `timeout`, `aborted`, `bad_url`, `bad_response`) y mensaje en español. Modelo por defecto `qwen3:8b` (equipo de Michael: 32 GB de RAM, RTX 5060 Laptop de 8 GB), con `num_ctx` 12 288 porque las descripciones de las herramientas ocupan unos 6 000 tokens.
+- **Orquestador** (`src/main/core/ai/assistant.ts`):
+  - `send` vuelve en seguida y la respuesta llega por `ai:event`.
+  - Responde una vez a la vez por conversación y como mucho 6 pasos de herramientas.
+  - Recortes: resultados a 8 000 caracteres (los de turnos anteriores a 1 500), historial de 20 mensajes y búsquedas de movimientos de 50 como máximo.
+  - El prompt de sistema va en español, con la fecha de hoy, y no nombra la app.
+- **Herramientas** (40):
+  - Las registra cada módulo en `aiTools`, y el núcleo las suyas `core_*`. El registro valida nombres `<dueño>_<nombre>` únicos.
+  - Las de lectura reutilizan los servicios de siempre.
+  - Las de acción solo hacen `plan`. Al confirmar, `apply` llama a la misma función con la misma etiqueta de cola que el handler de la página, así que la validación y la auditoría son las de siempre y la lógica financiera no cambia.
+  - Aceptan nombres además de ids, y los importes en euros pasan a céntimos.
+- **Alcance de los cambios (decisión de Michael)**:
+  - Finanzas: movimientos (crear, editar, categoría, estado y borrar), presupuestos y objetivos.
+  - Entreno: sesiones manuales y sus datos, objetivos, eventos, plan de la semana y rutinas.
+  - Núcleo: crear gráficos.
+  - Nada de cuentas, categorías, inversiones, reglas, ajustes, fusiones, importaciones ni restaurar. Un test falla si aparece una acción nueva sin su caso.
+- **Propuestas**:
+  - Con criterio común y 3 o más cambios, se agrupan en una ventana con «Confirmar todo». Si no, van una a una. Hoy solo «recategorizar» da criterio.
+  - Huella (sha1 del registro) para caducar: si el registro cambió, la propuesta pasa a `stale` y no escribe nada.
+  - Un grupo se aplica en orden: si se para a mitad queda `partial`, y si falla el primero, `failed`.
+  - Se guardan en el mensaje del asistente (`proposals_json`).
+- **Sugerencias**:
+  - Las calcula la app y funcionan con Ollama apagado. Entreno usa la revisión semanal pura (`src/shared/modules/entreno/metrics/review.ts`) y Finanzas usa `computeAlerts`.
+  - La revisión mira la última semana completa: adherencia, estancamientos (fuerza o sin categoría; igualar cuenta como estancado), grupos por debajo de su mínimo (solo los que tienen series en las últimas N semanas), ritmo de objetivos, HYROX y récords. Como mucho 3 por tipo.
+  - Los cinco umbrales están en Ajustes › Entreno › Revisión semanal (`trn_settings`, sin migración).
+- **Tablas del núcleo**: `core_ai_threads` y `core_ai_messages` (1003), y `core_settings` (1004, claves `ai.*`). Los mensajes no se auditan; los ajustes sí.
+- **Interfaz**:
+  - `core/asistente/`: panel con estado de Ollama, conversaciones, respuesta en directo, propuestas sueltas y en grupo, y sugerencias con «Coméntalo».
+  - La tarjeta «Sugerencias» (`core.sugerencias`) se añade desde «Editar panel». No va al Inicio por defecto para no aparecer en los paneles ya guardados.
+  - Ajustes › Asistente sustituye a la sección MCP.
+  - El texto del asistente se pinta sin `dangerouslySetInnerHTML`.
+- **MCP eliminado**: `src/mcp/`, `scripts/build-mcp.mjs`, el script `mcp`, `@modelcontextprotocol/sdk`, `esbuild` (solo lo usaba el MCP), `out/mcp` del empaquetado y `finanzas:mcp.config`.
+- **Pendiente**: comprobar con el modelo real que `qwen3:8b` elige bien entre 40 herramientas. Si no, la opción es ofrecerle solo las del módulo de la pregunta.
+
 ## 4. Modelo de datos de Entreno
 
 La exportación de Hevy tiene una fila por serie con estas columnas: `title`, `start_time`, `end_time`, `description`, `exercise_title`, `superset_id`, `exercise_notes`, `set_index`, `set_type`, `weight_kg`, `reps`, `distance_km`, `duration_seconds`, `rpe`.
@@ -225,7 +262,7 @@ Las métricas son funciones puras en `src/shared/modules/entreno/` con tests, y 
 
 - Proveedor: Ollama en `http://localhost:11434`, llamado solo desde el proceso principal.
 - Interfaz `LlmProvider` intercambiable (chat, herramientas, streaming). Hoy solo existe `OllamaProvider`. Un futuro proveedor que haga de puente con Claude sería otro `LlmProvider`, sin tocar el resto.
-- Modelo configurable en Ajustes. Se elige uno con buen uso de herramientas que quepa en el equipo de Michael (pendiente de saber RAM y GPU).
+- Modelo configurable en Ajustes. Por defecto `qwen3:8b`, que usa bien las herramientas y cabe entero en la GPU del equipo de Michael (32 GB de RAM, RTX 5060 Laptop de 8 GB).
 - Herramientas de lectura: las métricas registradas por cada módulo y resúmenes (mes de finanzas, semana de entreno, progreso de objetivos).
 - Herramientas que proponen cambios (crear objetivo, ajustar una rutina, crear un gráfico): la IA **propone**, la interfaz lo muestra, Michael confirma y entonces se escribe a través de la cola.
 - Sugerencias: revisión semanal de entreno (estancamientos, grupos musculares por debajo de lo previsto, adherencia, ritmo hacia HYROX) y avisos de finanzas que ya calcula la app.
@@ -275,17 +312,20 @@ La sesión principal (orquestador) va con **Opus 5.5** (desde F2; en F0 y F1 fue
 
 ## 12. Pendiente de Michael
 
-- RAM y GPU del portátil, para elegir el modelo de Ollama.
-- Instalar Ollama antes de la fase F6.
+- Instalar Ollama y descargar el modelo (`ollama pull qwen3:8b`) para probar F6 en Windows.
 
-## 13. Estado (27/11/2026)
+## 13. Estado (28/11/2026)
 
-- **Hechas y en `main`**: F0 a F5. **Publicada la 0.6.0** (primera con Entreno, gráficos y paneles), que Michael ya usa con sus datos reales.
-- **Siguiente**: F6 IA local (§8 y fila F6 de §10), con el agente `ia-local` (opus · high). Antes de planificarla hay que preguntar a Michael la RAM y la GPU y si ya tiene Ollama instalado (§12).
-- **Qué hay para F6**:
-  - Métricas de los dos módulos registradas en el núcleo con su contrato (`src/shared/core/metrics-types.ts`, `core:metrics.list/compute/options`), listas para usarlas como herramientas de lectura.
-  - `entreno:metrics.next` responde a «¿qué me toca?».
-  - Los gráficos se crean con `core:charts.save` y una especificación validada, lo que sirve para la propuesta «crear un gráfico».
-  - El hueco del asistente ya está en el shell (F2) y el rango de migraciones del núcleo (1000–1999) va por la 1002.
-  - Hay que eliminar `src/mcp/`, `scripts/build-mcp.mjs`, el script `mcp` y el paso de `build` que lo compila, la regla de `tests/core/reglas.test.ts` que menciona el MCP congelado y sus entradas en `docs/NOMBRE_APP.md`.
-- **Después**: F7 cierre (1.0.0) y el parche de cambio de nombre.
+- **Hechas**:
+  - F0 a F5 en `main`. **Publicada la 0.6.0**, que Michael ya usa con sus datos reales.
+  - F6 IA local en la rama `evolucion/f6-ia-local`, pendiente de que Michael la pruebe en Windows con Ollama y haga el merge (§3.8).
+- **Siguiente: F7 cierre** (fila F7 de §10), con `tests` y `revisor`:
+  - prueba de extremo a extremo;
+  - revisión completa;
+  - README;
+  - versión 1.0.0 cuando Michael la pida.
+- **Qué hay para F7**:
+  - No hay tests de componentes en la interfaz. La prueba de extremo a extremo de F6 se hizo con un Ollama falso (un script de Node fuera del repo que imita `/api/tags` y `/api/chat` en NDJSON) y datos sintéticos con `FINANZAS_DATA_DIR`. Es un buen punto de partida para la de F7.
+  - Si el modelo real no elige bien entre las 40 herramientas, ver el pendiente de §3.8.
+  - Pendientes de fases anteriores: §3.6 y §3.7.
+- **Después**: el parche de cambio de nombre (`docs/NOMBRE_APP.md`).

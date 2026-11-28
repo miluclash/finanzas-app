@@ -35,7 +35,7 @@ Datos de prueba separados de los reales: `FINANZAS_DATA_DIR=<carpeta>` antes de 
 5. **Migraciones solo hacia delante**, una por cambio, nunca editar una migración ya publicada. Antes de aplicar migraciones, la app hace copia de seguridad automática.
 6. **Tablas nuevas con prefijo**: `trn_` (entreno), `core_` (núcleo compartido). Las tablas de finanzas no se renombran.
 7. **Privacidad**: el repo es público. Nada de datos reales, capturas con datos reales, `.env` ni archivos de Hevy en el repo. Las claves van en un `.env` fuera del repo (en la carpeta de datos), y `.env` está en `.gitignore`.
-8. **IA solo local** (Ollama en `localhost`). Ninguna llamada a APIs externas de IA. El servidor MCP actual (`src/mcp/`) está congelado: no se le añaden herramientas y se elimina en la fase de IA local.
+8. **IA solo local** (Ollama en `localhost`). Ninguna llamada a APIs externas de IA. El servidor MCP antiguo se eliminó en F6; el asistente local vive en `src/main/core/ai/` y solo `ollama.ts` habla por la red.
 9. **Todo lo configurable es editable desde la app**: catálogos, objetivos, planes, gráficos, parámetros de métricas.
 10. Interfaz y textos en **español de España**, tono cercano y claro.
 
@@ -67,6 +67,8 @@ La interfaz nunca toca la base de datos: pide datos al proceso principal por IPC
 - **Plan**: modo plan, explora con `explorador` (haiku · low) y pregunta a Michael solo lo que cambia el diseño. Michael suele **editar el plan y devolverlo al rechazar**: ese texto pasa a ser el plan aprobado, se guarda tal cual en el archivo de plan y no se reinterpreta.
 - **Contrato primero**: si dos agentes trabajan en paralelo sobre la misma frontera (tipos, IPC, componentes), el orquestador escribe y sube antes un archivo de tipos compartido (como `src/shared/core/metrics-types.ts` en F5) y los dos compilan contra él.
 - **Los agentes no hacen commits.** El orquestador revisa el diff, pasa `npm run typecheck`, `npm test` y los dorados, y hace un commit por etapa (`F<N> etapa 1A: …`), solo con los archivos de esa etapa si hay otro agente trabajando.
+  - Si otro agente tiene el árbol a medias, en F6 se verificó cada etapa en una worktree temporal de `HEAD` dentro del scratchpad, con solo los archivos de esa etapa y `node_modules` enlazado con una unión (`mklink /J`).
+  - Al acabar, se quita primero la unión (`rmdir`) y luego `git worktree remove --force`, para no borrar el `node_modules` real.
 - **Encargos a agentes**: autocontenidos (qué leer, qué archivos son suyos y cuáles no tocar, qué agentes trabajan a la vez, verificación e informe con extensión máxima). Para continuar o corregir, `SendMessage` al mismo agente, que conserva el contexto. Si un agente se corta por el límite de uso, se le reanuda con `SendMessage` cuando se restablece, sin empezar otro.
 - **Antes de cerrar**: `tests` cubre huecos (sin tocar producción), `revisor` revisa la rama entera, los arreglos los hace el agente dueño de cada parte, `registro-nombre` actualiza `docs/NOMBRE_APP.md`, y el orquestador escribe `docs/CHANGELOG.md` y la sección «Cómo quedó tras F<N>» de `docs/EVOLUCION.md`.
 - **PR**: `gh` no está instalado. Se sube la rama y se da a Michael el enlace `https://github.com/miluclash/finanzas-app/pull/new/<rama>` con título y texto listos.
